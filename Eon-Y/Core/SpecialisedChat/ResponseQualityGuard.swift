@@ -322,20 +322,26 @@ actor ResponseQualityGuard {
         case .greeting:
             return swedishBuilder.buildGreeting(emotionalTone: question.emotionalTone, isFollowUp: question.isFollowUp)
         case .selfReference:
-            return "Jag är Eon, ett kognitivt AI-system som körs på din iPhone. Vad vill du veta om mig?"
+            return "Jag är Eon, ett kognitivt AI-system som körs direkt på din iPhone. Jag har medvetandesimulering, eget minne och en ständigt växande kunskapsbas. Vad vill du veta mer om?"
         case .personal:
             return swedishBuilder.buildEmpatheticResponse(input: question.originalInput)
         case .factual, .definition:
             return swedishBuilder.buildUncertainResponse(topic: question.coreTopic)
+        case .explanation, .whyExplanation:
+            return "Gällande \(question.coreTopic) — jag har begränsad kunskap men kan resonera utifrån det jag vet. \(question.coreTopic.capitalized) är ett komplext ämne som berör flera aspekter. Vill du att jag försöker resonera djupare?"
+        case .comparison:
+            return "Jag har inte all data för att göra en fullständig jämförelse av \(question.coreTopic), men jag kan dela med mig av det jag vet och resonera kring skillnaderna."
+        case .howTo:
+            return "Jag har begränsad kunskap om exakt hur man gör det, men jag kan ge ett övergripande tillvägagångssätt baserat på vad jag vet om \(question.coreTopic)."
+        case .list:
+            return "Jag kan inte ge en komplett lista just nu, men här är vad jag vet om \(question.coreTopic)."
         default:
-            // v26: Substantive fallback responses — give actual content, not deflections
             let fallbacks = [
-                "\(question.coreTopic.capitalized) är ett ämne jag har begränsad kunskap om just nu. Min förståelse utvecklas fortfarande.",
-                "Jag vet inte tillräckligt om \(question.coreTopic) för att ge ett komplett svar. Jag vill vara ärlig om det.",
-                "Min kunskap om \(question.coreTopic) är begränsad. Jag kan resonera kring det, men vill inte ge felaktig information.",
-                "Gällande \(question.coreTopic) — jag har inte tillräcklig information för att ge ett bra svar just nu.",
+                "Gällande \(question.coreTopic) — min kunskap är begränsad men jag kan resonera kring det jag vet. Vill du att jag försöker?",
+                "\(question.coreTopic.capitalized) är ett intressant ämne. Min förståelse utvecklas fortfarande, men jag delar gärna det jag vet.",
+                "Jag har inte full kunskap om \(question.coreTopic), men jag kan ge mitt bästa resonemang baserat på det jag lärt mig.",
             ]
-            return fallbacks.randomElement() ?? "Jag har inte tillräcklig kunskap för att svara på det just nu."
+            return fallbacks.randomElement() ?? "Min kunskap om \(question.coreTopic) är begränsad. Jag vill vara ärlig om det."
         }
     }
 }

@@ -161,56 +161,57 @@ actor ResponseComposer {
         thinkingResults: [ThinkingPath]
     ) -> String {
         var parts: [String] = []
-        var charBudget = 1400  // ~550 tokens ≈ 1400 tecken (increased for richer context)
+        var charBudget = 1800  // ~700 tokens ≈ 1800 tecken (generous budget for rich context)
 
-        // 1. Systeminstruktion (kort)
-        let sysInstruction = "Du är Eon, kunnig AI. Ge FAKTISKA svar med konkret information. Eka ALDRIG frågan. Börja direkt med innehåll."
+        // 1. Systeminstruktion (rikare, mer specifik)
+        let sysInstruction = "Du är Eon, ett intelligent AI-system med djup kunskap. Svara DIREKT med fakta och substans. ALDRIG eka frågan. ALDRIG börja med 'Bra fråga'. Ge konkreta detaljer, siffror, namn. Var personlig och engagerande."
         parts.append(sysInstruction)
         charBudget -= sysInstruction.count
 
-        // 2. Strategiinstruktioner (bara viktigaste)
-        if let firstInstruction = strategy.instructions.first, charBudget > 100 {
-            let instr = String(firstInstruction.prefix(min(100, charBudget - 20)))
-            parts.append(instr)
-            charBudget -= instr.count
+        // 2. Strategiinstruktioner (upp till 2)
+        for instr in strategy.instructions.prefix(2) where charBudget > 80 {
+            let trimmed = String(instr.prefix(min(120, charBudget - 10)))
+            parts.append(trimmed)
+            charBudget -= trimmed.count
         }
 
-        // 3. Självkunskap (om relevant)
+        // 3. Konversationskontext (viktigare att ha tidigt)
+        if question.isFollowUp && !conversationContext.currentTopic.isEmpty, charBudget > 40 {
+            let recentTopics = conversationContext.recentTopics.prefix(3).joined(separator: ", ")
+            let ctx = "Sammanhang: \(conversationContext.currentTopic). Senaste ämnen: \(recentTopics). \(conversationContext.conversationSummary.prefix(80))"
+            let trimCtx = String(ctx.prefix(min(180, charBudget - 5)))
+            parts.append(trimCtx)
+            charBudget -= trimCtx.count
+        }
+
+        // 4. Självkunskap (om relevant)
         if selfKnowledge.isRelevant, charBudget > 100 {
-            let selfText = selfKnowledge.relevantFacts.prefix(2)
-                .joined(separator: " ")
-                .prefix(min(200, charBudget - 20))
+            let selfFacts = selfKnowledge.relevantFacts.prefix(3).joined(separator: " ")
+            let selfText = String(selfFacts.prefix(min(250, charBudget - 20)))
             parts.append("[Om mig] \(selfText)")
             charBudget -= selfText.count + 10
 
             if !selfKnowledge.currentState.isEmpty, charBudget > 50 {
-                let state = String(selfKnowledge.currentState.prefix(min(100, charBudget - 10)))
+                let state = String(selfKnowledge.currentState.prefix(min(120, charBudget - 10)))
                 parts.append("[Tillstånd] \(state)")
                 charBudget -= state.count + 12
             }
         }
 
-        // 4. Kunskap (om tillgänglig)
+        // 5. Kunskap (om tillgänglig — ge mer kontext)
         if strategy.useKnowledge && knowledge.hasStrongKnowledge, charBudget > 80 {
-            let context = knowledge.bestContextForPrompt(maxChars: min(250, charBudget - 20))
+            let context = knowledge.bestContextForPrompt(maxChars: min(400, charBudget - 20))
             if !context.isEmpty {
-                parts.append("[Fakta] \(context)")
-                charBudget -= context.count + 8
+                parts.append("[Kunskap] \(context)")
+                charBudget -= context.count + 12
             }
         }
 
-        // 5. Bästa tänkande-resultat
-        if let best = thinkingResults.first, best.confidence > 0.4, charBudget > 60 {
-            let thought = String(best.conclusion.prefix(min(80, charBudget - 15)))
-            parts.append("[Analys] \(thought)")
-            charBudget -= thought.count + 10
-        }
-
-        // 6. Konversationskontext (om uppföljning)
-        if question.isFollowUp && !conversationContext.currentTopic.isEmpty, charBudget > 40 {
-            let ctx = "Senaste ämne: \(conversationContext.currentTopic)"
-            parts.append(ctx)
-            charBudget -= ctx.count
+        // 6. Alla relevanta tänkande-resultat
+        for path in thinkingResults.prefix(2) where path.confidence > 0.35 && charBudget > 60 {
+            let thought = String(path.conclusion.prefix(min(100, charBudget - 15)))
+            parts.append("[Resonemang: \(path.approach.rawValue)] \(thought)")
+            charBudget -= thought.count + 20
         }
 
         // 7. Frågan sist (viktigast — syns alltid närmast generering)
@@ -232,7 +233,7 @@ actor ResponseComposer {
     ) -> String {
         var parts: [String] = []
 
-        parts.append("Du är Eon, ett djuptänkande AI-system. Ge ett utförligt och genomtänkt svar.")
+        parts.append("Du är Eon, ett djuptänkande AI-system med medvetandesimulering. Ge ett utförligt, genomtänkt och faktabaserat svar. Nämn konkreta detaljer, siffror, namn. Strukturera med tydliga avsnitt.")
 
         // Instruktioner
         for instr in strategy.instructions.prefix(3) {

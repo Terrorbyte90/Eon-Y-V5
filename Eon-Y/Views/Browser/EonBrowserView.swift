@@ -408,6 +408,7 @@ struct EonBrowserView: View {
         VStack(spacing: 16) {
             goalHeader
             goalModePicker
+            humanBehaviorToggle
             if agent.mode == .article { articleDomainPicker }
             goalTextInput
             goalStartButton
@@ -457,11 +458,18 @@ struct EonBrowserView: View {
 
     private func goalModeButton(_ m: BrowseMode) -> some View {
         let isSelected = agent.mode == m
+        let icon: String = {
+            switch m {
+            case .research: return "magnifyingglass"
+            case .article: return "doc.text.fill"
+            case .action: return "hand.tap.fill"
+            }
+        }()
         return Button {
             withAnimation(.spring(response: 0.3)) { agent.mode = m }
         } label: {
             HStack(spacing: 5) {
-                Image(systemName: m == .research ? "magnifyingglass" : "doc.text.fill")
+                Image(systemName: icon)
                     .font(.system(size: 11))
                 Text(m.rawValue)
                     .font(.system(size: 12, weight: isSelected ? .semibold : .regular, design: .rounded))
@@ -476,10 +484,34 @@ struct EonBrowserView: View {
         }
     }
 
+    private var humanBehaviorToggle: some View {
+        Button {
+            withAnimation(.spring(response: 0.3)) { agent.humanBehavior.toggle() }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: agent.humanBehavior ? "figure.walk" : "bolt.fill")
+                    .font(.system(size: 11))
+                Text(agent.humanBehavior ? "Mänskligt beteende" : "Snabb robot")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+            }
+            .foregroundStyle(agent.humanBehavior ? Color(hex: "#34D399") : .white.opacity(0.4))
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            .background(
+                Capsule()
+                    .fill(agent.humanBehavior ? Color(hex: "#34D399").opacity(0.12) : Color.white.opacity(0.04))
+                    .overlay(Capsule().strokeBorder(agent.humanBehavior ? Color(hex: "#34D399").opacity(0.3) : Color.white.opacity(0.06), lineWidth: 0.6))
+            )
+        }
+    }
+
     private var goalTextInput: some View {
-        let placeholder = agent.mode == .research
-            ? "T.ex. \"Hitta bästa gaming PC för billigast peng\""
-            : "T.ex. \"Undersök självmedvetenhet hos AI-system\""
+        let placeholder: String = {
+            switch agent.mode {
+            case .research: return "T.ex. \"Hitta bästa gaming PC för billigast peng\""
+            case .article: return "T.ex. \"Undersök självmedvetenhet hos AI-system\""
+            case .action: return "T.ex. \"Logga in på X och skapa ett inlägg\" eller \"Hitta billigaste flyget till Spanien\""
+            }
+        }()
         return ZStack(alignment: .topLeading) {
             if agent.goal.isEmpty {
                 Text(placeholder)
@@ -507,7 +539,13 @@ struct EonBrowserView: View {
 
     private var goalStartButton: some View {
         let isEmpty = agent.goal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let label = agent.mode == .research ? "Starta forskning" : "Skapa artikel"
+        let label: String = {
+            switch agent.mode {
+            case .research: return "Starta forskning"
+            case .article: return "Skapa artikel"
+            case .action: return "Utför uppgift"
+            }
+        }()
         return Button {
             showGoalSheet = false
             agent.startBrowsing()
@@ -678,6 +716,8 @@ struct EonBrowserView: View {
         case .reading:    return Color(hex: "#34D399")
         case .extracting: return Color(hex: "#FBBF24")
         case .writing:    return Color(hex: "#F472B6")
+        case .acting:     return Color(hex: "#F59E0B")
+        case .waiting:    return Color(hex: "#8B5CF6")
         case .done:       return Color(hex: "#34D399")
         case .error:      return Color(hex: "#EF4444")
         }
@@ -854,6 +894,9 @@ struct WebViewContainer: UIViewRepresentable {
 
         let helpersScript = WKUserScript(source: Self.browserHelpersJS, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         contentController.addUserScript(helpersScript)
+
+        let formScript = WKUserScript(source: Self.formInteractionJS, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        contentController.addUserScript(formScript)
 
         config.userContentController = contentController
 
@@ -1287,6 +1330,152 @@ struct WebViewContainer: UIViewRepresentable {
         return JSON.stringify(results);
     };
     """
+
+    // MARK: - Form Interaction & Human Behavior JS Helpers
+
+    static let formInteractionJS = """
+    // Smart form field finder - finds input by multiple strategies
+    window.eonFindInput = function(hint) {
+        hint = hint.toLowerCase();
+        // Strategy 1: Direct selector
+        var el = document.querySelector(hint);
+        if (el) return el;
+
+        // Strategy 2: By name, id, placeholder, aria-label, type
+        var inputs = document.querySelectorAll('input, textarea, select');
+        for (var i = 0; i < inputs.length; i++) {
+            var inp = inputs[i];
+            var name = (inp.name || '').toLowerCase();
+            var id = (inp.id || '').toLowerCase();
+            var placeholder = (inp.placeholder || '').toLowerCase();
+            var ariaLabel = (inp.getAttribute('aria-label') || '').toLowerCase();
+            var type = (inp.type || '').toLowerCase();
+            var label = '';
+            // Check associated label
+            if (inp.id) {
+                var labelEl = document.querySelector('label[for="' + inp.id + '"]');
+                if (labelEl) label = (labelEl.innerText || '').toLowerCase();
+            }
+            if (name.indexOf(hint) >= 0 || id.indexOf(hint) >= 0 ||
+                placeholder.indexOf(hint) >= 0 || ariaLabel.indexOf(hint) >= 0 ||
+                label.indexOf(hint) >= 0 || type === hint) {
+                return inp;
+            }
+        }
+
+        // Strategy 3: Fuzzy match on nearby text
+        var allLabels = document.querySelectorAll('label');
+        for (var l = 0; l < allLabels.length; l++) {
+            if ((allLabels[l].innerText || '').toLowerCase().indexOf(hint) >= 0) {
+                var forAttr = allLabels[l].getAttribute('for');
+                if (forAttr) {
+                    var target = document.getElementById(forAttr);
+                    if (target) return target;
+                }
+                // Try next sibling or child input
+                var nextInput = allLabels[l].querySelector('input, textarea, select') ||
+                                allLabels[l].nextElementSibling;
+                if (nextInput && (nextInput.tagName === 'INPUT' || nextInput.tagName === 'TEXTAREA' || nextInput.tagName === 'SELECT')) {
+                    return nextInput;
+                }
+            }
+        }
+        return null;
+    };
+
+    // Simulate realistic mouse movement to element
+    window.eonMoveToElement = function(el) {
+        if (!el) return;
+        var rect = el.getBoundingClientRect();
+        var x = rect.left + rect.width / 2 + (Math.random() * 10 - 5);
+        var y = rect.top + rect.height / 2 + (Math.random() * 6 - 3);
+        el.dispatchEvent(new MouseEvent('mouseover', {clientX: x, clientY: y, bubbles: true}));
+        el.dispatchEvent(new MouseEvent('mousemove', {clientX: x, clientY: y, bubbles: true}));
+    };
+
+    // Get page form analysis for action planning
+    window.eonAnalyzeForms = function() {
+        var forms = [];
+        var allForms = document.querySelectorAll('form');
+        for (var f = 0; f < Math.min(allForms.length, 5); f++) {
+            var form = allForms[f];
+            var fields = [];
+            var inputs = form.querySelectorAll('input, textarea, select');
+            for (var i = 0; i < inputs.length; i++) {
+                var inp = inputs[i];
+                if (inp.type === 'hidden') continue;
+                fields.push({
+                    tag: inp.tagName.toLowerCase(),
+                    type: inp.type || 'text',
+                    name: inp.name || '',
+                    id: inp.id || '',
+                    placeholder: inp.placeholder || '',
+                    required: inp.required,
+                    ariaLabel: inp.getAttribute('aria-label') || ''
+                });
+            }
+            var submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
+            forms.push({
+                action: form.action || '',
+                method: form.method || 'get',
+                fields: fields,
+                submitText: submitBtn ? (submitBtn.innerText || submitBtn.value || 'Submit') : ''
+            });
+        }
+        return JSON.stringify(forms);
+    };
+
+    // Detect if page has login form
+    window.eonHasLoginForm = function() {
+        var passwordInputs = document.querySelectorAll('input[type="password"]');
+        return passwordInputs.length > 0 ? 'true' : 'false';
+    };
+
+    // Get all interactive elements on page
+    window.eonGetInteractiveElements = function() {
+        var elements = [];
+        var clickable = document.querySelectorAll('button, a[href], input[type="submit"], [role="button"], [onclick]');
+        for (var i = 0; i < Math.min(clickable.length, 30); i++) {
+            var el = clickable[i];
+            if (el.offsetParent === null) continue; // Skip hidden
+            var text = (el.innerText || el.value || el.getAttribute('aria-label') || '').trim();
+            if (text.length > 0 && text.length < 100) {
+                var rect = el.getBoundingClientRect();
+                elements.push({
+                    text: text.substring(0, 60),
+                    tag: el.tagName.toLowerCase(),
+                    type: el.type || '',
+                    x: Math.round(rect.left),
+                    y: Math.round(rect.top),
+                    visible: rect.top >= 0 && rect.top < window.innerHeight
+                });
+            }
+        }
+        return JSON.stringify(elements);
+    };
+
+    // Simulate realistic scrolling behavior
+    window.eonHumanScroll = function(amount) {
+        var start = window.scrollY;
+        var target = start + amount;
+        var duration = 500 + Math.random() * 500;
+        var startTime = performance.now();
+
+        function easeInOutCubic(t) {
+            return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        }
+
+        function step(currentTime) {
+            var elapsed = currentTime - startTime;
+            var progress = Math.min(elapsed / duration, 1);
+            window.scrollTo(0, start + (target - start) * easeInOutCubic(progress));
+            if (progress < 1) requestAnimationFrame(step);
+        }
+
+        requestAnimationFrame(step);
+        return 'done';
+    };
+    """;
 
     // MARK: - Cookie Banner Dismissal
 
