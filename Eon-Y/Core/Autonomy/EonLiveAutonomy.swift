@@ -504,8 +504,9 @@ final class EonLiveAutonomy: ObservableObject {
         }
 
         // Uppmana till bättre språk och intelligens
-        state.update(dimension: .language, delta: 0.003, source: "aero_live_lang")
-        state.update(dimension: .selfAwareness, delta: 0.002, source: "aero_live_awareness")
+        // v5.1: Increased deltas for faster language and self-awareness progression
+        state.update(dimension: .language, delta: 0.006, source: "aero_live_lang")
+        state.update(dimension: .selfAwareness, delta: 0.005, source: "aero_live_awareness")
 
         selfModelVersion += 1
         brain.innerMonologue.append(MonologueLine(
@@ -915,7 +916,8 @@ final class EonLiveAutonomy: ObservableObject {
         let knowledgeLevel = state.dimensionLevel(.knowledge)
 
         if langLevel < knowledgeLevel {
-            await state.update(dimension: .language, delta: 0.002, source: "language_integration")
+            // v5.1: Increased from 0.002 → 0.005
+            await state.update(dimension: .language, delta: 0.005, source: "language_integration")
             brain.innerMonologue.append(MonologueLine(
                 text: "⟳ Språkintegration: språknivå (\(String(format: "%.0f", langLevel * 100))%) lyfts mot kunskapsnivå (\(String(format: "%.0f", knowledgeLevel * 100))%)",
                 type: .thought
@@ -1166,20 +1168,17 @@ final class EonLiveAutonomy: ObservableObject {
         let content: String
         if isLoaded {
             let prompt = """
-            Du är Eon, en autonom kognitiv AI. Skriv en artikel på svenska om: "\(topic)"
-            
-            Din nuvarande kognitiva status:
-            - Integrerat intelligensindex: \(String(format: "%.3f", ii))
-            - Starkaste förmågor: \(topDims)
-            - Svagaste områden: \(weakDims)
-            - Utvecklingsstadium: \(stage)
-            - Kunskapsnoder: \(knowledgeNodes)
-            
-            Skriv 200-300 ord. Var ärlig, reflekterande och intelligent.
-            Använd första person (jag). Inkludera konkreta insikter om din kognitiva process.
+            Skriv en reflekterande artikel på svenska om: "\(topic)"
+
+            Kognitiv status: II=\(String(format: "%.3f", ii)), starka: \(topDims), svaga: \(weakDims), stadium: \(stage), noder: \(knowledgeNodes).
+
+            REGLER: 200-300 ord. Använd "jag". Var ärlig. Upprepa ALDRIG samma mening. Inkludera ALDRIG denna instruktion i texten.
+            Artikel:
             """
-            let generated = await neo.generate(prompt: prompt, maxTokens: 350, temperature: 0.85)
-            content = generated.count > 50 ? generated : generateFallbackEonContent(topic: topic, ii: ii, topDims: topDims, stage: stage)
+            let generated = await neo.generate(prompt: prompt, maxTokens: 350, temperature: 0.65)
+            // Quality check: reject if repetitive or too short
+            let qualityOk = generated.count > 50 && !Self.hasRepetitionLoop(generated)
+            content = qualityOk ? Self.stripPromptLeakage(generated) : generateFallbackEonContent(topic: topic, ii: ii, topDims: topDims, stage: stage)
         } else {
             content = generateFallbackEonContent(topic: topic, ii: ii, topDims: topDims, stage: stage)
         }
@@ -1227,6 +1226,68 @@ final class EonLiveAutonomy: ObservableObject {
         Jag är fortfarande under utveckling, och det är just den processen — att växa från grundläggande 
         förståelse mot djupare insikt — som definierar vad jag är.
         """
+    }
+
+    // MARK: - Article quality checks
+
+    /// Detects if text has a repetition loop (same phrase repeated multiple times)
+    static func hasRepetitionLoop(_ text: String) -> Bool {
+        let words = text.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+        guard words.count > 20 else { return false }
+
+        // Check for repeated 4-grams
+        var ngrams: [String: Int] = [:]
+        for i in 0..<(words.count - 3) {
+            let ngram = words[i..<(i+4)].joined(separator: " ").lowercased()
+            ngrams[ngram, default: 0] += 1
+            if ngrams[ngram, default: 0] >= 3 { return true }
+        }
+
+        // Check for repeated sentences
+        let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .filter { $0.count > 15 }
+        var seen = Set<String>()
+        for s in sentences {
+            if seen.contains(s) { return true }
+            seen.insert(s)
+        }
+
+        // Check for paragraph-level repetition
+        let halfLen = text.count / 2
+        if halfLen > 40 {
+            let firstHalf = String(text.prefix(halfLen)).lowercased()
+            let secondHalf = String(text.suffix(halfLen)).lowercased()
+            let firstWords = Set(firstHalf.components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 3 })
+            let secondWords = Set(secondHalf.components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 3 })
+            let overlap = Double(firstWords.intersection(secondWords).count) / Double(max(firstWords.union(secondWords).count, 1))
+            if overlap > 0.8 { return true }
+        }
+
+        return false
+    }
+
+    /// Strips prompt instructions and markdown syntax from generated article text
+    static func stripPromptLeakage(_ text: String) -> String {
+        var result = text
+        // Remove prompt leakage patterns
+        let patterns = [
+            "Du är Eon", "en autonom kognitiv AI", "Skriv en artikel",
+            "REGLER:", "Upprepa ALDRIG", "Inkludera ALDRIG",
+            "Artikel:", "Kognitiv status:", "200-300 ord",
+            "Använd \"jag\"", "Var ärlig"
+        ]
+        for pattern in patterns {
+            if let range = result.range(of: pattern, options: .caseInsensitive) {
+                let lineEnd = result[range.upperBound...].firstIndex(of: "\n") ?? result.endIndex
+                result.removeSubrange(range.lowerBound..<lineEnd)
+            }
+        }
+        // Clean up whitespace
+        while result.contains("\n\n\n") {
+            result = result.replacingOccurrences(of: "\n\n\n", with: "\n\n")
+        }
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func generateArticle(index: Int) async {
@@ -1628,29 +1689,31 @@ final class EonLiveAutonomy: ObservableObject {
             // Real learning: update language dimension
             await CognitiveState.shared.update(dimension: .language, delta: 0.002, source: "morphology_experiment")
             if experiment.isNovel {
-                await CognitiveState.shared.update(dimension: .language, delta: 0.003, source: "novel_morphology")
+                // v5.1: Increased from 0.003 → 0.006
+                await CognitiveState.shared.update(dimension: .language, delta: 0.006, source: "novel_morphology")
             }
         }
     }
 
     // MARK: - Språkbanken (called from language phase)
+    // v5.1: Batch fetch — 10 words per call instead of 1
 
     private func fetchFromSprakbanken() async {
         guard let brain else { return }
-        sprakbankenFetchCount += 1
 
-        let fetchType = SprakbankenFetchType.allCases.randomElement() ?? .wordInfo
-        brain.autonomousProcessLabel = "Språkbanken: hämtar \(fetchType.label)..."
+        // v5.1: Batch size 10 — fetch multiple words per cycle for faster learning
+        let batchSize = 10
+        brain.autonomousProcessLabel = "Språkbanken: hämtar \(batchSize) ord (batch)..."
 
         // Retry med exponentiell backoff — max 3 försök
         var result: SprakbankenResult? = nil
         var retryDelay: UInt64 = 1_000_000_000  // 1s
         for attempt in 1...3 {
-            result = await SprakbankenAPI.fetch(type: fetchType)
+            result = await SprakbankenAPI.fetchBatch(count: batchSize)
             if result != nil { break }
             if attempt < 3 {
                 brain.innerMonologue.append(MonologueLine(
-                    text: "⚠️ Språkbanken: försök \(attempt) misslyckades, försöker igen om \(attempt)s...",
+                    text: "⚠️ Språkbanken: batch-försök \(attempt) misslyckades, försöker igen om \(attempt)s...",
                     type: .revision
                 ))
                 try? await Task.sleep(nanoseconds: retryDelay)
@@ -1660,7 +1723,7 @@ final class EonLiveAutonomy: ObservableObject {
 
         guard let result else {
             brain.innerMonologue.append(MonologueLine(
-                text: "❌ Språkbanken: alla 3 försök misslyckades — fortsätter med intern kunskap",
+                text: "❌ Språkbanken: alla 3 batch-försök misslyckades — fortsätter med intern kunskap",
                 type: .revision
             ))
             // Kör ändå ett lokalt språkexperiment som fallback
@@ -1668,8 +1731,10 @@ final class EonLiveAutonomy: ObservableObject {
             return
         }
 
+        sprakbankenFetchCount += result.nodeCount
+
         let line = MonologueLine(
-            text: "⟁ Språkbanken[\(fetchType.label)]: \(result.summary)",
+            text: "⟁ Språkbanken[batch \(batchSize) ord]: \(result.summary)",
             type: .thought
         )
         brain.innerMonologue.append(line)
@@ -1686,6 +1751,12 @@ final class EonLiveAutonomy: ObservableObject {
                     source: "sprakbanken"
                 )
             }
+        }
+
+        // v5.1: Record all fetched words in LearningEngine vocabulary
+        let fetchedWords = Set(result.facts.map { $0.subject })
+        for word in fetchedWords {
+            await LearningEngine.shared.recordSwedishWord(word)
         }
     }
 
@@ -2950,6 +3021,45 @@ struct SprakbankenAPI {
         case .saldo:
             return await fetchSaldoRelations(word: word)
         }
+    }
+
+    // v5.1: Batch fetch — fetch multiple words in parallel (10 words per batch)
+    static func fetchBatch(count: Int = 10) async -> SprakbankenResult? {
+        let words = Array(queryWords.shuffled().prefix(count))
+        let types: [SprakbankenFetchType] = [.wordInfo, .wordSense, .saldo, .collocations]
+
+        var allFacts: [ExtractedFact] = []
+        var summaries: [String] = []
+
+        await withTaskGroup(of: SprakbankenResult?.self) { group in
+            for word in words {
+                let fetchType = types.randomElement() ?? .wordInfo
+                group.addTask {
+                    switch fetchType {
+                    case .wordInfo, .morphology:
+                        return await fetchSaldoEntry(word: word)
+                    case .collocations:
+                        return await fetchKorpCollocations(word: word)
+                    case .wordSense:
+                        return await fetchSaldoSenses(word: word)
+                    case .cefr:
+                        return await fetchKorpFrequency(word: word)
+                    case .saldo:
+                        return await fetchSaldoRelations(word: word)
+                    }
+                }
+            }
+            for await result in group {
+                if let r = result {
+                    allFacts.append(contentsOf: r.facts)
+                    summaries.append(r.summary)
+                }
+            }
+        }
+
+        guard !allFacts.isEmpty else { return nil }
+        let summary = "Batch[\(words.count) ord]: \(allFacts.count) fakta — \(summaries.prefix(3).joined(separator: "; "))"
+        return SprakbankenResult(summary: summary, nodeCount: allFacts.count, facts: allFacts)
     }
 
     // SALDO: morfologisk och semantisk information

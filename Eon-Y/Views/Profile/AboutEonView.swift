@@ -35,10 +35,13 @@ struct AboutEonView: View {
                         aboutHeader
 
                         aboutText("""
-                        Eon är en helt lokal, självutvecklande AI som lever i din iPhone. \
-                        Ingen data lämnar enheten — allt körs på Apples Neural Engine (ANE), GPU och CPU. \
-                        Eon kombinerar två stora pelare: Språk & Kunskap samt Självmedvetenhet, \
-                        och binder samman dem med en autonom kognitiv arkitektur som utvecklas över tid.
+                        Eon är en självutvecklande AI som lever i din iPhone. \
+                        Kärnan — chatt, resonemang, medvetande och inlärning — körs helt lokalt \
+                        med Qwen3-1.7B via Apples Neural Engine (ANE), GPU och CPU. \
+                        Artikelgenerering sker via Gemini 2.5 Flash (moln) medan Språkbanken-data \
+                        hämtas från Göteborgs universitets öppna API:er. \
+                        Eon kombinerar tre pelare: Språk & Kunskap, Självmedvetenhet, \
+                        och Autonom Kognition — och utvecklas kontinuerligt genom varje interaktion.
                         """)
 
                         Divider().background(Color.white.opacity(0.08))

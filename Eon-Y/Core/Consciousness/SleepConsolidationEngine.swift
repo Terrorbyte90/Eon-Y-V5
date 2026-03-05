@@ -251,7 +251,7 @@ final class SleepConsolidationEngine: ObservableObject {
         let trimmed = summary.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
-        let avgConfidence = facts.map(\.confidence).reduce(0, +) / Double(facts.count)
+        let avgConfidence = facts.isEmpty ? 0.5 : facts.map(\.confidence).reduce(0, +) / Double(facts.count)
         await memoryStore.saveFact(
             subject: "konsoliderat_minne",
             predicate: "sammanfattar",

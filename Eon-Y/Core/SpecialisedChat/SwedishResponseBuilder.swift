@@ -92,7 +92,7 @@ final class SwedishResponseBuilder: Sendable {
             return fact
         }
 
-        return "\(starters[0]) \(fact.lowercased())"
+        return "\(starters.first ?? "\(topic.capitalized) är") \(fact.lowercased())"
     }
 
     // MARK: - Faktastart (för hybrid-generering)
@@ -282,7 +282,7 @@ final class SwedishResponseBuilder: Sendable {
 
         for sentence in sentences.dropFirst() {
             // Varannan mening: direkt, varannan med övergång
-            if transitionIndex % 2 == 1 && transitionIndex < transitions.count {
+            if transitionIndex % 2 == 1 && transitionIndex / 2 < transitions.count {
                 let t = transitions[transitionIndex / 2]
                 let cleaned = sentence.hasPrefix(sentence.prefix(1).uppercased())
                     ? sentence.prefix(1).lowercased() + sentence.dropFirst()

@@ -506,7 +506,10 @@ struct ProjectView: View {
     ]
     @State private var showNewProjectSheet = false
     @State private var newProjectName = ""
+    @State private var newProjectType: ProjectType = .standard
     @State private var expandedProject: UUID? = nil
+    @State private var projectToDelete: ProjectFolder? = nil
+    @State private var showDeleteConfirmation = false
     @State private var eonAnalyzing: UUID? = nil
     @State private var eonAnalysisResult: String? = nil
 
@@ -537,18 +540,51 @@ struct ProjectView: View {
             }
             .alert("Nytt projekt", isPresented: $showNewProjectSheet) {
                 TextField("Projektnamn", text: $newProjectName)
-                Button("Skapa") {
-                    if !newProjectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        projects.append(ProjectFolder(name: newProjectName, icon: "folder.fill", color: "#14B8A6", documents: []))
-                        newProjectName = ""
+                ForEach(ProjectType.allCases) { type in
+                    Button(type == newProjectType ? "● \(type.rawValue)" : type.rawValue) {
+                        newProjectType = type
                     }
                 }
-                Button("Avbryt", role: .cancel) { newProjectName = "" }
+                Button("Skapa") {
+                    if !newProjectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        projects.append(ProjectFolder(
+                            name: newProjectName,
+                            icon: newProjectType.icon,
+                            color: newProjectType.color,
+                            documents: [],
+                            projectType: newProjectType
+                        ))
+                        newProjectName = ""
+                        newProjectType = .standard
+                    }
+                }
+                Button("Avbryt", role: .cancel) { newProjectName = ""; newProjectType = .standard }
+            } message: {
+                Text("Välj projekttyp genom att klicka på den, sedan ange namn och klicka Skapa.")
+            }
+            .alert("Ta bort projekt?", isPresented: $showDeleteConfirmation) {
+                Button("Ta bort", role: .destructive) {
+                    if let toDelete = projectToDelete {
+                        projects.removeAll { $0.id == toDelete.id }
+                    }
+                    projectToDelete = nil
+                }
+                Button("Avbryt", role: .cancel) { projectToDelete = nil }
+            } message: {
+                Text("Vill du verkligen ta bort \"\(projectToDelete?.name ?? "")\" och alla dess dokument?")
             }
 
             // Project folders
             ForEach($projects) { $project in
                 projectFolderCard(project: $project)
+                    .contextMenu {
+                        Button {
+                            projectToDelete = project.wrappedValue
+                            showDeleteConfirmation = true
+                        } label: {
+                            Label("Ta bort projekt", systemImage: "trash")
+                        }
+                    }
             }
 
             if projects.isEmpty {
@@ -593,9 +629,20 @@ struct ProjectView: View {
                             Text(project.wrappedValue.name)
                                 .font(.system(size: 15, weight: .semibold, design: .rounded))
                                 .foregroundStyle(.white.opacity(0.9))
-                            Text("\(project.wrappedValue.documents.count) dokument")
-                                .font(.system(size: 10, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.35))
+                            HStack(spacing: 6) {
+                                if project.wrappedValue.projectType != .standard {
+                                    Text(project.wrappedValue.projectType.rawValue)
+                                        .font(.system(size: 9, weight: .medium, design: .rounded))
+                                        .foregroundStyle(folderColor.opacity(0.7))
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 1)
+                                        .background(folderColor.opacity(0.1))
+                                        .clipShape(Capsule())
+                                }
+                                Text("\(project.wrappedValue.documents.count) dokument")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(.white.opacity(0.35))
+                            }
                         }
 
                         Spacer()
@@ -774,12 +821,49 @@ enum MCRecommendation {
     }
 }
 
+enum ProjectType: String, CaseIterable, Identifiable {
+    case standard = "Standard"
+    case djupanalys = "Djupanalys"
+    case autonomResearcher = "Autonom Researcher"
+    case kreativStudio = "Kreativ Studio"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .standard: return "folder.fill"
+        case .djupanalys: return "magnifyingglass.circle.fill"
+        case .autonomResearcher: return "globe.desk.fill"
+        case .kreativStudio: return "paintpalette.fill"
+        }
+    }
+
+    var color: String {
+        switch self {
+        case .standard: return "#14B8A6"
+        case .djupanalys: return "#7C3AED"
+        case .autonomResearcher: return "#2563EB"
+        case .kreativStudio: return "#F59E0B"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .standard: return "Generellt projekt med dokument"
+        case .djupanalys: return "Djupgående analys av komplexa ämnen"
+        case .autonomResearcher: return "Autonom kunskapsinhämtning och forskning"
+        case .kreativStudio: return "Kreativt skapande och idégenerering"
+        }
+    }
+}
+
 struct ProjectFolder: Identifiable {
     let id = UUID()
     var name: String
     var icon: String
     var color: String
     var documents: [ProjectDocument]
+    var projectType: ProjectType = .standard
 }
 
 struct ProjectDocument: Identifiable {

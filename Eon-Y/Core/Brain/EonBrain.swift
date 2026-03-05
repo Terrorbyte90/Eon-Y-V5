@@ -916,18 +916,19 @@ enum DevelopmentalStage: String {
 
     // Mappar integrerat intelligensindex → developmentalStage
     // Synkroniserat med hemvyns 14-nivå-system
+    // v5.1: Lowered thresholds for faster stage progression
     static func fromIntelligence(_ ii: Double) -> DevelopmentalStage {
         switch ii {
-        case ..<0.44: return .toddler
-        case 0.44..<0.60: return .child
-        case 0.60..<0.76: return .adolescent
+        case ..<0.38: return .toddler
+        case 0.38..<0.52: return .child
+        case 0.52..<0.68: return .adolescent
         default: return .mature
         }
     }
 
     // Progress (0..1) mot nästa stage
     static func progressToNext(_ ii: Double) -> Double {
-        let thresholds: [Double] = [0.0, 0.44, 0.60, 0.76, 1.0]
+        let thresholds: [Double] = [0.0, 0.38, 0.52, 0.68, 1.0]
         for i in 0..<thresholds.count - 1 {
             if ii < thresholds[i + 1] {
                 let range = thresholds[i + 1] - thresholds[i]

@@ -51,8 +51,9 @@ actor MetacognitionCore {
         // 6. Uppdatera CognitiveState
         let insightText = insights.first?.content ?? ""
         await MainActor.run { state.metacognitiveInsight = insightText }
-        await state.update(dimension: .metacognition, delta: 0.004, source: "metacognition_core") // Reduced from 0.008
-        await state.update(dimension: .selfAwareness, delta: 0.003, source: "metacognition_core") // Reduced from 0.005
+        // v5.1: Increased deltas for faster metacognition and self-awareness progression
+        await state.update(dimension: .metacognition, delta: 0.007, source: "metacognition_core")
+        await state.update(dimension: .selfAwareness, delta: 0.005, source: "metacognition_core")
 
         // v27: Enhanced stagnation intervention — genuine strategy switching
         // When many dimensions are stagnating, don't just nudge numbers — switch strategies.

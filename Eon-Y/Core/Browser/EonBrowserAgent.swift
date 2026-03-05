@@ -519,43 +519,61 @@ class EonBrowserAgent: ObservableObject {
     }
 
     private func generateSearchQueryWithQwen() async -> String {
-        let modeHint = mode == .article ? "en djupgående kunskapsartikel om" : "bästa information om"
+        let modeHint = mode == .article ? "kunskapsartikel" : "information"
         let prompt = """
-        Du är en sökexpert. Generera den PERFEKTA Google-sökfrågan (max 8 ord) för att hitta \(modeHint): \(goal)
-        Regler:
-        - Använd de mest specifika nyckelorden
-        - Inkludera ämnesspecifika termer
-        - Optimera för relevanta resultat
-        Svara BARA med sökfrågan, inget annat.
+        UPPGIFT: Skriv en Google-sökfråga (max 8 ord) för att hitta \(modeHint) om: \(goal)
+        REGLER: Svara BARA med sökorden. Inga meningar. Inga förklaringar.
+        Sökfråga:
         """
 
         let result = await NeuralEngineOrchestrator.shared.generate(
-            prompt: prompt, maxTokens: 30, temperature: 0.3, enableThinking: false
+            prompt: prompt, maxTokens: 20, temperature: 0.2, enableThinking: false
         )
 
-        return result
+        let cleaned = result
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "\"", with: "")
             .components(separatedBy: "\n").first?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        // Validate: if Qwen returned a conversational response instead of search terms, fall back
+        let invalidPhrases = ["spännande", "fascinerande", "intressant", "jag", "du är", "vad roligt",
+                              "det du", "som jag", "berätta", "kan analyseras", "gärna"]
+        let lower = cleaned.lowercased()
+        if invalidPhrases.contains(where: { lower.contains($0) }) || cleaned.split(separator: " ").count > 12 {
+            return "" // Fall back to NL-based query generation
+        }
+
+        return cleaned
     }
 
     private func generateAlternativeQuery(original: String) async -> String {
         let prompt = """
         Sökningen "\(original)" gav inte tillräckligt med resultat om: \(goal)
-        Generera en ALTERNATIV sökfråga (max 8 ord) med andra nyckelord och vinklar.
-        Svara BARA med sökfrågan.
+        UPPGIFT: Skriv en ALTERNATIV sökfråga (max 8 ord) med andra nyckelord.
+        REGLER: Svara BARA med sökorden. Inga meningar.
+        Alternativ sökfråga:
         """
 
         let result = await NeuralEngineOrchestrator.shared.generate(
-            prompt: prompt, maxTokens: 30, temperature: 0.5, enableThinking: false
+            prompt: prompt, maxTokens: 20, temperature: 0.4, enableThinking: false
         )
 
-        return result
+        let cleaned = result
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "\"", with: "")
             .components(separatedBy: "\n").first?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        // Validate: reject conversational responses
+        let invalidPhrases = ["spännande", "fascinerande", "intressant", "jag", "du är", "vad roligt",
+                              "det du", "som jag", "berätta", "gärna"]
+        let lower = cleaned.lowercased()
+        if invalidPhrases.contains(where: { lower.contains($0) }) || cleaned.split(separator: " ").count > 12 {
+            return ""
+        }
+
+        return cleaned
     }
 
     private func generateSearchQueryWithNL() -> String {

@@ -709,7 +709,7 @@ struct ArticleDetailView: View {
                                     .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(article.domainColor.opacity(0.2), lineWidth: 1))
                             )
 
-                        Text(article.content)
+                        Text(LocalizedStringKey(cleanArticleMarkdown(article.content)))
                             .font(.system(size: 14, design: .rounded))
                             .foregroundStyle(.white.opacity(0.75))
                             .lineSpacing(5)
@@ -1135,6 +1135,40 @@ struct KnowledgeArticle: Identifiable {
 
     /// Seed-artiklar hämtas från KnowledgeArticleLibrary.swift — lägg till nya artiklar där.
     static let seedArticles: [KnowledgeArticle] = KnowledgeArticle.library
+}
+
+// MARK: - Article content cleaning
+
+/// Cleans article content for markdown rendering:
+/// - Strips raw markdown heading syntax (###) that shouldn't be visible
+/// - Strips prompt instructions that leaked into output
+private func cleanArticleMarkdown(_ content: String) -> String {
+    var result = content
+
+    // Strip prompt leakage
+    let leakagePatterns = [
+        "Du är Eon", "en autonom kognitiv AI", "Skriv en artikel",
+        "REGLER:", "Upprepa ALDRIG", "Inkludera ALDRIG",
+        "Artikel:", "200-300 ord", "Använd \"jag\""
+    ]
+    for pattern in leakagePatterns {
+        if let range = result.range(of: pattern, options: .caseInsensitive) {
+            let lineEnd = result[range.upperBound...].firstIndex(of: "\n") ?? result.endIndex
+            result.removeSubrange(range.lowerBound..<lineEnd)
+        }
+    }
+
+    // Clean triple hashes that render as raw text
+    result = result.replacingOccurrences(of: "### ", with: "")
+    result = result.replacingOccurrences(of: "## ", with: "")
+    result = result.replacingOccurrences(of: "# ", with: "")
+
+    // Clean up whitespace
+    while result.contains("\n\n\n") {
+        result = result.replacingOccurrences(of: "\n\n\n", with: "\n\n")
+    }
+
+    return result.trimmingCharacters(in: .whitespacesAndNewlines)
 }
 
 #Preview {

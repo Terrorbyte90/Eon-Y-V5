@@ -224,25 +224,29 @@ struct UnifiedLogView: View {
     private func loadLogs() {
         isLoading = true
         Task.detached(priority: .userInitiated) {
+            // v5.1: All logs reversed — newest first
             let cog = CognitionLogger.shared.readAll()
                 .components(separatedBy: "\n")
                 .filter { !$0.isEmpty }
+                .reversed()
                 .enumerated()
                 .map { LogLine(index: $0.offset, text: $0.element, tab: .cognition) }
 
             // v15: Language log from EonBrain
             let langLog = await MainActor.run { EonBrain.shared.languageLog }
-            let lang = langLog.enumerated().map { LogLine(index: $0.offset, text: $0.element, tab: .language) }
+            let lang = langLog.reversed().enumerated().map { LogLine(index: $0.offset, text: $0.element, tab: .language) }
 
             let diag = ResourceDiagnosticsLogger.shared.readAll()
                 .components(separatedBy: "\n")
                 .filter { !$0.isEmpty }
+                .reversed()
                 .enumerated()
                 .map { LogLine(index: $0.offset, text: $0.element, tab: .diagnostics) }
 
             let sess = RunSessionLogger.shared.allSessionsContent()
                 .components(separatedBy: "\n")
                 .filter { !$0.isEmpty }
+                .reversed()
                 .enumerated()
                 .map { LogLine(index: $0.offset, text: $0.element, tab: .sessions) }
 
