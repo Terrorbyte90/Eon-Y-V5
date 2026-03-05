@@ -667,8 +667,9 @@ final class IntegratedCognitiveArchitecture: ObservableObject {
         // v7: Self-awareness gain modulated by meta-attention level (genuine self-observation)
         let ast = AttentionSchemaEngine.shared
         let metaBonus = ast.metaAttentionLevel > 0.5 ? 1.5 : 1.0
-        await state.update(dimension: .selfAwareness, delta: 0.004 * metaBonus, source: "self_development")
-        await state.update(dimension: .metacognition, delta: 0.002 * metaBonus, source: "self_development")
+        // v5.1: Increased deltas for faster consciousness progression
+        await state.update(dimension: .selfAwareness, delta: 0.007 * metaBonus, source: "self_development")
+        await state.update(dimension: .metacognition, delta: 0.004 * metaBonus, source: "self_development")
 
         // v7: If consciousness Q-index is improving, log the trajectory
         let ce = ConsciousnessEngine.shared

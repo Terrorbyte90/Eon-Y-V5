@@ -161,10 +161,10 @@ actor ResponseComposer {
         thinkingResults: [ThinkingPath]
     ) -> String {
         var parts: [String] = []
-        var charBudget = 900  // ~350 tokens ≈ 900 tecken
+        var charBudget = 1400  // ~550 tokens ≈ 1400 tecken (increased for richer context)
 
         // 1. Systeminstruktion (kort)
-        let sysInstruction = "Du är Eon, AI på svenska. Svara koncist och korrekt."
+        let sysInstruction = "Du är Eon, kunnig AI. Ge FAKTISKA svar med konkret information. Eka ALDRIG frågan. Börja direkt med innehåll."
         parts.append(sysInstruction)
         charBudget -= sysInstruction.count
 

@@ -144,14 +144,16 @@ actor LearningEngine {
             }
 
             // Knowledge score: logarithmic from facts (30% weight)
-            let factScore = totalFacts > 0 ? min(0.30, 0.06 * log2(Double(totalFacts) + 1)) : 0.0
+            // v5.1: Increased base multiplier from 0.06 → 0.09 for faster fact-driven growth
+            let factScore = totalFacts > 0 ? min(0.30, 0.09 * log2(Double(totalFacts) + 1)) : 0.0
 
             // FSRS mastery score: active study (25% weight)
             let domainFSRSItems = fsrsItems.filter { $0.domain == domain }
             let reviewedItems = domainFSRSItems.filter { $0.reviewCount > 0 }
             let avgStability = reviewedItems.isEmpty ? 0.0 :
                 reviewedItems.reduce(0.0) { $0 + $1.stability } / Double(reviewedItems.count)
-            let fsrsScore = min(0.25, avgStability * 0.05 + Double(reviewedItems.count) * 0.015)
+            // v5.1: Increased FSRS score multipliers for faster study-driven growth
+            let fsrsScore = min(0.25, avgStability * 0.07 + Double(reviewedItems.count) * 0.020)
 
             // Conversation performance score: how well we use this domain (25% weight)
             let convScore: Double
@@ -171,11 +173,12 @@ actor LearningEngine {
                     langBonus = 0.0
                 }
                 // Vocabulary size bonus for language domains
-                let vocabBonus = min(0.05, Double(uniqueSwedishWords.count) / 5000.0 * 0.05)
+                // v5.1: Increased cap and lowered threshold for faster vocab-driven growth
+                let vocabBonus = min(0.10, Double(uniqueSwedishWords.count) / 2000.0 * 0.10)
                 let newLevel = min(0.95, factScore + fsrsScore + convScore + langBonus + vocabBonus)
                 if var comp = competencyBook[domain] {
                     let recentlyStudied = comp.lastStudied.timeIntervalSinceNow > -3600
-                    let growthBonus = recentlyStudied ? 0.003 : 0.0
+                    let growthBonus = recentlyStudied ? 0.006 : 0.0
                     comp.level = min(0.95, max(comp.level, newLevel) + growthBonus)
                     competencyBook[domain] = comp
                     UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
@@ -184,7 +187,7 @@ actor LearningEngine {
                 let newLevel = min(0.90, factScore + fsrsScore + convScore)
                 if var comp = competencyBook[domain] {
                     let recentlyStudied = comp.lastStudied.timeIntervalSinceNow > -3600
-                    let growthBonus = recentlyStudied ? 0.003 : 0.0
+                    let growthBonus = recentlyStudied ? 0.006 : 0.0
                     comp.level = min(0.95, max(comp.level, newLevel) + growthBonus)
                     competencyBook[domain] = comp
                     UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
@@ -849,7 +852,8 @@ actor LearningEngine {
 
         // 3. v27: Interleaved scheduling — mix domains for better retention
         // Research shows interleaving domains during practice improves learning efficiency
-        let batchSize = gaps.first.map { $0.urgency > 1.5 ? 7 : 5 } ?? 5
+        // v5.1: Increased batch sizes (5/7 → 12/15) for faster learning progression
+        let batchSize = gaps.first.map { $0.urgency > 1.5 ? 15 : 12 } ?? 12
         let interleaved = interleaveDomains(items: Array(dueItems.prefix(batchSize * 2)), maxItems: batchSize)
         var studiedItems: [String] = []
         for item in interleaved {
@@ -885,8 +889,9 @@ actor LearningEngine {
             for interaction in interactions {
                 guard var target = competencyBook[interaction.target] else { continue }
                 // Transfer is proportional to source level, interaction strength, and target room to grow
+                // v5.1: Increased transfer rate from 0.003 → 0.008 for faster cross-domain propagation
                 let roomToGrow = 1.0 - target.level
-                let transfer = sourceLevel * interaction.strength * roomToGrow * 0.003
+                let transfer = sourceLevel * interaction.strength * roomToGrow * 0.008
                 if transfer > 0.0005 {
                     target.level = min(0.95, target.level + transfer)
                     competencyBook[interaction.target] = target

@@ -443,11 +443,12 @@ actor ResponseStrategyPlanner {
         complexity: ResponseStrategy.ResponseComplexity,
         questionType: QuestionProfile.QuestionType
     ) -> Int {
+        // Increased token budgets to allow substantive, factual answers
         switch complexity {
-        case .simple: return 60
-        case .moderate: return 120
-        case .complex: return 200
-        case .deep: return 350
+        case .simple: return 100
+        case .moderate: return 200
+        case .complex: return 350
+        case .deep: return 500
         }
     }
 }

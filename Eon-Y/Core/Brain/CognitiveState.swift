@@ -100,8 +100,9 @@ final class CognitiveState: ObservableObject {
         let old = dimensions[dimension] ?? 0.3
 
         // Diminishing returns: adapt based on growth phase.
-        let velocityBonus = growthVelocity > 0.0005 ? 0.15 : 0.0
-        let diminishingFactor = max(0.1, (1.0 - old * 0.9) + velocityBonus)
+        // v5.1: Reduced from 0.9 → 0.7 to allow faster progression in early-to-mid stages
+        let velocityBonus = growthVelocity > 0.0005 ? 0.20 : 0.0
+        let diminishingFactor = max(0.15, (1.0 - old * 0.7) + velocityBonus)
         let effectiveDelta = delta * diminishingFactor
 
         let new = max(0.01, min(0.95, old + effectiveDelta))
@@ -114,7 +115,8 @@ final class CognitiveState: ObservableObject {
         }
 
         // Samla kausal propagation i batch istället för att köra omedelbart
-        let propagationFactor: Double = 0.12
+        // v5.1: Increased from 0.12 → 0.18 for faster cross-dimension growth
+        let propagationFactor: Double = 0.18
         let historyCount = dimensionHistory[dimension]?.count ?? 0
         if historyCount > 30 {
             let values = dimensionHistory[dimension] ?? []
@@ -407,7 +409,8 @@ final class CognitiveState: ObservableObject {
         let baseline: Double = savedII > 0.1 ? max(0.30, savedII * 0.80) : 0.35
 
         // Mycket låg decay — bara ett litet tryck mot baseline, inte en radering
-        let decayRate: Double = 0.00008      // Halverat från tidigare 0.00015
+        // v5.1: Reduced from 0.00008 → 0.00005 for slower regression
+        let decayRate: Double = 0.00005
 
         for dim in CognitiveDimension.allCases where dim != .cognitiveLoad {
             guard let current = dimensions[dim] else { continue }
@@ -448,7 +451,8 @@ final class CognitiveState: ObservableObject {
                 for dim in loop.dimensions {
                     let current = dimensions[dim] ?? 0.35
                     guard current > 0.45 else { continue }  // Kräver verklig aktivitet
-                    let boost = loop.strength * 0.003 * (avgLevel - 0.5)  // Reducerat från 0.005
+                    // v5.1: Increased from 0.003 → 0.005 for faster feedback-loop driven growth
+                    let boost = loop.strength * 0.005 * (avgLevel - 0.5)
                     dimensions[dim] = min(0.99, current + boost)
                 }
             } else if loop.type == .negative {

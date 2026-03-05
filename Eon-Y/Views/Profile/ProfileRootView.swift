@@ -573,10 +573,20 @@ struct InterestRadarCard: View {
 struct ProfileMemoryTimeline: View {
     let memories: [UserMemory]
 
+    // v5.1: Sort by emotional weight (most significant first), show more memories
+    private var sortedMemories: [UserMemory] {
+        memories.sorted { $0.emotionalWeight > $1.emotionalWeight }
+    }
+
+    private func memoryColor(_ weight: Double) -> Color {
+        if weight > 0.7 { return Color(hex: "#F59E0B") }  // Strong memory — gold
+        if weight > 0.4 { return Color(hex: "#FBBF24") }  // Medium memory — amber
+        return Color(hex: "#D4A853")                        // Light memory — muted
+    }
+
     var body: some View {
         GlassCard(tint: Color(hex: "#FBBF24")) {
             VStack(alignment: .leading, spacing: 12) {
-                // v25: Replace EmptyView with memory count badge
                 PanelHeader(icon: "sparkles", title: "Eons minnen om dig", color: Color(hex: "#FBBF24")) {
                     Text("\(memories.count)")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
@@ -589,20 +599,31 @@ struct ProfileMemoryTimeline: View {
                         .foregroundStyle(Color.white.opacity(0.3))
                         .padding(.vertical, 8)
                 } else {
-                    ForEach(Array(memories.prefix(5))) { memory in
+                    ForEach(Array(sortedMemories.prefix(12))) { memory in
                         HStack(alignment: .top, spacing: 10) {
                             Circle()
-                                .fill(Color(hex: "#FBBF24").opacity(0.6))
+                                .fill(memoryColor(memory.emotionalWeight))
                                 .frame(width: 6, height: 6)
                                 .padding(.top, 5)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(memory.description)
                                     .font(.system(size: 12, design: .rounded))
                                     .foregroundStyle(Color.white.opacity(0.75))
-                                    .lineLimit(2)
-                                Text(memory.date.formatted(.relative(presentation: .named)))
-                                    .font(.system(size: 10, design: .monospaced))
-                                    .foregroundStyle(Color.white.opacity(0.28))
+                                    .lineLimit(3)
+                                HStack(spacing: 6) {
+                                    if !memory.domain.isEmpty {
+                                        Text(memory.domain)
+                                            .font(.system(size: 9, weight: .medium, design: .rounded))
+                                            .foregroundStyle(memoryColor(memory.emotionalWeight).opacity(0.7))
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 1)
+                                            .background(memoryColor(memory.emotionalWeight).opacity(0.1))
+                                            .clipShape(Capsule())
+                                    }
+                                    Text(memory.date.formatted(.relative(presentation: .named)))
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundStyle(Color.white.opacity(0.28))
+                                }
                             }
                         }
                     }

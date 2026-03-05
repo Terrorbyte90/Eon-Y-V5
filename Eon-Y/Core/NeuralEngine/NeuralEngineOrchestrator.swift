@@ -435,7 +435,9 @@ actor NeuralEngineOrchestrator {
             "[OBS:", "Eon (svar om", "Eon (djupanalys om", "Användare:",
             "UPPREPA ALDRIG", "bryt ALDRIG", "Kognitiv profil:", "II=",
             "KORRIGERING:", "REVISION:", "Reviderat svar",
-            "<|im_start|>", "<|im_end|>", "<think>", "</think>"
+            "<|im_start|>", "<|im_end|>", "<think>", "</think>",
+            "ABSOLUTA REGLER:", "FÖRBJUDET:", "Ge FAKTISKA svar",
+            "Eka ALDRIG", "svar med fakta", "[UPPGIFT:"
         ]
         for pattern in leakagePatterns {
             if let range = result.range(of: pattern) {
@@ -451,7 +453,15 @@ actor NeuralEngineOrchestrator {
             "det du undrar över",
             "kan analyseras från flera perspektiv",
             "kan ses från flera perspektiv",
-            "kan betraktas från flera perspektiv"
+            "kan betraktas från flera perspektiv",
+            "spännande tanke om",
+            "vad roligt att prata med dig",
+            "fascinerande ämne som jag gärna utforskar",
+            "är ett fascinerande ämne",
+            "är en spännande fråga",
+            "vad roligt att du frågar",
+            "berätta mer så",
+            "det är en intressant fråga"
         ]
         let lines = result.components(separatedBy: "\n")
         var cleanedLines: [String] = []

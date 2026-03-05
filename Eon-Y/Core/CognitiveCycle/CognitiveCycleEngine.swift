@@ -585,12 +585,12 @@ actor CognitiveCycleEngine {
                 await onMonologue(MonologueLine(text: "Relevans \(String(format: "%.0f%%", qaRelevance * 100)) — svaret verkar inte handla om \(inputAnalysis.coreTopic), regenererar...", type: .loopTrigger))
                 // Regenerate with a much more focused prompt
                 let focusedPrompt = """
-                Svara varmt och direkt på svenska om: \(inputAnalysis.coreTopic)
+                Ge ett faktabaserat svar på svenska om: \(inputAnalysis.coreTopic)
                 \(inputAnalysis.questionSummary)
                 \(inputAnalysis.namedEntities.isEmpty ? "" : "Det handlar om: \(inputAnalysis.namedEntities.joined(separator: ", "))")
-                Börja ALDRIG med "det du frågar om". Börja direkt med innehåll.
+                REGLER: Börja DIREKT med faktiskt innehåll. Eka ALDRIG frågan. Inga tomma fraser.
                 Användare: \(input)
-                Eon:
+                Eon (fakta):
                 """
                 let focusedText = await neuralEngine.generate(prompt: focusedPrompt, maxTokens: 200, temperature: 0.55, enableThinking: false)
                 if !focusedText.isEmpty {
@@ -939,8 +939,8 @@ actor CognitiveCycleEngine {
     // Priority (highest=last, closest to generation): Question > Self-knowledge > Facts > Article > History
 
     private func buildPrompt(input: String, context: CognitiveCycleContext) async -> String {
-        // Token budget: ~350 tokens ≈ 900 Swedish chars
-        let totalBudget = 900
+        // Token budget: ~550 tokens ≈ 1400 Swedish chars (increased for richer knowledge context)
+        let totalBudget = 1400
 
         // --- FIXED sections (always included) ---
         // Section A: System instruction (~120 chars)
@@ -950,18 +950,18 @@ actor CognitiveCycleEngine {
         case .informal:  registerHint = " Vardagligt."
         default:       registerHint = ""
         }
-        let sysLine = "Du är Eon, en varm och personlig AI-kompanjon. Svara direkt med substans — eka aldrig frågan. Var som en klok vän.\(registerHint)"
+        let sysLine = "Du är Eon, en kunnig AI. Ge FAKTISKA svar med konkret information. ALDRIG eka frågan. ALDRIG \"kan analyseras från flera perspektiv\". ALDRIG \"berätta mer\". Svara med substans direkt.\(registerHint)"
 
         // Section Z: Question anchoring (MUST be last — most visible to model)
         var anchorLines: [String] = []
         if let analysis = context.inputAnalysis {
-            anchorLines.append("[Svara om: \(analysis.coreTopic). \(analysis.questionSummary)]")
+            anchorLines.append("[UPPGIFT: Besvara frågan om \(analysis.coreTopic) med faktisk information. \(analysis.questionSummary)]")
             if !analysis.namedEntities.isEmpty {
                 anchorLines.append("[Namn: \(analysis.namedEntities.joined(separator: ", "))]")
             }
         }
         anchorLines.append("Användare: \(input)")
-        anchorLines.append("Eon:")
+        anchorLines.append("Eon (svar med fakta):")
         let anchorText = anchorLines.joined(separator: "\n")
 
         // Calculate remaining budget after fixed sections

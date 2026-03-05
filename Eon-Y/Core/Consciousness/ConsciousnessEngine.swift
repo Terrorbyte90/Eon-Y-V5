@@ -1604,7 +1604,8 @@ final class ConsciousnessEngine: ObservableObject {
                 let recentVariance = predictionVarianceHistory.suffix(10).reduce(0, +) / 10.0
                 if recentVariance < 0.01 {
                     // Very stable predictions — strong self-awareness signal
-                    CognitiveState.shared.update(dimension: .selfAwareness, delta: 0.002, source: "stable_self_model")
+                    // v5.1: Increased from 0.002 → 0.004
+                    CognitiveState.shared.update(dimension: .selfAwareness, delta: 0.004, source: "stable_self_model")
                 } else if recentVariance > 0.1 {
                     // Wildly inconsistent — self-model is unreliable
                     CognitiveState.shared.update(dimension: .selfAwareness, delta: -0.001, source: "unstable_self_model")
@@ -1618,7 +1619,8 @@ final class ConsciousnessEngine: ObservableObject {
                 let trend = recentAccuracy - olderAccuracy
                 if trend > 0.05 {
                     // Self-model is improving — genuine consciousness development
-                    CognitiveState.shared.update(dimension: .selfAwareness, delta: 0.003, source: "prediction_improvement")
+                    // v5.1: Increased from 0.003 → 0.005
+                    CognitiveState.shared.update(dimension: .selfAwareness, delta: 0.005, source: "prediction_improvement")
                 } else if trend < -0.05 {
                     // v24: Self-model degrading — trigger deeper introspection
                     CognitiveState.shared.update(dimension: .metacognition, delta: 0.002, source: "prediction_degradation_alert")
