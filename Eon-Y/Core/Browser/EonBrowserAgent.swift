@@ -7,6 +7,7 @@ import NaturalLanguage
 enum BrowseMode: String, CaseIterable {
     case research = "Forskning"
     case article = "Skapa artikel"
+    case action = "Utför uppgift"
 }
 
 struct BrowseStep: Identifiable {
@@ -17,7 +18,41 @@ struct BrowseStep: Identifiable {
     let detail: String
     let type: StepType
 
-    enum StepType { case thinking, navigating, reading, extracting, writing, done, error }
+    enum StepType { case thinking, navigating, reading, extracting, writing, acting, waiting, done, error }
+}
+
+// MARK: - Action Plan for multi-step tasks
+
+struct ActionPlan: Sendable {
+    let steps: [ActionStep]
+    let requiresLogin: Bool
+    let targetURL: String?
+}
+
+struct ActionStep: Sendable, Identifiable {
+    let id = UUID()
+    let order: Int
+    let description: String
+    let type: ActionType
+    let selector: String?
+    let value: String?
+    let url: String?
+
+    enum ActionType: String, Sendable {
+        case navigate       // Go to a URL
+        case search         // Search on Google or site
+        case fillInput      // Fill a text field
+        case click          // Click a button/link
+        case select         // Select from dropdown
+        case scroll         // Scroll to find content
+        case wait           // Wait for page load
+        case extract        // Extract specific info
+        case compare        // Compare items/prices
+        case submitForm     // Submit a form
+        case login          // Login with credentials
+        case typeText       // Type text into active element
+        case screenshot     // Capture current state
+    }
 }
 
 struct BrowseResult {
@@ -81,6 +116,9 @@ class EonBrowserAgent: ObservableObject {
     @Published var result: BrowseResult?
     @Published var progress: Double = 0
     @Published var statusLabel: String = "Redo"
+    @Published var humanBehavior: Bool = true
+    @Published var actionPlan: ActionPlan?
+    @Published var currentActionStep: Int = 0
 
     var onNavigate: ((URL) -> Void)?
     var onExtractContent: ((@escaping (PageContent) -> Void) -> Void)?
@@ -94,6 +132,10 @@ class EonBrowserAgent: ObservableObject {
     private var failedExtractions = 0
     private var maxPages = 10
     private var pagesVisited = 0
+    private var retryCount = 0
+    private var maxRetries = 3
+    private var extractedPrices: [(item: String, price: String, url: String)] = []
+    private var obstacleCount = 0
 
     private let tagger = NLTagger(tagSchemes: [.lexicalClass, .nameType])
 
@@ -111,9 +153,19 @@ class EonBrowserAgent: ObservableObject {
         failedExtractions = 0
         pagesVisited = 0
         progress = 0
+        retryCount = 0
+        extractedPrices.removeAll()
+        obstacleCount = 0
+        actionPlan = nil
+        currentActionStep = 0
 
         addStep(.thinking, "Analyserar ditt mål", "Förstår vad du vill ha...")
-        Task { await planAndExecute() }
+
+        if mode == .action {
+            Task { await planAndExecuteAction() }
+        } else {
+            Task { await planAndExecute() }
+        }
     }
 
     func stopBrowsing() {
@@ -223,11 +275,15 @@ class EonBrowserAgent: ObservableObject {
             await dismissPageOverlays()
             await expandCollapsedContent()
             await scrollPageDown()
-            try? await Task.sleep(nanoseconds: 400_000_000)
+            await humanDelay(min: 0.3, max: 0.8)
 
             guard let pageContent = await extractWithRetry() else {
                 failedExtractions += 1
                 addStep(.error, "Kunde inte läsa sidan (\(failedExtractions))", "Hoppar till nästa...")
+                // Handle obstacle if repeated failures
+                if failedExtractions >= 2 {
+                    _ = await handleObstacle(step: ActionStep(order: 0, description: "Läsa sida", type: .extract, selector: nil, value: nil, url: nil))
+                }
                 continue
             }
 
@@ -250,11 +306,16 @@ class EonBrowserAgent: ObservableObject {
             }
             pagesVisited += 1
 
+            // Extract prices if goal suggests price comparison
+            if goal.lowercased().contains("pris") || goal.lowercased().contains("billig") || goal.lowercased().contains("köp") || goal.lowercased().contains("bäst") {
+                await extractPricesFromPage()
+            }
+
             if pagesVisited < maxPages && collectedContent.map(\.text).joined().count < 6000 {
                 await followDeepLink(on: pageContent)
             }
 
-            try? await Task.sleep(nanoseconds: 300_000_000)
+            await humanDelay(min: 0.2, max: 0.6)
         }
     }
 
@@ -333,8 +394,692 @@ class EonBrowserAgent: ObservableObject {
                 break
             }
 
-            try? await Task.sleep(nanoseconds: 400_000_000)
+            await humanDelay(min: 0.3, max: 0.8)
         }
+    }
+
+    // MARK: - Action Mode: Multi-step task execution
+
+    private func planAndExecuteAction() async {
+        addStep(.thinking, "Planerar uppgiftssteg", "Analyserar: \(goal)")
+        statusLabel = "Planerar..."
+
+        let plan = await generateActionPlan()
+        actionPlan = plan
+
+        if plan.steps.isEmpty {
+            addStep(.error, "Kunde inte skapa en plan", "Försök formulera om din uppgift.")
+            isBrowsing = false
+            return
+        }
+
+        addStep(.thinking, "Plan klar: \(plan.steps.count) steg", plan.steps.prefix(3).map(\.description).joined(separator: " → "))
+
+        for (index, step) in plan.steps.enumerated() {
+            guard isBrowsing else { break }
+            await waitWhilePaused()
+            guard isBrowsing else { break }
+
+            currentActionStep = index
+            progress = Double(index) / Double(plan.steps.count)
+            statusLabel = "Steg \(index + 1)/\(plan.steps.count): \(step.description.prefix(30))..."
+
+            let success = await executeActionStep(step)
+            if !success {
+                obstacleCount += 1
+                addStep(.error, "Steg \(index + 1) misslyckades", step.description)
+
+                // Try to handle the obstacle
+                let resolved = await handleObstacle(step: step)
+                if !resolved {
+                    if obstacleCount >= 3 {
+                        addStep(.error, "För många hinder", "Avbryter efter \(obstacleCount) misslyckade försök.")
+                        break
+                    }
+                    continue
+                }
+            }
+
+            await humanDelay(min: 0.3, max: 1.2)
+        }
+
+        // Collect results
+        if !collectedContent.isEmpty || !extractedPrices.isEmpty {
+            await generateActionResult()
+        } else {
+            // Try to extract current page as result
+            if let content = await extractWithRetry(), !content.isEmpty {
+                collectedContent.append((url: content.url, title: content.title, text: String(content.readableText.prefix(4000))))
+                await generateActionResult()
+            } else {
+                addStep(.done, "Uppgift utförd", "Alla steg genomförda.")
+                result = BrowseResult(title: "Uppgift: \(String(goal.prefix(40)))", summary: "Eon utförde alla steg i uppgiften.", sources: Array(visitedURLs), fullContent: "", articleDomain: nil)
+                isBrowsing = false
+                progress = 1.0
+            }
+        }
+    }
+
+    private func generateActionPlan() async -> ActionPlan {
+        let prompt = """
+        Du planerar steg för en webbläsarrobot. Uppgiften är:
+        \(goal)
+
+        Skriv en steg-för-steg plan. Varje steg ska vara ETT av:
+        - NAVIGATE:url (gå till URL)
+        - SEARCH:sökord (sök på Google)
+        - FILL:css-selector|värde (fyll i fält)
+        - CLICK:css-selector (klicka på element)
+        - SELECT:css-selector|värde (välj i dropdown)
+        - SCROLL (scrolla ner)
+        - WAIT (vänta på laddning)
+        - EXTRACT:vad (extrahera specifik info)
+        - COMPARE (jämför insamlad data)
+        - SUBMIT (skicka formulär)
+        - LOGIN:url (navigera till login-sida)
+        - TYPE:text (skriv text i aktivt fält)
+
+        Svara med EN rad per steg. Inga förklaringar. Max 15 steg.
+        """
+
+        let raw = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 300, temperature: 0.3, enableThinking: true
+        )
+
+        var steps: [ActionStep] = []
+        var requiresLogin = false
+        var targetURL: String?
+
+        let lines = raw.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && $0.count > 3 }
+
+        for (i, line) in lines.enumerated() {
+            let upper = line.uppercased()
+            if upper.hasPrefix("NAVIGATE:") {
+                let url = String(line.dropFirst(9)).trimmingCharacters(in: .whitespaces)
+                if targetURL == nil { targetURL = url }
+                steps.append(ActionStep(order: i, description: "Navigera till \(url)", type: .navigate, selector: nil, value: nil, url: url))
+            } else if upper.hasPrefix("SEARCH:") {
+                let query = String(line.dropFirst(7)).trimmingCharacters(in: .whitespaces)
+                steps.append(ActionStep(order: i, description: "Sök: \(query)", type: .search, selector: nil, value: query, url: nil))
+            } else if upper.hasPrefix("FILL:") {
+                let parts = String(line.dropFirst(5)).components(separatedBy: "|")
+                let selector = parts[0].trimmingCharacters(in: .whitespaces)
+                let value = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
+                steps.append(ActionStep(order: i, description: "Fyll i: \(selector.prefix(30))", type: .fillInput, selector: selector, value: value, url: nil))
+            } else if upper.hasPrefix("CLICK:") {
+                let selector = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+                steps.append(ActionStep(order: i, description: "Klicka: \(selector.prefix(30))", type: .click, selector: selector, value: nil, url: nil))
+            } else if upper.hasPrefix("SELECT:") {
+                let parts = String(line.dropFirst(7)).components(separatedBy: "|")
+                let selector = parts[0].trimmingCharacters(in: .whitespaces)
+                let value = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
+                steps.append(ActionStep(order: i, description: "Välj: \(value)", type: .select, selector: selector, value: value, url: nil))
+            } else if upper.hasPrefix("SCROLL") {
+                steps.append(ActionStep(order: i, description: "Scrolla ner", type: .scroll, selector: nil, value: nil, url: nil))
+            } else if upper.hasPrefix("WAIT") {
+                steps.append(ActionStep(order: i, description: "Väntar på laddning", type: .wait, selector: nil, value: nil, url: nil))
+            } else if upper.hasPrefix("EXTRACT:") {
+                let what = String(line.dropFirst(8)).trimmingCharacters(in: .whitespaces)
+                steps.append(ActionStep(order: i, description: "Extrahera: \(what)", type: .extract, selector: nil, value: what, url: nil))
+            } else if upper.hasPrefix("COMPARE") {
+                steps.append(ActionStep(order: i, description: "Jämför resultat", type: .compare, selector: nil, value: nil, url: nil))
+            } else if upper.hasPrefix("SUBMIT") {
+                steps.append(ActionStep(order: i, description: "Skicka formulär", type: .submitForm, selector: nil, value: nil, url: nil))
+            } else if upper.hasPrefix("LOGIN:") {
+                let url = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+                requiresLogin = true
+                steps.append(ActionStep(order: i, description: "Logga in", type: .login, selector: nil, value: nil, url: url))
+            } else if upper.hasPrefix("TYPE:") {
+                let text = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                steps.append(ActionStep(order: i, description: "Skriv text", type: .typeText, selector: nil, value: text, url: nil))
+            }
+        }
+
+        // Fallback: If Qwen failed, create basic plan from goal analysis
+        if steps.isEmpty {
+            steps = buildFallbackActionPlan()
+        }
+
+        return ActionPlan(steps: steps, requiresLogin: requiresLogin, targetURL: targetURL)
+    }
+
+    private func buildFallbackActionPlan() -> [ActionStep] {
+        let lower = goal.lowercased()
+        var steps: [ActionStep] = []
+
+        // Detect intent from goal keywords
+        if lower.contains("logga in") || lower.contains("login") {
+            steps.append(ActionStep(order: 0, description: "Sök inloggningssida", type: .search, selector: nil, value: goal, url: nil))
+            steps.append(ActionStep(order: 1, description: "Vänta", type: .wait, selector: nil, value: nil, url: nil))
+        } else if lower.contains("billig") || lower.contains("pris") || lower.contains("bästa pris") || lower.contains("köp") {
+            steps.append(ActionStep(order: 0, description: "Sök produkter", type: .search, selector: nil, value: goal, url: nil))
+            steps.append(ActionStep(order: 1, description: "Extrahera priser", type: .extract, selector: nil, value: "priser", url: nil))
+            steps.append(ActionStep(order: 2, description: "Jämför", type: .compare, selector: nil, value: nil, url: nil))
+        } else if lower.contains("skapa") || lower.contains("skriv") || lower.contains("posta") || lower.contains("inlägg") {
+            steps.append(ActionStep(order: 0, description: "Sök sida", type: .search, selector: nil, value: goal, url: nil))
+            steps.append(ActionStep(order: 1, description: "Extrahera", type: .extract, selector: nil, value: "formulär", url: nil))
+        } else {
+            // Generic: search + extract
+            steps.append(ActionStep(order: 0, description: "Sök", type: .search, selector: nil, value: goal, url: nil))
+            steps.append(ActionStep(order: 1, description: "Extrahera info", type: .extract, selector: nil, value: "relevant information", url: nil))
+        }
+
+        return steps
+    }
+
+    private func executeActionStep(_ step: ActionStep) async -> Bool {
+        switch step.type {
+        case .navigate:
+            guard let urlStr = step.url, let url = URL(string: urlStr) else { return false }
+            addStep(.navigating, "Navigerar till \(url.host ?? urlStr)", urlStr)
+            await navigateAndWaitForLoad(url: url)
+            await humanDelay(min: 0.5, max: 1.5)
+            await dismissPageOverlays()
+            return true
+
+        case .search:
+            let query = step.value ?? goal
+            addStep(.thinking, "Söker", query)
+            let searchURL = buildSearchURL(query: query)
+            await navigateAndWaitForLoad(url: searchURL)
+            await humanDelay(min: 0.3, max: 1.0)
+            await dismissPageOverlays()
+            // Browse top results
+            let searchResults = await extractSearchResults()
+            if !searchResults.isEmpty {
+                await browseSearchResults(Array(searchResults.prefix(5)))
+            }
+            return true
+
+        case .fillInput:
+            guard let selector = step.selector, let value = step.value else { return false }
+            addStep(.acting, "Fyller i fält", "\(selector.prefix(30)): \(value.prefix(20))")
+            if humanBehavior {
+                return await typeWithHumanBehavior(selector: selector, text: value)
+            } else {
+                return await fillInputField(selector: selector, value: value)
+            }
+
+        case .click:
+            guard let selector = step.selector else {
+                // Try smart click: use Qwen to find the right element
+                return await smartClick(description: step.description)
+            }
+            addStep(.acting, "Klickar", selector.prefix(40).description)
+            let success = await clickElement(selector)
+            await humanDelay(min: 0.3, max: 0.8)
+            return success
+
+        case .select:
+            guard let selector = step.selector, let value = step.value else { return false }
+            addStep(.acting, "Väljer", "\(value) i \(selector.prefix(20))")
+            return await selectOption(selector: selector, value: value)
+
+        case .scroll:
+            addStep(.navigating, "Scrollar ner", "")
+            if humanBehavior {
+                await humanScroll()
+            } else {
+                await scrollPageDown()
+            }
+            return true
+
+        case .wait:
+            addStep(.waiting, "Väntar på laddning", "")
+            await humanDelay(min: 1.0, max: 3.0)
+            return true
+
+        case .extract:
+            addStep(.extracting, "Extraherar information", step.value ?? "")
+            if let content = await extractWithRetry(), !content.isEmpty {
+                let text = String(content.readableText.prefix(4000))
+                if !isDuplicateContent(text) {
+                    collectedContent.append((url: content.url, title: content.title, text: text))
+                }
+                // Extract prices if looking for deals
+                if goal.lowercased().contains("pris") || goal.lowercased().contains("billig") || goal.lowercased().contains("köp") {
+                    await extractPricesFromPage()
+                }
+                return true
+            }
+            return false
+
+        case .compare:
+            addStep(.thinking, "Jämför insamlad data", "\(collectedContent.count) sidor, \(extractedPrices.count) priser")
+            // Comparison is done during result generation
+            return true
+
+        case .submitForm:
+            addStep(.acting, "Skickar formulär", "")
+            return await submitCurrentForm()
+
+        case .login:
+            guard let urlStr = step.url, let url = URL(string: urlStr) else { return false }
+            addStep(.acting, "Navigerar till inloggning", urlStr)
+            await navigateAndWaitForLoad(url: url)
+            await humanDelay(min: 0.5, max: 1.5)
+            await dismissPageOverlays()
+            // User needs to fill in credentials - pause for takeover
+            addStep(.waiting, "Väntar på att du fyller i inloggningsuppgifter", "Ta över och logga in, sedan lämna tillbaka kontrollen")
+            isPaused = true
+            statusLabel = "Väntar på din inloggning..."
+            await waitWhilePaused()
+            return true
+
+        case .typeText:
+            guard let text = step.value else { return false }
+            addStep(.acting, "Skriver text", String(text.prefix(40)))
+            if humanBehavior {
+                return await typeIntoActiveElement(text: text)
+            } else {
+                _ = await runJS("document.activeElement.value = '\(text.replacingOccurrences(of: "'", with: "\\'"))'")
+                return true
+            }
+
+        case .screenshot:
+            addStep(.reading, "Registrerar sidans tillstånd", "")
+            return true
+        }
+    }
+
+    // MARK: - Obstacle Detection & Handling
+
+    private func handleObstacle(step: ActionStep) async -> Bool {
+        addStep(.thinking, "Analyserar hinder", "Försöker lösa problemet...")
+
+        // Detect what kind of obstacle we hit
+        let obstacleType = await detectObstacleType()
+
+        switch obstacleType {
+        case .cookieBanner:
+            addStep(.acting, "Hanterar cookie-banner", "")
+            await dismissPageOverlays()
+            return true
+
+        case .loginWall:
+            addStep(.waiting, "Inloggningsvägg detekterad", "Ta över för att logga in")
+            isPaused = true
+            statusLabel = "Logga in och lämna tillbaka kontrollen"
+            await waitWhilePaused()
+            return true
+
+        case .captcha:
+            addStep(.waiting, "CAPTCHA detekterad", "Ta över och lös CAPTCHA")
+            isPaused = true
+            statusLabel = "Lös CAPTCHA och lämna tillbaka kontrollen"
+            await waitWhilePaused()
+            return true
+
+        case .paywall:
+            addStep(.thinking, "Betalvägg detekterad", "Försöker hitta alternativ källa...")
+            // Try going back and finding alternative
+            await goBack()
+            await humanDelay(min: 0.5, max: 1.0)
+            return true
+
+        case .rateLimit:
+            addStep(.waiting, "Hastighetsbegränsning", "Väntar innan nästa försök...")
+            try? await Task.sleep(nanoseconds: humanBehavior ? UInt64.random(in: 3_000_000_000...8_000_000_000) : 2_000_000_000)
+            return true
+
+        case .pageNotFound:
+            addStep(.thinking, "Sidan hittades inte", "Försöker alternativ väg...")
+            await goBack()
+            return true
+
+        case .popupBlock:
+            await dismissPageOverlays()
+            await expandCollapsedContent()
+            return true
+
+        case .unknown:
+            // Try generic recovery: dismiss overlays, scroll, retry
+            await dismissPageOverlays()
+            await humanDelay(min: 0.3, max: 0.8)
+            await expandCollapsedContent()
+            return retryCount < maxRetries
+        }
+    }
+
+    private enum ObstacleType {
+        case cookieBanner, loginWall, captcha, paywall, rateLimit, pageNotFound, popupBlock, unknown
+    }
+
+    private func detectObstacleType() async -> ObstacleType {
+        let pageInfo = await runJS("""
+        (function() {
+            var body = document.body ? document.body.innerText.toLowerCase() : '';
+            var url = window.location.href.toLowerCase();
+            if (body.indexOf('captcha') >= 0 || body.indexOf('recaptcha') >= 0 || body.indexOf('hcaptcha') >= 0 || document.querySelector('iframe[src*="captcha"]')) return 'captcha';
+            if (body.indexOf('log in') >= 0 || body.indexOf('logga in') >= 0 || body.indexOf('sign in') >= 0 || url.indexOf('login') >= 0 || url.indexOf('signin') >= 0) {
+                var inputs = document.querySelectorAll('input[type="password"]');
+                if (inputs.length > 0) return 'login';
+            }
+            if (body.indexOf('subscribe') >= 0 || body.indexOf('premium') >= 0 || body.indexOf('prenumerera') >= 0 || body.indexOf('paywall') >= 0) {
+                var payIndicators = document.querySelectorAll('[class*="paywall"], [class*="premium"], [class*="subscribe"]');
+                if (payIndicators.length > 0) return 'paywall';
+            }
+            if (body.indexOf('rate limit') >= 0 || body.indexOf('too many requests') >= 0 || body.indexOf('429') >= 0) return 'ratelimit';
+            if (body.indexOf('404') >= 0 || body.indexOf('not found') >= 0 || body.indexOf('hittades inte') >= 0) return 'notfound';
+            var overlays = document.querySelectorAll('[class*="cookie"], [class*="consent"], [role="dialog"]');
+            for (var i = 0; i < overlays.length; i++) {
+                if (window.getComputedStyle(overlays[i]).display !== 'none') return 'cookie';
+            }
+            var fixedEls = document.querySelectorAll('[class*="modal"], [class*="popup"], [class*="overlay"]');
+            for (var j = 0; j < fixedEls.length; j++) {
+                var style = window.getComputedStyle(fixedEls[j]);
+                if (style.position === 'fixed' && style.display !== 'none') return 'popup';
+            }
+            return 'unknown';
+        })()
+        """)
+
+        switch pageInfo {
+        case "captcha": return .captcha
+        case "login": return .loginWall
+        case "paywall": return .paywall
+        case "ratelimit": return .rateLimit
+        case "notfound": return .pageNotFound
+        case "cookie": return .cookieBanner
+        case "popup": return .popupBlock
+        default: return .unknown
+        }
+    }
+
+    // MARK: - Human Behavior Simulation
+
+    private func humanDelay(min: Double, max: Double) async {
+        guard humanBehavior else {
+            try? await Task.sleep(nanoseconds: UInt64(min * 1_000_000_000))
+            return
+        }
+        let delay = Double.random(in: min...max)
+        try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+    }
+
+    private func humanScroll() async {
+        // Vary scroll amount and add random pauses
+        let scrollAmount = Int.random(in: 50...100)
+        _ = await runJS("window.scrollBy({top: window.innerHeight * \(scrollAmount) / 100, behavior: 'smooth'})")
+        await humanDelay(min: 0.4, max: 1.2)
+
+        // Sometimes scroll back up a tiny bit (human behavior)
+        if Bool.random() && humanBehavior {
+            _ = await runJS("window.scrollBy({top: -\(Int.random(in: 30...80)), behavior: 'smooth'})")
+            await humanDelay(min: 0.2, max: 0.5)
+        }
+
+        // Simulate random mouse movement
+        if humanBehavior {
+            let x = Int.random(in: 50...350)
+            let y = Int.random(in: 100...600)
+            _ = await runJS("document.elementFromPoint(\(x), \(y))")
+        }
+    }
+
+    private func typeWithHumanBehavior(selector: String, text: String) async -> Bool {
+        let escaped = selector.replacingOccurrences(of: "'", with: "\\'")
+
+        // Focus the element first
+        let focused = await runJS("(function(){ var el = document.querySelector('\(escaped)'); if(!el) return 'false'; el.focus(); el.click(); el.value = ''; return 'true'; })()")
+        guard focused == "true" else { return false }
+        await humanDelay(min: 0.2, max: 0.5)
+
+        // Type each character with realistic delays
+        for char in text {
+            let charEscaped = String(char).replacingOccurrences(of: "'", with: "\\'").replacingOccurrences(of: "\\", with: "\\\\")
+            _ = await runJS("""
+            (function(){
+                var el = document.querySelector('\(escaped)');
+                if(!el) return;
+                el.value += '\(charEscaped)';
+                el.dispatchEvent(new Event('input', {bubbles: true}));
+                el.dispatchEvent(new KeyboardEvent('keydown', {key: '\(charEscaped)', bubbles: true}));
+                el.dispatchEvent(new KeyboardEvent('keyup', {key: '\(charEscaped)', bubbles: true}));
+            })()
+            """)
+            // Human typing speed: 50-150ms per character
+            let charDelay = UInt64.random(in: 40_000_000...150_000_000)
+            try? await Task.sleep(nanoseconds: charDelay)
+        }
+
+        // Final input event
+        _ = await runJS("(function(){ var el = document.querySelector('\(escaped)'); if(el){ el.dispatchEvent(new Event('change', {bubbles: true})); } })()")
+        return true
+    }
+
+    private func typeIntoActiveElement(text: String) async -> Bool {
+        // Type into whatever element is currently focused
+        for char in text {
+            let charEscaped = String(char).replacingOccurrences(of: "'", with: "\\'").replacingOccurrences(of: "\\", with: "\\\\")
+            _ = await runJS("""
+            (function(){
+                var el = document.activeElement;
+                if(!el) return;
+                if(el.isContentEditable) {
+                    document.execCommand('insertText', false, '\(charEscaped)');
+                } else {
+                    el.value = (el.value || '') + '\(charEscaped)';
+                    el.dispatchEvent(new Event('input', {bubbles: true}));
+                }
+            })()
+            """)
+            if humanBehavior {
+                let charDelay = UInt64.random(in: 40_000_000...150_000_000)
+                try? await Task.sleep(nanoseconds: charDelay)
+            }
+        }
+        return true
+    }
+
+    // MARK: - Form Interaction
+
+    private func fillInputField(selector: String, value: String) async -> Bool {
+        let escaped = selector.replacingOccurrences(of: "'", with: "\\'")
+        let valueEscaped = value.replacingOccurrences(of: "'", with: "\\'")
+        let result = await runJS("""
+        (function(){
+            var el = document.querySelector('\(escaped)');
+            if(!el) {
+                // Try by name, id, placeholder, aria-label
+                el = document.querySelector('input[name*="\(escaped)"], input[id*="\(escaped)"], input[placeholder*="\(escaped)"], input[aria-label*="\(escaped)"], textarea[name*="\(escaped)"], textarea[placeholder*="\(escaped)"]');
+            }
+            if(!el) return 'false';
+            el.focus();
+            el.value = '\(valueEscaped)';
+            el.dispatchEvent(new Event('input', {bubbles: true}));
+            el.dispatchEvent(new Event('change', {bubbles: true}));
+            return 'true';
+        })()
+        """)
+        return result == "true"
+    }
+
+    private func selectOption(selector: String, value: String) async -> Bool {
+        let escaped = selector.replacingOccurrences(of: "'", with: "\\'")
+        let valueEscaped = value.replacingOccurrences(of: "'", with: "\\'")
+        let result = await runJS("""
+        (function(){
+            var el = document.querySelector('\(escaped)');
+            if(!el) el = document.querySelector('select[name*="\(escaped)"]');
+            if(!el || el.tagName !== 'SELECT') return 'false';
+            for(var i = 0; i < el.options.length; i++) {
+                if(el.options[i].text.toLowerCase().indexOf('\(valueEscaped)'.toLowerCase()) >= 0 ||
+                   el.options[i].value.toLowerCase().indexOf('\(valueEscaped)'.toLowerCase()) >= 0) {
+                    el.selectedIndex = i;
+                    el.dispatchEvent(new Event('change', {bubbles: true}));
+                    return 'true';
+                }
+            }
+            return 'false';
+        })()
+        """)
+        return result == "true"
+    }
+
+    private func submitCurrentForm() async -> Bool {
+        let result = await runJS("""
+        (function(){
+            // Try submit button first
+            var submit = document.querySelector('button[type="submit"], input[type="submit"], button.submit, [class*="submit"]');
+            if(submit) { submit.click(); return 'clicked'; }
+            // Try finding a form and submitting it
+            var form = document.querySelector('form');
+            if(form) { form.submit(); return 'submitted'; }
+            // Try Enter key on active element
+            var active = document.activeElement;
+            if(active) {
+                active.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true}));
+                return 'enter';
+            }
+            return 'false';
+        })()
+        """)
+        await humanDelay(min: 1.0, max: 2.5)
+        return result != "false"
+    }
+
+    private func smartClick(description: String) async -> Bool {
+        // Use Qwen to find the right element on the page
+        guard let content = await extractWithRetry() else { return false }
+
+        let clickableElements = content.links.prefix(20).enumerated().map { i, link in
+            "\(i+1). [\(link.text.prefix(40))]"
+        }.joined(separator: "\n")
+
+        let prompt = """
+        Uppgift: \(description)
+        Klickbara element på sidan:
+        \(clickableElements)
+        Vilket nummer ska klickas? Svara BARA med ett nummer.
+        """
+
+        let result = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 5, temperature: 0.1, enableThinking: false
+        )
+
+        let digits = result.filter(\.isNumber)
+        if let num = Int(digits), num > 0, num <= content.links.count {
+            let link = content.links[num - 1]
+            if let url = URL(string: link.href) {
+                await navigateAndWaitForLoad(url: url)
+                await humanDelay(min: 0.3, max: 1.0)
+                await dismissPageOverlays()
+                return true
+            }
+        }
+        return false
+    }
+
+    // MARK: - Price Extraction
+
+    private func extractPricesFromPage() async {
+        let priceJSON = await runJS("""
+        (function(){
+            var results = [];
+            // Common price patterns
+            var priceRegex = /(?:kr|SEK|\\$|€|USD|EUR|:-)[\\s]?[\\d\\s,.]+|[\\d\\s,.]+[\\s]?(?:kr|SEK|\\$|€|USD|EUR|:-)/gi;
+            var priceElements = document.querySelectorAll('[class*="price"], [class*="pris"], [class*="cost"], [class*="amount"], [data-price], [itemprop="price"]');
+
+            for(var i = 0; i < Math.min(priceElements.length, 20); i++) {
+                var text = (priceElements[i].innerText || '').trim();
+                if(text.length > 0 && text.length < 50) {
+                    var parent = priceElements[i].closest('article, [class*="product"], [class*="item"], [class*="card"], li');
+                    var name = '';
+                    if(parent) {
+                        var titleEl = parent.querySelector('h2, h3, h4, a[class*="title"], [class*="name"], [class*="titel"]');
+                        if(titleEl) name = (titleEl.innerText || '').trim().substring(0, 80);
+                    }
+                    if(!name) name = 'Produkt ' + (i+1);
+                    results.push({item: name, price: text});
+                }
+            }
+
+            // Fallback: scan body text for prices
+            if(results.length === 0) {
+                var bodyText = document.body ? document.body.innerText : '';
+                var matches = bodyText.match(priceRegex);
+                if(matches) {
+                    for(var m = 0; m < Math.min(matches.length, 10); m++) {
+                        results.push({item: 'Pris ' + (m+1), price: matches[m].trim()});
+                    }
+                }
+            }
+
+            return JSON.stringify(results);
+        })()
+        """)
+
+        guard let jsonString = priceJSON,
+              let data = jsonString.data(using: .utf8),
+              let array = try? JSONSerialization.jsonObject(with: data) as? [[String: String]] else { return }
+
+        let currentURL = self.currentURL?.absoluteString ?? ""
+        for item in array {
+            if let itemName = item["item"], let price = item["price"] {
+                extractedPrices.append((item: itemName, price: price, url: currentURL))
+            }
+        }
+
+        if !extractedPrices.isEmpty {
+            addStep(.extracting, "Hittade \(extractedPrices.count) priser", extractedPrices.prefix(3).map { "\($0.item): \($0.price)" }.joined(separator: ", "))
+        }
+    }
+
+    // MARK: - Action Result Generation
+
+    private func generateActionResult() async {
+        addStep(.writing, "Sammanställer resultat", "\(collectedContent.count) sidor, \(extractedPrices.count) priser")
+        statusLabel = "Skriver resultat..."
+        progress = 0.9
+
+        var resultText = ""
+
+        if !extractedPrices.isEmpty {
+            // Price comparison result
+            let priceList = extractedPrices.prefix(15).map { "\($0.item): \($0.price)" }.joined(separator: "\n")
+            let prompt = """
+            Du är en prisexpert. Analysera dessa priser och ge en rekommendation:
+            MÅL: \(goal)
+
+            HITTADE PRISER:
+            \(priceList)
+
+            Ge en tydlig sammanfattning: Vilken är billigast? Bäst valuta för pengarna? Rekommendation?
+            Skriv på svenska, max 300 ord.
+            """
+            resultText = await generateWithQwen(prompt: prompt, maxTokens: 500)
+        }
+
+        if resultText.isEmpty && !collectedContent.isEmpty {
+            let combinedContent = collectedContent.map { "[\($0.title)]\n\($0.text)" }.joined(separator: "\n---\n")
+            let prompt = """
+            UPPGIFT: \(goal)
+            RESULTAT: Sammanfatta vad som gjordes och hittades.
+
+            INSAMLAD DATA:
+            \(String(combinedContent.prefix(3000)))
+
+            Skriv en tydlig rapport om resultaten. Svenska, max 400 ord.
+            """
+            resultText = await generateWithQwen(prompt: prompt, maxTokens: 600)
+        }
+
+        if resultText.isEmpty {
+            resultText = "Uppgiften utförd. \(collectedContent.count) sidor besökta, \(extractedPrices.count) priser hittade."
+        }
+
+        let title = await generateTitle() ?? "Resultat: \(String(goal.prefix(30)))"
+        let sources = Array(visitedURLs)
+
+        result = BrowseResult(title: title, summary: resultText, sources: sources,
+                              fullContent: collectedContent.map(\.text).joined(separator: "\n"), articleDomain: nil)
+        addStep(.done, "Uppgift slutförd!", "\(collectedContent.count) sidor, \(sources.count) källor")
+        statusLabel = "Klar"
+        progress = 1.0
+        isBrowsing = false
     }
 
     // MARK: - JS Action Helpers
@@ -373,8 +1118,12 @@ class EonBrowserAgent: ObservableObject {
     }
 
     private func scrollPageDown() async {
-        _ = await runJS("window.eonScrollDown()")
-        try? await Task.sleep(nanoseconds: 600_000_000)
+        if humanBehavior {
+            await humanScroll()
+        } else {
+            _ = await runJS("window.eonScrollDown()")
+            try? await Task.sleep(nanoseconds: 600_000_000)
+        }
     }
 
     private func dismissPageOverlays() async {
@@ -519,7 +1268,13 @@ class EonBrowserAgent: ObservableObject {
     }
 
     private func generateSearchQueryWithQwen() async -> String {
-        let modeHint = mode == .article ? "kunskapsartikel" : "information"
+        let modeHint: String = {
+            switch mode {
+            case .article: return "kunskapsartikel"
+            case .action: return "webbsida för att utföra uppgiften"
+            case .research: return "information"
+            }
+        }()
         let prompt = """
         UPPGIFT: Skriv en Google-sökfråga (max 8 ord) för att hitta \(modeHint) om: \(goal)
         REGLER: Svara BARA med sökorden. Inga meningar. Inga förklaringar.
@@ -616,7 +1371,8 @@ class EonBrowserAgent: ObservableObject {
             }
         }
 
-        try? await Task.sleep(nanoseconds: 800_000_000)
+        // Human-like wait after page load
+        await humanDelay(min: 0.5, max: 1.5)
     }
 
     // MARK: - Extraction with retry
@@ -672,7 +1428,8 @@ class EonBrowserAgent: ObservableObject {
     ]
 
     private func filterLinks(_ links: [(text: String, href: String)]) -> [(text: String, href: String)] {
-        links.filter { link in
+        let isActionMode = mode == .action
+        return links.filter { link in
             guard !visitedURLs.contains(link.href),
                   link.href.hasPrefix("http"),
                   link.text.count > 3,
@@ -681,17 +1438,28 @@ class EonBrowserAgent: ObservableObject {
             let hrefLower = link.href.lowercased()
             let textLower = link.text.lowercased()
 
+            // In action mode, allow auth-related paths (login, signup etc.)
+            let effectiveBlockedPaths: Set<String> = isActionMode
+                ? Self.blockedPaths.subtracting(["login", "signup", "register", "signin", "auth", "oauth", "account", "password"])
+                : Self.blockedPaths
+
             for blocked in Self.blockedDomains {
                 if hrefLower.contains(blocked) { return false }
             }
-            for blocked in Self.blockedPaths {
+            for blocked in effectiveBlockedPaths {
                 if hrefLower.contains(blocked) { return false }
             }
 
-            let navWords: Set<String> = ["menu", "meny", "hem", "home", "about", "om oss", "kontakt",
-                                          "contact", "logga in", "log in", "sign in", "cookie", "acceptera",
+            var navWords: Set<String> = ["menu", "meny", "hem", "home", "about", "om oss", "kontakt",
+                                          "contact", "cookie", "acceptera",
                                           "share", "dela", "print", "skriv ut", "previous", "next",
                                           "föregående", "nästa"]
+            // In action mode, don't block login-related navigation
+            if !isActionMode {
+                navWords.insert("logga in")
+                navWords.insert("log in")
+                navWords.insert("sign in")
+            }
             if navWords.contains(where: { textLower == $0 || textLower.hasPrefix($0 + " ") }) { return false }
 
             return true
@@ -728,23 +1496,32 @@ class EonBrowserAgent: ObservableObject {
             await generateResearchResult(content: combinedContent, sources: sources)
         case .article:
             await generateArticleResult(content: combinedContent, sources: sources)
+        case .action:
+            await generateResearchResult(content: combinedContent, sources: sources)
         }
     }
 
     private func generateResearchResult(content: String, sources: [String]) async {
+        var extraContext = ""
+        if !extractedPrices.isEmpty {
+            let priceList = extractedPrices.prefix(15).map { "\($0.item): \($0.price)" }.joined(separator: "\n")
+            extraContext = "\n\nHITTADE PRISER:\n\(priceList)\n"
+        }
+
         let qwenResult = await generateWithQwen(
             prompt: """
             Du är en erfaren forskare. Besvara på svenska med fakta och substans:
-            
+
             FRÅGA: \(goal)
-            
+
             INSAMLAD DATA (\(collectedContent.count) källor):
             \(String(content.prefix(3000)))
-            
+            \(extraContext)
             Instruktioner:
             - Sammanfatta de viktigaste fynden med konkreta fakta
             - Strukturera med tydliga stycken
             - Nämn specifika siffror, namn, datum om tillgängligt
+            - Om priser hittades: rangordna från billigast till dyrast och ge rekommendation
             - Skriv max 500 ord, varmt och engagerande
             """,
             maxTokens: 700
@@ -755,7 +1532,7 @@ class EonBrowserAgent: ObservableObject {
 
         result = BrowseResult(title: title, summary: summary, sources: sources,
                               fullContent: content, articleDomain: nil)
-        addStep(.done, "Forskning klar!", "\(collectedContent.count) sidor, \(sources.count) källor")
+        addStep(.done, "Forskning klar!", "\(collectedContent.count) sidor, \(sources.count) källor\(extractedPrices.isEmpty ? "" : ", \(extractedPrices.count) priser")")
         statusLabel = "Klar"
         progress = 1.0
         isBrowsing = false
@@ -896,6 +1673,8 @@ extension BrowseStep.StepType {
         case .reading:    return "doc.text.magnifyingglass"
         case .extracting: return "text.magnifyingglass"
         case .writing:    return "pencil.line"
+        case .acting:     return "hand.tap.fill"
+        case .waiting:    return "hourglass"
         case .done:       return "checkmark.circle.fill"
         case .error:      return "exclamationmark.triangle.fill"
         }

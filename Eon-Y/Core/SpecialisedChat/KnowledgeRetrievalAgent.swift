@@ -35,13 +35,13 @@ struct KnowledgeBundle: Sendable {
         let relevanceScore: Float
     }
 
-    /// Bygger den bästa kompakta kontexten för prompten (max ~150 tokens)
-    func bestContextForPrompt(maxChars: Int = 500) -> String {
+    /// Bygger den bästa kompakta kontexten för prompten (generous budget)
+    func bestContextForPrompt(maxChars: Int = 600) -> String {
         var parts: [String] = []
         var remaining = maxChars
 
-        // Prioritet 1: Bästa fakta
-        for fact in facts.prefix(3) where remaining > 0 {
+        // Prioritet 1: Bästa fakta (fler nu)
+        for fact in facts.prefix(5) where remaining > 0 {
             let text = fact.naturalLanguage
             if text.count < remaining {
                 parts.append(text)
@@ -49,16 +49,19 @@ struct KnowledgeBundle: Sendable {
             }
         }
 
-        // Prioritet 2: Bästa artikel (bara rubrik + kort utdrag)
-        if let best = articles.first, remaining > 50 {
-            let excerpt = "\(best.title): \(String(best.content.prefix(min(remaining - 10, 120))))"
+        // Prioritet 2: Bästa artiklar (fler, med mer innehåll)
+        for article in articles.prefix(2) where remaining > 50 {
+            let maxExcerpt = min(remaining - 10, 200)
+            let excerpt = "\(article.title): \(String(article.content.prefix(maxExcerpt)))"
             parts.append(excerpt)
             remaining -= excerpt.count + 2
         }
 
-        // Prioritet 3: Relevantaste minne
-        if let best = memories.first, remaining > 30 {
-            parts.append(String(best.content.prefix(min(remaining, 100))))
+        // Prioritet 3: Relevanta minnen
+        for mem in memories.prefix(2) where remaining > 30 {
+            let memText = String(mem.content.prefix(min(remaining, 120)))
+            parts.append(memText)
+            remaining -= memText.count + 2
         }
 
         return parts.joined(separator: ". ")
@@ -81,7 +84,7 @@ actor KnowledgeRetrievalAgent {
 
         // Kör ALLA sökningar parallellt
         async let factsResult = searchAndRankFacts(input: input, entities: entities, embedding: inputEmbedding, hasBERT: hasEmbedding)
-        async let articlesResult = searchAndRankArticles(input: input, embedding: inputEmbedding, hasBERT: hasEmbedding, maxArticles: 1)
+        async let articlesResult = searchAndRankArticles(input: input, embedding: inputEmbedding, hasBERT: hasEmbedding, maxArticles: 2)
         async let memoriesResult = searchAndRankMemories(input: input, embedding: inputEmbedding, hasBERT: hasEmbedding)
 
         let facts = await factsResult
@@ -124,16 +127,16 @@ actor KnowledgeRetrievalAgent {
         var allFacts: [(subject: String, predicate: String, object: String)] = []
         let seen = NSMutableSet()  // Dedup
 
-        // Sök 1: Original input
-        let inputFacts = await memory.searchFacts(query: input, limit: deepMode ? 15 : 10)
+        // Sök 1: Original input (generous limits)
+        let inputFacts = await memory.searchFacts(query: input, limit: deepMode ? 20 : 12)
         for f in inputFacts {
             let key = "\(f.subject)|\(f.predicate)|\(f.object)"
             if !seen.contains(key) { seen.add(key); allFacts.append(f) }
         }
 
-        // Sök 2: Varje entitet
-        for entity in entities.prefix(3) {
-            let eFacts = await memory.searchFacts(query: entity.text, limit: 5)
+        // Sök 2: Varje entitet (fler fakta per entitet)
+        for entity in entities.prefix(4) {
+            let eFacts = await memory.searchFacts(query: entity.text, limit: 7)
             for f in eFacts {
                 let key = "\(f.subject)|\(f.predicate)|\(f.object)"
                 if !seen.contains(key) { seen.add(key); allFacts.append(f) }
@@ -144,8 +147,8 @@ actor KnowledgeRetrievalAgent {
         let inputWords = input.components(separatedBy: .whitespacesAndNewlines)
             .map { $0.trimmingCharacters(in: .punctuationCharacters) }
             .filter { $0.count > 3 }
-        for word in inputWords.prefix(3) {
-            let wFacts = await memory.searchFacts(query: word, limit: 3)
+        for word in inputWords.prefix(4) {
+            let wFacts = await memory.searchFacts(query: word, limit: 4)
             for f in wFacts {
                 let key = "\(f.subject)|\(f.predicate)|\(f.object)"
                 if !seen.contains(key) { seen.add(key); allFacts.append(f) }
@@ -180,8 +183,8 @@ actor KnowledgeRetrievalAgent {
                 }
             }
             return scored.sorted { $0.relevanceScore > $1.relevanceScore }
-                .filter { $0.relevanceScore > 0.20 }
-                .prefix(deepMode ? 8 : 4).map { $0 }
+                .filter { $0.relevanceScore > 0.18 }
+                .prefix(deepMode ? 10 : 6).map { $0 }
         } else {
             return allFacts.prefix(deepMode ? 6 : 3).map {
                 KnowledgeBundle.RankedFact(subject: $0.subject, predicate: $0.predicate,
@@ -296,16 +299,17 @@ actor KnowledgeRetrievalAgent {
         articles: [KnowledgeBundle.RankedArticle],
         memories: [KnowledgeBundle.RankedMemory]
     ) -> KnowledgeBundle {
-        // Beräkna kunskapstäckning
-        let hasRelevantFacts = facts.first.map { $0.relevanceScore > 0.35 } ?? false
-        let hasRelevantArticles = articles.first.map { $0.relevanceScore > 0.35 } ?? false
-        let hasRelevantMemories = memories.first.map { $0.relevanceScore > 0.35 } ?? false
+        // Beräkna kunskapstäckning (lowered thresholds for more aggressive knowledge use)
+        let hasRelevantFacts = facts.first.map { $0.relevanceScore > 0.28 } ?? false
+        let hasRelevantArticles = articles.first.map { $0.relevanceScore > 0.30 } ?? false
+        let hasRelevantMemories = memories.first.map { $0.relevanceScore > 0.30 } ?? false
 
         let hasStrong = hasRelevantFacts || hasRelevantArticles
         let coverage: Double
-        if hasRelevantFacts && hasRelevantArticles { coverage = 0.9 }
-        else if hasRelevantFacts || hasRelevantArticles { coverage = 0.6 }
-        else if hasRelevantMemories { coverage = 0.3 }
+        if hasRelevantFacts && hasRelevantArticles { coverage = 0.95 }
+        else if hasRelevantFacts || hasRelevantArticles { coverage = 0.7 }
+        else if hasRelevantMemories { coverage = 0.4 }
+        else if !facts.isEmpty || !articles.isEmpty { coverage = 0.15 }
         else { coverage = 0.05 }
 
         // Bygg sammanfattning

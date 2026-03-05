@@ -330,39 +330,39 @@ actor ResponseStrategyPlanner {
     ) -> [String] {
         var instructions: [String] = []
 
-        // Grundläggande instruktion baserat på strategi
+        // Grundläggande instruktion baserat på strategi — varje ska driva MOT substans
         switch type {
         case .greeting:
-            instructions.append("Svara kort och vänligt. Visa personlighet.")
+            instructions.append("Svara kort och vänligt med personlighet. Visa att du är engagerad och klar för samtal.")
         case .selfExplanation:
-            instructions.append("Beskriv dig själv naturligt. Använd 'jag' och var ärlig om dina förmågor och begränsningar.")
+            instructions.append("Beskriv dig själv naturligt och ärligt. Använd 'jag'. Nämn konkreta förmågor, begränsningar och vad du upplever just nu.")
             if selfKnowledge.isRelevant {
-                instructions.append("Inkludera relevant självkunskap: \(selfKnowledge.relevantFacts.prefix(2).joined(separator: "; "))")
+                instructions.append("Självkunskap: \(selfKnowledge.relevantFacts.prefix(3).joined(separator: "; "))")
             }
             if !selfKnowledge.currentState.isEmpty {
-                instructions.append("Nämn ditt aktuella tillstånd om det är intressant: \(selfKnowledge.currentState)")
+                instructions.append("Aktuellt tillstånd: \(selfKnowledge.currentState)")
             }
         case .factual, .knowledgeAnswer, .definition:
-            instructions.append("Svara sakligt och direkt. Fakta först.")
+            instructions.append("Svara med konkreta fakta först. Nämn siffror, namn, datum. Ge mer detalj än det minimala.")
             if knowledge.hasStrongKnowledge {
-                instructions.append("Basera svaret på: \(knowledge.knowledgeSummary.prefix(200))")
+                instructions.append("ANVÄND dessa fakta som grund: \(knowledge.knowledgeSummary.prefix(250))")
             }
         case .reasoning, .deepAnalysis:
-            instructions.append("Resonera steg för steg. Visa ditt tänkande.")
+            instructions.append("Resonera steg för steg med konkreta fakta. Visa logiken. Ge en tydlig slutsats.")
         case .comparison:
-            instructions.append("Jämför punkt för punkt. Var balanserad.")
+            instructions.append("Jämför systematiskt punkt för punkt. Var balanserad. Ge en tydlig rekommendation om möjligt.")
         case .listAnswer:
-            instructions.append("Lista tydligt med punkter.")
+            instructions.append("Lista tydligt och ordnat. Ge korta men informativa beskrivningar för varje punkt.")
         case .opinion:
-            instructions.append("Ge en genomtänkt åsikt. Visa att du resonerar.")
+            instructions.append("Ge en genomtänkt åsikt med konkret argumentation. Visa att du resonerar och väger för och emot.")
         case .creative:
-            instructions.append("Var kreativ och originell. Släpp loss lite.")
+            instructions.append("Var kreativ, originell och engagerande. Visa stilistisk medvetenhet.")
         case .empathetic:
-            instructions.append("Visa empati först, sedan hjälp. Lyssna aktivt.")
+            instructions.append("Visa genuin empati. Bekräfta känslan först, ge sedan konkret stöd eller perspektiv.")
         case .followUp:
-            instructions.append("Koppla tillbaka till föregående ämne. Var koncis.")
+            instructions.append("Koppla tillbaka till föregående ämne. Lägg till ny information eller fördjupning, inte bara upprepning.")
         case .conversational:
-            instructions.append("Var naturlig och personlig. Ställ gärna en motfråga.")
+            instructions.append("Var naturlig, personlig och substantiv. Ställ en intressant motfråga. Visa nyfikenhet.")
         }
 
         // Toninstruktion
@@ -443,12 +443,22 @@ actor ResponseStrategyPlanner {
         complexity: ResponseStrategy.ResponseComplexity,
         questionType: QuestionProfile.QuestionType
     ) -> Int {
-        // Increased token budgets to allow substantive, factual answers
+        // Generous token budgets for rich, substantive answers
+        let base: Int
         switch complexity {
-        case .simple: return 100
-        case .moderate: return 200
-        case .complex: return 350
-        case .deep: return 500
+        case .simple: base = 120
+        case .moderate: base = 250
+        case .complex: base = 450
+        case .deep: base = 600
+        }
+        // Extra tokens for types that need more detail
+        switch questionType {
+        case .explanation, .whyExplanation, .comparison, .list, .creative:
+            return min(base + 100, 700)
+        case .howTo:
+            return min(base + 80, 600)
+        default:
+            return base
         }
     }
 }
