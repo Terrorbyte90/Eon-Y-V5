@@ -56,6 +56,40 @@ actor EonEvaluator {
                      testCases: [
                         BenchmarkCase(prompt: "Vad har morfologi gemensamt med kausalitet?", expectedKeywords: ["struktur", "relation", "mönster", "koppling"], minScore: 0.4),
                      ]),
+
+        // ── SVENSKA SPRÅKTEST (v30 - 300% utökad) ──
+        EonBenchmark(id: "swedish_grammar", name: "Svensk grammatik", category: .knowledge,
+                     description: "Förstår Eon svensk grammatik (V2, bisatser, kongruens)?",
+                     testCases: [
+                        BenchmarkCase(prompt: "Vad är V2-regeln i svenska?", expectedKeywords: ["verb", "andra", "plats", "huvudsats", "syntax"], minScore: 0.6),
+                        BenchmarkCase(prompt: "Hur fungerar ordföljd i bisatser?", expectedKeywords: ["subjekt", "verb", "adverb", "inte", "bisats"], minScore: 0.5),
+                        BenchmarkCase(prompt: "Förklara passivbildning med -s", expectedKeywords: ["passiv", "suffix", "-s", "läses", "skrivs"], minScore: 0.5),
+                        BenchmarkCase(prompt: "Vad är topikalisering?", expectedKeywords: ["ordföljd", "första", "plats", "subjekt", "betoning"], minScore: 0.4),
+                     ]),
+
+        EonBenchmark(id: "swedish_morphology", name: "Svensk morfologi", category: .knowledge,
+                     description: "Kan Eon analysera svenska ord morfologiskt?",
+                     testCases: [
+                        BenchmarkCase(prompt: "Analysera ordet 'förutspåbarhet'", expectedKeywords: ["förut", "säg", "spå", "bar", "het", "suffix"], minScore: 0.5),
+                        BenchmarkCase(prompt: "Vad är ett sammansatt ord på svenska?", expectedKeywords: ["sammansättning", "grundord", "bestämningsord", "fogemorfem"], minScore: 0.5),
+                        BenchmarkCase(prompt: "Förklara böjning av svenska substantiv", expectedKeywords: ["plural", "bestämd", "obestämd", "utrum", "neutrum"], minScore: 0.5),
+                        BenchmarkCase(prompt: "Vad är ett derivat?", expectedKeywords: ["avledning", "rot", "suffix", "nybildning", "ordklass"], minScore: 0.4),
+                     ]),
+
+        EonBenchmark(id: "swedish_semantics", name: "Svensk semantik och WSD", category: .knowledge,
+                     description: "Kan Eon disambiguera svenska flertydiga ord?",
+                     testCases: [
+                        BenchmarkCase(prompt: "Vad betyder 'band' i meningen 'han spelade i ett band'?", expectedKeywords: ["musikgrupp", "spela", "musik", "rockband"], minScore: 0.6),
+                        BenchmarkCase(prompt: "Vad betyder 'mål' i meningen 'hon satte ett mål'?", expectedKeywords: ["syfte", "ändamål", "delmål", "sport"], minScore: 0.5),
+                        BenchmarkCase(prompt: "Vad betyder 'rätt' i meningen 'det var en god rätt'?", expectedKeywords: ["maträtt", "middag", "mat", "god"], minScore: 0.5),
+                     ]),
+
+        EonBenchmark(id: "swedish_pragmatics", name: "Svensk pragmatik", category: .adaptivity,
+                     description: "Kan Eon använda svenska korrekt i konversation?",
+                     testCases: [
+                        BenchmarkCase(prompt: "Hjälp mig förbättra min svenska", expectedKeywords: ["svenska", "språket", "grammatik", "övning", "lära"], minScore: 0.4),
+                        BenchmarkCase(prompt: "Kan du förklara svenska idiomer?", expectedKeywords: ["idiom", "uttryck", "betydelse", "svenska", "fras"], minScore: 0.4),
+                     ]),
     ]
 
     // MARK: - Kör benchmark
