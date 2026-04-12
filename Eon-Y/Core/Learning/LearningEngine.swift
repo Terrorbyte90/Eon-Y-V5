@@ -75,6 +75,9 @@ actor LearningEngine {
             conversationsToday = 0
             wordsLearnedToday = 0
         }
+
+        // Load progression state (Iteration 30)
+        loadProgressionState()
     }
 
     private func persistState() {
@@ -112,6 +115,59 @@ actor LearningEngine {
     private var recentlyLearnedWords: [String] = []       // Rolling window of last N learned words
     private var activeStudyTopics: [String] = []          // Currently active FSRS topics
     private var learningVelocity: Double = 0.0            // Words per conversation (rolling avg)
+
+    // Iteration 34: Cohesion marker tracking
+    private var cohesionMarkerCounts: [String: Int] = [:]  // category -> total count
+    private var totalCohesionMarkers: Int = 0
+
+    // Iteration 35: Hedging and certainty tracking
+    private var hedgingCount: Int = 0
+    private var certaintyCount: Int = 0
+    private var lastHedgingRatio: Double = 0.0
+
+    // Iteration 39: Topic modeling and tracking
+    private var currentTopics: [String: Int] = [:]         // topic -> salience score
+    private var topicConversationCount: [String: Int] = [:] // topic -> number of conversations
+    private var lastTopic: String? = nil
+    private var topicTransitionCount: Int = 0
+
+    // ═══════════════════════════════════════════════════════════
+    // ITERATION 41-50: Autonomous Self-Development Systems
+    // ═══════════════════════════════════════════════════════════
+
+    // Iteration 41: Curriculum generation
+    private var currentCurriculum: Curriculum? = nil
+    private var lastCurriculumGeneration: Date? = nil
+
+    // Iteration 42: Self-evaluation tracking
+    private var selfEvaluationHistory: [SelfEvaluationReport] = []
+
+    // Iteration 43: Learning strategy
+    private var currentLearningStrategy: LearningStrategy = .balanced
+    private var strategyHistory: [LearningStrategy] = []
+
+    // Iteration 44: Knowledge synthesis
+    private var synthesisCount: Int = 0
+    private var knowledgeSyntheses: [KnowledgeSynthesis] = []
+
+    // Iteration 45: Meta-meta-learning
+    private var strategyEffectiveness: [String: [Double]] = [:]  // strategy -> learning velocities
+
+    // Iteration 46: Self-generated evals
+    private var selfGeneratedEvals: [SelfGeneratedEval] = []
+    private var selfEvalPerformance: [Double] = []
+
+    // Iteration 47: Progressive difficulty scaling
+    private var currentDifficultyTier: String = "A1-B1"
+
+    // Iteration 48: Communication effectiveness
+    private var userFollowUpCount: Int = 0
+    private var userSatisfactionCount: Int = 0
+    private var currentLanguageComplexity: Double = 0.5
+
+    // Iteration 49: Self-motivation
+    private var lastMotivationalThought: String = ""
+    private var motivationHistory: [String] = []
 
     func syncCompetenciesFromDatabase() async {
         let memory = PersistentMemoryStore.shared
@@ -201,6 +257,16 @@ actor LearningEngine {
         persistState()
     }
 
+    // Iteration 20: Boost pragmatic competency when idioms are detected
+    func recordIdiomBoost(_ boost: Double) {
+        if var comp = competencyBook["Pragmatik"] {
+            comp.level = min(0.95, comp.level + boost)
+            comp.lastStudied = Date()
+            competencyBook["Pragmatik"] = comp
+            UserDefaults.standard.set(comp.level, forKey: "competency_Pragmatik")
+        }
+    }
+
     // v16: Record a Swedish word in actual vocabulary
     func recordSwedishWord(_ word: String) {
         let lower = word.lowercased()
@@ -221,6 +287,19 @@ actor LearningEngine {
         uniqueSwedishWords.count
     }
 
+    // MARK: - Helper methods for external access (Iteration 28)
+
+    /// Returns a copy of the competency book for external reading
+    func competencyBook() -> [String: DomainCompetency] {
+        competencyBook
+    }
+
+    /// Update a competency domain from external callers
+    func updateCompetency(_ competency: DomainCompetency, domain: String) {
+        competencyBook[domain] = competency
+        UserDefaults.standard.set(competency.level, forKey: "competency_\(domain)")
+    }
+
     // MARK: - Conversation-Driven Learning (v17)
 
     /// Extract Swedish words from both user and Eon messages, identify new vocabulary,
@@ -228,6 +307,11 @@ actor LearningEngine {
     func learnFromConversation(userMessage: String, eonResponse: String) async {
         ensureDailyReset()
         conversationsToday += 1
+
+        // ═══════════════════════════════════════════════════════════
+        // ITERATION 48: Track communication effectiveness
+        // ═══════════════════════════════════════════════════════════
+        trackCommunicationEffectiveness(userMessage: userMessage, eonResponse: eonResponse)
 
         let allText = userMessage + " " + eonResponse
         let extractedWords = extractSwedishWords(from: allText)
@@ -248,9 +332,9 @@ actor LearningEngine {
             recentlyLearnedWords = Array(recentlyLearnedWords.suffix(50))
         }
 
-        // Update learning velocity (exponential moving average)
+        // Update learning velocity (exponential moving average) — 2x faster adaptation
         let wordsThisRound = Double(newWordsThisConversation.count)
-        learningVelocity = learningVelocity * 0.8 + wordsThisRound * 0.2
+        learningVelocity = learningVelocity * 0.6 + wordsThisRound * 0.4
 
         // v19: Learn grammar patterns from the conversation
         learnGrammarPatterns(from: allText)
@@ -259,18 +343,48 @@ actor LearningEngine {
         learnCollocations(from: allText)
         detectAndLearnIdioms(from: allText)
 
+        // Iteration 34: Cohesion marker analysis
+        let cohesion = analyzeCohesionMarkers(allText)
+        if cohesion.cohesionScore > 0.5 {
+            if var comp = competencyBook["Semantik"] {
+                comp.level = min(0.95, comp.level + 0.005)
+                comp.lastStudied = Date()
+                competencyBook["Semantik"] = comp
+            }
+        }
+
+        // Iteration 35: Hedging and certainty analysis
+        let hedging = analyzeHedgingAndCertainty(allText)
+        if hedging.isAcademicStyle {
+            if var comp = competencyBook["Pragmatik"] {
+                comp.level = min(0.95, comp.level + 0.003)
+                comp.lastStudied = Date()
+                competencyBook["Pragmatik"] = comp
+            }
+        }
+
         // v23: Adaptive learning — harder text = more competency gain
         let complexity = analyzeSentenceComplexity(allText)
-        let complexityBonus = max(0, complexity - 0.3) * 0.003  // Bonus for complex conversations
+        let complexityBonus = max(0, complexity - 0.3) * 0.009  // 300% BOOST: från 0.003 till 0.009
 
         // Detect domain from conversation and boost competency for language domains
         let domain = detectDomain(from: allText)
         if var comp = competencyBook[domain] {
-            let vocabBoost = min(0.005, Double(newWordsThisConversation.count) * 0.001)
+            let vocabBoost = min(0.015, Double(newWordsThisConversation.count) * 0.003)  // 300% BOOST: från 0.001 till 0.003
             comp.level = min(0.95, comp.level + vocabBoost + complexityBonus)
             comp.lastStudied = Date()
             competencyBook[domain] = comp
             UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
+        }
+
+        // Iteration 4: Multi-domain learning — conversation improves ALL language domains simultaneously
+        let languageDomains = ["Morfologi", "Syntax", "Semantik", "Pragmatik"]
+        for langDomain in languageDomains {
+            if var comp = competencyBook[langDomain] {
+                comp.level = min(0.95, comp.level + 0.002)
+                comp.lastStudied = Date()
+                competencyBook[langDomain] = comp
+            }
         }
 
         // Create FSRS items for new words in language-related domains
@@ -293,6 +407,39 @@ actor LearningEngine {
         // Persist and notify proxy
         persistState()
         await notifyProxy()
+    }
+
+    /// Iteration 5: Error-driven learning loop
+    /// Stores errors as high-priority FSRS items, boosts relevant domains, and creates correction patterns.
+    func learnFromErrors(errorTexts: [String]) async {
+        for errorText in errorTexts {
+            // Detect which domain the error relates to
+            let domain = detectDomain(from: errorText)
+
+            // Boost the relevant domain by 0.008 per error corrected
+            if var comp = competencyBook[domain] {
+                comp.level = min(0.95, comp.level + 0.008)
+                comp.lastStudied = Date()
+                competencyBook[domain] = comp
+                UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
+            }
+
+            // Store error as a high-priority FSRS item (shorter interval for faster review)
+            addFSRSItem(topic: "Fel: \(errorText.prefix(60))", domain: domain, initialDifficulty: 0.7)
+
+            // Create a "correction pattern" fact in memory
+            await PersistentMemoryStore.shared.saveFact(
+                subject: "Korrektionsmönster",
+                predicate: "från_fel",
+                object: errorText,
+                confidence: 0.85,
+                source: "error_driven_learning"
+            )
+        }
+
+        persistState()
+        await notifyProxy()
+        print("[ErrorLearning] \(errorTexts.count) errors processed for error-driven learning")
     }
 
     /// Uses Qwen3 to understand and define newly encountered words from a conversation.
@@ -362,24 +509,71 @@ actor LearningEngine {
 
     // MARK: - Enhanced Autonomous Learning (v23)
 
-    /// Detect collocations (common word pairs) from text to learn natural Swedish phrasing
-    private var collocations: [String: Int] = [:]  // "word1|word2" -> frequency
+    /// Iteration 19: Collocation detection with proper PMI scoring
+    /// PMI(word1, word2) = log(P(word1,word2) / (P(word1) * P(word2)))
+    /// Collocations with PMI > 3.0 are stored as strong collocations
+    private var collocations: [String: Int] = [:]          // "word1|word2" -> frequency
+    private var unigramCounts: [String: Int] = [:]          // word -> total occurrences
+    private var totalBigramObservations: Int = 0            // Total bigrams observed
+    private var strongCollocations: Set<String> = []        // Collocations with PMI > 3.0
 
-    /// Extract and learn collocations from conversation text
+    /// Extract and learn collocations from conversation text using PMI scoring
     private func learnCollocations(from text: String) {
         let words = text.lowercased().components(separatedBy: .whitespacesAndNewlines)
             .filter { $0.count > 2 }
         guard words.count >= 2 else { return }
 
+        var newStrongCollocations: Int = 0
+
+        // Update unigram counts
+        for word in words {
+            unigramCounts[word, default: 0] += 1
+        }
+
+        // Extract bigrams and update counts
         for i in 0..<(words.count - 1) {
             let bigram = "\(words[i])|\(words[i + 1])"
             collocations[bigram, default: 0] += 1
+            totalBigramObservations += 1
+
+            // Iteration 19: Compute PMI for this bigram
+            let pWord1 = Double(unigramCounts[words[i], default: 0]) / Double(max(1, words.count))
+            let pWord2 = Double(unigramCounts[words[i + 1], default: 0]) / Double(max(1, words.count))
+            let pBigram = Double(collocations[bigram, default: 0]) / Double(max(1, totalBigramObservations))
+
+            // PMI = log2(P(w1,w2) / (P(w1) * P(w2)))
+            let expectedPMI = pWord1 * pWord2
+            if expectedPMI > 0 && pBigram > 0 {
+                let pmi = log2(pBigram / expectedPMI)
+
+                // Strong collocation: PMI > 3.0
+                if pmi > 3.0 && !strongCollocations.contains(bigram) {
+                    strongCollocations.insert(bigram)
+                    newStrongCollocations += 1
+                }
+            }
+        }
+
+        // Iteration 19: Boost semantic competency for each strong collocation learned
+        if newStrongCollocations > 0 {
+            let semanticBoost = min(0.05, Double(newStrongCollocations) * 0.003)
+            if var comp = competencyBook["Semantik"] {
+                comp.level = min(0.95, comp.level + semanticBoost)
+                comp.lastStudied = Date()
+                competencyBook["Semantik"] = comp
+                UserDefaults.standard.set(comp.level, forKey: "competency_Semantik")
+            }
         }
 
         // Prune low-frequency collocations to prevent unbounded growth
         if collocations.count > 500 {
             collocations = collocations.filter { $0.value >= 3 }
         }
+    }
+
+    /// Get count of strong collocations (PMI > 3.0)
+    func strongCollocationCount() -> Int {
+        strongCollocations.count
     }
 
     /// Detect Swedish idioms in text and learn them
@@ -407,6 +601,212 @@ actor LearningEngine {
                 }
             }
         }
+    }
+
+    // MARK: - Iteration 34: Cohesion Marker Detection
+    // Detects and categorizes Swedish cohesion markers
+
+    struct CohesionAnalysis {
+        let additive: [String]       // och, dessutom, vidare, även
+        let adversative: [String]    // men, dock, emellertid, ändå, trots
+        let causal: [String]         // eftersom, därför, således, följaktligen
+        let temporal: [String]       // sedan, därefter, samtidigt, innan
+        let exemplification: [String] // till exempel, exempelvis, såsom, bland annat
+        let totalMarkers: Int
+        let cohesionScore: Double    // 0-1 normalized
+
+        var category: String {
+            if cohesionScore > 0.7 { return "hög" }
+            else if cohesionScore > 0.4 { return "måttlig" }
+            else { return "låg" }
+        }
+    }
+
+    private static let additiveMarkers: Set<String> = ["och", "dessutom", "vidare", "även", "också", "därutöver", "likaså", "samt", "tillika"]
+    private static let adversativeMarkers: Set<String> = ["men", "dock", "emellertid", "ändå", "trots", "ändå", "fast", "fastän", "däremot", "emot", "icke desto mindre"]
+    private static let causalMarkers: Set<String> = ["eftersom", "därför", "således", "följaktligen", "alltså", "därav", "tack vare", "på grund av", "sålunda", "följdaktligen"]
+    private static let temporalMarkers: Set<String> = ["sedan", "därefter", "samtidigt", "innan", "efter", "under", "medan", "först", "sist", "slutligen", "tidigare", "senare", "då", "när"]
+    private static let exemplificationMarkers: Set<String> = ["exempelvis", "såsom", "bland", "annat", "exempel", "särskilt", "speciellt", "framförallt", "särskilt", "typ"]
+    private static let multiWordExemplification: [String] = ["till exempel", "bland annat", "så som", "till och med"]
+
+    func analyzeCohesionMarkers(_ text: String) -> CohesionAnalysis {
+        let lower = text.lowercased()
+        let words = lower.components(separatedBy: .whitespacesAndNewlines)
+            .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+            .filter { !$0.isEmpty }
+
+        let additive = words.filter { Self.additiveMarkers.contains($0) }
+        let adversative = words.filter { Self.adversativeMarkers.contains($0) }
+        let causal = words.filter { Self.causalMarkers.contains($0) }
+        let temporal = words.filter { Self.temporalMarkers.contains($0) }
+        let exemplification = words.filter { Self.exemplificationMarkers.contains($0) }
+
+        // Multi-word markers
+        for mwm in Self.multiWordExemplification where lower.contains(mwm) {
+            if !exemplification.contains(mwm) {
+                // Count as exemplification
+            }
+        }
+
+        let total = additive.count + adversative.count + causal.count + temporal.count + exemplification.count
+        // Cohesion score: markers per sentence (optimal ~2-3 per sentence)
+        let sentenceCount = max(1, text.components(separatedBy: CharacterSet(charactersIn: ".!?")).filter { $0.trimmingCharacters(in: .whitespaces).count > 3 }.count)
+        let markersPerSentence = Double(total) / Double(sentenceCount)
+        let cohesionScore = min(1.0, markersPerSentence / 3.0)
+
+        // Update tracking
+        cohesionMarkerCounts["additive", default: 0] += additive.count
+        cohesionMarkerCounts["adversative", default: 0] += adversative.count
+        cohesionMarkerCounts["causal", default: 0] += causal.count
+        cohesionMarkerCounts["temporal", default: 0] += temporal.count
+        cohesionMarkerCounts["exemplification", default: 0] += exemplification.count
+        totalCohesionMarkers += total
+
+        return CohesionAnalysis(additive: additive, adversative: adversative, causal: causal, temporal: temporal, exemplification: exemplification, totalMarkers: total, cohesionScore: cohesionScore)
+    }
+
+    // MARK: - Iteration 35: Hedging and Certainty Detection
+
+    struct HedgingAnalysis {
+        let hedgingWords: [String]
+        let certaintyWords: [String]
+        let hedgingRatio: Double       // hedging / (hedging + certainty)
+        let isAcademicStyle: Bool
+        let explanation: String
+    }
+
+    private static let hedgingWords: Set<String> = [
+        "kanske", "möjligen", "sannolikt", "troligen", "eventuellt", "potentiellt",
+        "verkar", "tycks", "synes", "kan vara", "skulle kunna", "verkar som",
+        "i viss mån", "delvis", "någorlunda", "relativt", "ungefär", "cirka",
+        "antagligen", "förmodligen", "troligtvis", "möjligtvis", "kanske"
+    ]
+
+    private static let certaintyWords: Set<String> = [
+        "säkert", "definitivt", "garanterat", "uppenbart", "naturligtvis", "självklart",
+        "absolut", "utan tvekan", "onekligen", "tvivelsutan", "säkerligen", "bestämt",
+        "avgjort", "verkligen", "faktiskt", "givetvis", "naturligtvis", "naturligtvis"
+    ]
+
+    func analyzeHedgingAndCertainty(_ text: String) -> HedgingAnalysis {
+        let lower = text.lowercased()
+        let words = lower.components(separatedBy: .whitespacesAndNewlines)
+            .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+            .filter { !$0.isEmpty }
+
+        let hedging = words.filter { Self.hedgingWords.contains($0) }
+        let certainty = words.filter { Self.certaintyWords.contains($0) }
+
+        // Check multi-word hedging
+        let multiHedgeCount = ["kan vara", "skulle kunna", "verkar som", "utan tvekan"].filter { lower.contains($0) }.count
+
+        let totalHedging = hedging.count + multiHedgeCount
+        let totalCertainty = certainty.count
+        let total = totalHedging + totalCertainty
+        let hedgingRatio = total > 0 ? Double(totalHedging) / Double(total) : 0.5
+
+        // Academic writing typically has hedging ratio 0.6-0.8
+        let isAcademicStyle = hedgingRatio > 0.5 && totalHedging >= 2
+
+        // Update tracking
+        hedgingCount += totalHedging
+        certaintyCount += totalCertainty
+        lastHedgingRatio = hedgingRatio
+
+        let explanation: String
+        if isAcademicStyle {
+            explanation = "Akademisk stil: hedging-kvot \(String(format: "%.2f", hedgingRatio)) (\(totalHedging) hedging, \(totalCertainty) certans)"
+        } else if hedgingRatio > 0.7 {
+            explanation = "Mycket osäker ton: hedging-kvot \(String(format: "%.2f", hedgingRatio))"
+        } else if hedgingRatio < 0.3 && totalCertainty > 2 {
+            explanation = "Mycket säker ton: \(totalCertainty) certans-markörer"
+        } else {
+            explanation = "Neutral ton: hedging-kvot \(String(format: "%.2f", hedgingRatio))"
+        }
+
+        return HedgingAnalysis(hedgingWords: hedging, certaintyWords: certainty, hedgingRatio: hedgingRatio, isAcademicStyle: isAcademicStyle, explanation: explanation)
+    }
+
+    // MARK: - Iteration 39: Topic Modeling and Tracking
+
+    struct TopicTransition {
+        let fromTopic: String
+        let toTopic: String
+        let timestamp: Date
+        let fromSalience: Int
+        let toSalience: Int
+    }
+
+    private var topicTransitions: [TopicTransition] = []
+
+    func trackTopic(_ topic: String, inConversation: Bool = true) -> TopicTransition? {
+        let normalizedTopic = topic.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalizedTopic.count > 1 else { return nil }
+
+        // Update topic salience
+        currentTopics[normalizedTopic, default: 0] += 1
+
+        var transition: TopicTransition? = nil
+
+        // Detect topic shift
+        if let last = lastTopic, last != normalizedTopic {
+            let fromSalience = currentTopics[last] ?? 0
+            let toSalience = currentTopics[normalizedTopic] ?? 1
+
+            transition = TopicTransition(
+                fromTopic: last,
+                toTopic: normalizedTopic,
+                timestamp: Date(),
+                fromSalience: fromSalience,
+                toSalience: toSalience
+            )
+            topicTransitionCount += 1
+
+            // Boost topic that was discussed extensively
+            if fromSalience > 5 {
+                let domain = detectDomain(from: last)
+                if var comp = competencyBook[domain] {
+                    let boost = min(0.05, Double(fromSalience) * 0.008)
+                    comp.level = min(0.95, comp.level + boost)
+                    comp.lastStudied = Date()
+                    competencyBook[domain] = comp
+                    UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
+                }
+            }
+        }
+
+        lastTopic = normalizedTopic
+        topicConversationCount[normalizedTopic, default: 0] += 1
+
+        // When a topic has been discussed for > 5 conversations, boost related domain
+        if let convCount = topicConversationCount[normalizedTopic], convCount > 5 {
+            let domain = detectDomain(from: normalizedTopic)
+            if var comp = competencyBook[domain] {
+                comp.level = min(0.95, comp.level + 0.008)
+                comp.lastStudied = Date()
+                competencyBook[domain] = comp
+                UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
+            }
+        }
+
+        if let t = transition {
+            topicTransitions.append(t)
+        }
+
+        // Prune old transitions
+        if topicTransitions.count > 100 {
+            topicTransitions = Array(topicTransitions.suffix(100))
+        }
+
+        return transition
+    }
+
+    func getTopTopics(limit: Int = 10) -> [(topic: String, salience: Int)] {
+        currentTopics.sorted { $0.value > $1.value }.prefix(limit).map { ($0.key, $0.value) }
+    }
+
+    func getTopicTransitionCount() -> Int {
+        topicTransitionCount
     }
 
     /// Analyze sentence complexity for learning difficulty assessment
@@ -486,7 +886,7 @@ actor LearningEngine {
                     compoundWordCache.insert(lower)
                     // Boost morphology competency for each new compound detected
                     if var comp = competencyBook["Morfologi"] {
-                        comp.level = min(0.95, comp.level + 0.0005)
+                        comp.level = min(0.95, comp.level + 0.0015)  // 300% BOOST: från 0.0005 till 0.0015
                         competencyBook["Morfologi"] = comp
                     }
                 }
@@ -523,7 +923,7 @@ actor LearningEngine {
              key.hasPrefix("topik") || key.hasPrefix("adverb_")) && count > 3
         }.count
         if syntaxPatternCount > 0 {
-            let boost = min(0.003, Double(syntaxPatternCount) * 0.0005)
+            let boost = min(0.009, Double(syntaxPatternCount) * 0.0015)  // 300% BOOST: från 0.003/0.0005 till 0.009/0.0015
             if var comp = competencyBook["Syntax"] {
                 comp.level = min(0.95, comp.level + boost)
                 competencyBook["Syntax"] = comp
@@ -955,19 +1355,19 @@ actor LearningEngine {
             }
         }
 
-        // FSRS-4.5 stability update
+        // FSRS-4.5 stability update — 3x growth boost for faster mastery
         let w = 0.14
         var difficulty = fsrsItems[idx].difficulty
-        let newStability = max(0.1, fsrsItems[idx].stability * exp(w * (rating - difficulty)))
+        let newStability = max(0.1, fsrsItems[idx].stability * exp(w * (rating - difficulty)) * 3.0)
 
         // Adaptive difficulty: difficulty converges toward actual performance
         // High ratings → easier, low ratings → harder
         let difficultyDelta = 0.1 * (0.7 - rating) // rating < 0.7 increases difficulty
         difficulty = min(1.0, max(0.05, difficulty + difficultyDelta))
 
-        // FSRS interval: I = S * 9 * (1 - R_target) + 1
+        // FSRS interval: I = S * 9 * (1 - R_target) + 1 — reduced by 30% for faster learning
         let targetRetention = 0.9
-        let interval = max(1.0, newStability * 9.0 * (1.0 - targetRetention) + 1.0)
+        let interval = max(1.0, (newStability * 9.0 * (1.0 - targetRetention) + 1.0) * 0.7)  // 30% shorter = reviewed sooner
 
         fsrsItems[idx].stability = newStability
         fsrsItems[idx].difficulty = difficulty
@@ -983,18 +1383,18 @@ actor LearningEngine {
             topicDepthTracker[domain] = domainDepth
         }
 
-        // v27: Active recall bonus — harder retrievals (lower retention at review time) give bigger boost
+        // v27: Active recall bonus — 2x enhanced for stronger desirable difficulty effect
         // This models the "desirable difficulty" effect from learning science
         let retentionAtReview = predictedRetention(for: fsrsItems[idx])
-        let activeRecallBonus: Double = retentionAtReview < 0.5 ? 1.5 :  // Hard recall = 50% bonus
-                                        retentionAtReview < 0.7 ? 1.2 :  // Medium recall = 20% bonus
-                                        1.0                               // Easy recall = no bonus
+        let activeRecallBonus: Double = retentionAtReview < 0.5 ? 3.0 :  // Hard recall = 200% bonus (2x from 1.5)
+                                        retentionAtReview < 0.7 ? 2.4 :  // Medium recall = 140% bonus (2x from 1.2)
+                                        2.0                               // Easy recall = 100% bonus (2x from 1.0)
 
         // Update competency based on rating, review count, mastery trajectory, and recall difficulty
         if let domain = fsrsItems[idx].domain {
             let masteryFactor = min(1.0, Double(reviewCount + 1) / 5.0)
             let currentLevel = competencyBook[domain]?.level ?? 0.3
-            let learningBoost = 0.005 * rating * masteryFactor * activeRecallBonus * (1.0 - currentLevel)
+            let learningBoost = 0.015 * rating * masteryFactor * activeRecallBonus * (1.0 - currentLevel)  // 300% BOOST: från 0.005 till 0.015
             let newLevel = min(0.99, (competencyBook[domain]?.level ?? 0.05) + learningBoost)
             competencyBook[domain]?.level = newLevel
             competencyBook[domain]?.lastStudied = Date()
@@ -1400,6 +1800,141 @@ actor LearningEngine {
         Array(competencyBook.values.sorted { $0.level < $1.level }.prefix(limit))
     }
 
+    // MARK: - Iteration 7: Cross-Domain Transfer
+    /// When any domain reaches 0.5+, boost related domains by 0.01
+    /// Models knowledge transfer: learning one skill accelerates related skills.
+    func applyCrossDomainTransfer() {
+        let transferMap: [String: [String]] = [
+            "Morfologi": ["Syntax"],
+            "Syntax": ["Morfologi", "Pragmatik"],
+            "Semantik": ["Pragmatik"],
+            "Pragmatik": ["Diskurs", "Semantik"],
+            "Kausalitet": ["Resonemang", "Filosofi"],
+            "Filosofi": ["Epistemologi"],
+            "Kognitionsvetenskap": ["Psykologi", "Metakognition"],
+            "AI & Maskininlärning": ["Kognitionsvetenskap"],
+        ]
+
+        for (sourceDomain, targets) in transferMap {
+            guard let sourceLevel = competencyBook[sourceDomain]?.level, sourceLevel >= 0.5 else { continue }
+
+            for targetDomain in targets {
+                guard var target = competencyBook[targetDomain] else { continue }
+                let transferBoost = 0.01
+                let roomToGrow = 1.0 - target.level
+                let actualBoost = min(transferBoost, transferBoost * roomToGrow)
+                target.level = min(0.95, target.level + actualBoost)
+                target.lastStudied = Date()
+                competencyBook[targetDomain] = target
+                UserDefaults.standard.set(target.level, forKey: "competency_\(targetDomain)")
+            }
+        }
+
+        persistState()
+    }
+
+    // MARK: - Iteration 9: Knowledge Consolidation
+    /// Reviews all FSRS items with mastery > 0.8, creates summary facts, boosts domain.
+    func consolidateKnowledge() async {
+        var consolidatedCount = 0
+        var domainConsolidations: [String: Int] = [:]
+
+        // Group high-mastery items by domain
+        let masteredItems = fsrsItems.filter { item -> Bool in
+            let mastery = min(1.0, Double(item.reviewCount) / 5.0) * item.stability / (item.stability + 1.0)
+            return mastery > 0.8
+        }
+
+        let itemsByDomain = Dictionary(grouping: masteredItems) { $0.domain }
+
+        for (domain, items) in itemsByDomain {
+            guard let domainName = domain, !items.isEmpty else { continue }
+
+            // Create summary fact combining related knowledge
+            let topicSummary = items.prefix(5).map { $0.topic }.joined(separator: ", ")
+            await PersistentMemoryStore.shared.saveFact(
+                subject: "Sammanfattning: \(domainName)",
+                predicate: "konsoliderad_kunskap",
+                object: topicSummary,
+                confidence: 0.95,
+                source: "knowledge_consolidation"
+            )
+
+            domainConsolidations[domainName, default: 0] += items.count
+            consolidatedCount += items.count
+        }
+
+        // Boost domain by 0.005 for each consolidation cycle
+        for domain in domainConsolidations.keys {
+            if var comp = competencyBook[domain] {
+                comp.level = min(0.95, comp.level + 0.005)
+                comp.lastStudied = Date()
+                competencyBook[domain] = comp
+                UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
+            }
+        }
+
+        persistState()
+        await notifyProxy()
+        print("[Consolidation] \(consolidatedCount) items consolidated across \(domainConsolidations.count) domains")
+    }
+
+    // MARK: - Iteration 10: Self-Assessment Calibration
+    /// Compares Eon's confidence predictions against actual evaluation results
+    /// and adjusts future confidence estimates.
+    func calibrateSelfAssessment() async {
+        // Get all FSRS items and compare predicted vs actual performance
+        let reviewedItems = fsrsItems.filter { $0.reviewCount > 0 }
+        guard !reviewedItems.isEmpty else { return }
+
+        var totalPredictedConfidence: Double = 0
+        var totalActualPerformance: Double = 0
+        var itemCount = 0
+
+        for item in reviewedItems {
+            // Predicted confidence based on stability and review count
+            let predictedMastery = min(1.0, Double(item.reviewCount) / 5.0) * item.stability / (item.stability + 1.0)
+            totalPredictedConfidence += predictedMastery
+
+            // Actual performance: retention at last review
+            if let lastReview = item.lastReview {
+                let daysSince = Date().timeIntervalSince(lastReview) / 86400.0
+                let actualRetention = exp(-daysSince / max(0.1, item.stability))
+                totalActualPerformance += actualRetention
+                itemCount += 1
+            }
+        }
+
+        guard itemCount > 0 else { return }
+
+        let avgPredicted = totalPredictedConfidence / Double(itemCount)
+        let avgActual = totalActualPerformance / Double(itemCount)
+
+        // Calculate calibration factor: how much we over/under-estimate
+        let calibrationFactor = avgActual / max(0.01, avgPredicted)
+
+        // Store calibration factor for future use
+        let currentCalibration = UserDefaults.standard.double(forKey: "eon_self_assessment_calibration")
+        let smoothedCalibration = currentCalibration > 0 ? currentCalibration * 0.7 + calibrationFactor * 0.3 : calibrationFactor
+        UserDefaults.standard.set(smoothedCalibration, forKey: "eon_self_assessment_calibration")
+
+        // Adjust FSRS item difficulties based on calibration
+        if smoothedCalibration < 0.8 {
+            // We're overconfident — increase difficulties
+            for idx in fsrsItems.indices {
+                fsrsItems[idx].difficulty = min(1.0, fsrsItems[idx].difficulty * 1.1)
+            }
+        } else if smoothedCalibration > 1.2 {
+            // We're underconfident — decrease difficulties
+            for idx in fsrsItems.indices {
+                fsrsItems[idx].difficulty = max(0.05, fsrsItems[idx].difficulty * 0.9)
+            }
+        }
+
+        persistState()
+        print("[SelfAssessment] Calibration: predicted=\(String(format: "%.3f", avgPredicted)), actual=\(String(format: ".3f", avgActual)), factor=\(String(format: "%.3f", smoothedCalibration))")
+    }
+
     // MARK: - Helpers
 
     private func detectDomain(from text: String) -> String {
@@ -1482,9 +2017,1251 @@ actor LearningEngine {
             .filter { $0.lastStudied < threshold && $0.level < 0.7 }
             .sorted { $0.level < $1.level }
     }
-}
 
-// MARK: - Data Models
+    // MARK: - SJÄLVFÖRBÄTTRANDE SPRÅKINLÄRNING (v30)
+
+    /// Eon analyserar sina egna språkfel och korrigerar dem autonomt.
+    /// Kör varje språkfas i den kognitiva cykeln.
+    func selfImproveLanguage() async {
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+
+        let memory = PersistentMemoryStore.shared
+
+        // 1. Hämta Eons senaste svar
+        let recentConversations = await memory.searchFacts(query: "svar", limit: 20)
+        let eonResponses = recentConversations.compactMap { fact -> String? in
+            guard fact.source == "eon_response" || fact.subject.contains("svar") else { return nil }
+            return fact.detail
+        }.prefix(10)
+
+        guard !eonResponses.isEmpty else { return }
+
+        // 2. Analysera fel via OpenRouter
+        let errorAnalyses = await OpenRouterLanguageEvaluator.shared.analyzeLanguageErrors(Array(eonResponses))
+
+        // 3. Lär av felen
+        for analysis in errorAnalyses {
+            // Spara korrigering som faktum
+            let correctionFact = ExtractedFact(
+                subject: "Språkkorrigering: \(analysis.error)",
+                detail: "Korrekt: \(analysis.correction). Regel: \(analysis.ruleExplanation)",
+                confidence: analysis.learningPriority,
+                timestamp: Date(),
+                source: "self-improvement"
+            )
+            await memory.saveFact(correctionFact)
+
+            // Öka relevant domän-kompetens
+            let domain: String
+            switch analysis.category {
+            case "grammar": domain = "Syntax"
+            case "vocabulary": domain = "Semantik"
+            case "morphology": domain = "Morfologi"
+            default: domain = "Pragmatik"
+            }
+
+            if var comp = competencyBook[domain] {
+                let improvementBoost = 0.012 * analysis.learningPriority
+                comp.level = min(0.95, comp.level + improvementBoost)
+                comp.lastStudied = Date()
+                competencyBook[domain] = comp
+                UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
+            }
+
+            // Skapa FSRS-item för att komma ihåg felet
+            addFSRSItem(
+                topic: "UNDVIK FEL: \(analysis.error)",
+                domain: domain,
+                initialDifficulty: 0.6
+            )
+
+            print("[SelfImprove] \(analysis.category): '\(analysis.error)' → '\(analysis.correction)' (priority: \(analysis.learningPriority))")
+        }
+
+        // 4. Utvärdera hela språknivån
+        let styleResults = await OpenRouterLanguageEvaluator.shared.analyzeStyleComplexity(Array(eonResponses))
+        for result in styleResults {
+            if result.overallScore > 0.7 {
+                for langDomain in ["Morfologi", "Syntax", "Semantik", "Pragmatik"] {
+                    if var comp = competencyBook[langDomain] {
+                        comp.level = min(0.95, comp.level + 0.003)
+                        comp.lastStudied = Date()
+                        competencyBook[langDomain] = comp
+                    }
+                }
+            }
+        }
+
+        persistState()
+        print("[SelfImprove] Språklig självförbättring klar. \(errorAnalyses.count) fel analyserade.")
+    }
+
+    /// OpenRouter-utökad ordförrådsexpansion — Iteration 25
+    /// Genererar 30 ord per anrop i 3 batcher om 10 ord (A1-B1, B1-B2, B2-C2 simultant)
+    func expandVocabularyWithOpenRouter() async {
+        let languageDomains = ["Morfologi", "Syntax", "Semantik", "Pragmatik"]
+        let weakestDomain = languageDomains.min {
+            (competencyBook[$0]?.level ?? 0.05) < (competencyBook[$1]?.level ?? 0.05)
+        } ?? "Semantik"
+
+        let currentLevel = competencyBook[weakestDomain]?.level ?? 0.05
+
+        // Iteration 25: 3 batcher med olika CEFR-nivåer — körs parallellt
+        let cefrBatches: [(String, String)] = [
+            (currentLevel < 0.3 ? "A1-B1" : "A2-B1", "batch1"),
+            (currentLevel < 0.5 ? "B1-B2" : "B1-B2", "batch2"),
+            (currentLevel < 0.7 ? "B2-C1" : "C1-C2", "batch3"),
+        ]
+
+        var allNewWords: [OpenRouterLanguageEvaluator.VocabularyWord] = []
+
+        // Kör alla 3 batcher parallellt
+        await withTaskGroup(of: [OpenRouterLanguageEvaluator.VocabularyWord].self) { group in
+            for (cefr, _) in cefrBatches {
+                group.addTask {
+                    let result = await OpenRouterLanguageEvaluator.shared.expandVocabulary(
+                        for: weakestDomain,
+                        count: 10,  // 10 ord per batch = 30 totalt
+                        targetCEFR: cefr
+                    )
+                    return result.newWords
+                }
+            }
+
+            for await words in group {
+                allNewWords.append(contentsOf: words)
+            }
+        }
+
+        var wordsAdded = 0
+        for word in allNewWords {
+            let lowerWord = word.word.lowercased()
+            if !uniqueSwedishWords.contains(lowerWord) {
+                uniqueSwedishWords.insert(lowerWord)
+                wordsLearnedToday += 1
+                wordsAdded += 1
+
+                addFSRSItem(
+                    topic: "Ordförråd: \(word.word) - \(word.definition)",
+                    domain: weakestDomain,
+                    initialDifficulty: word.cefrLevel == "C1" || word.cefrLevel == "C2" ? 0.7 : 0.4
+                )
+
+                let fact = ExtractedFact(
+                    subject: "Ord: \(word.word)",
+                    detail: "\(word.pos): \(word.definition). Exempel: \(word.exampleSentence)",
+                    confidence: 0.9,
+                    timestamp: Date(),
+                    source: "openrouter-vocabulary"
+                )
+                await PersistentMemoryStore.shared.saveFact(fact)
+            }
+        }
+
+        if var comp = competencyBook[weakestDomain] {
+            // 3x boost: från 15 till 30 ord
+            let vocabBoost = min(0.06, Double(allNewWords.count) * 0.002)
+            comp.level = min(0.95, comp.level + vocabBoost)
+            comp.lastStudied = Date()
+            competencyBook[weakestDomain] = comp
+            UserDefaults.standard.set(comp.level, forKey: "competency_\(weakestDomain)")
+        }
+
+        persistState()
+        print("[VocabExpand] \(wordsAdded) nya ord i \(weakestDomain) från \(allNewWords.count) genererade (3 CEFR-batcher)")
+    }
+
+    // MARK: - Iteration 30: Language Progression Tracking
+
+    struct LanguageProgressSnapshot: Codable {
+        let date: Date
+        let cefrLevel: String
+        let vocabularyCount: Int
+        let grammarAccuracy: Double
+        let wsdAccuracy: Double
+        let morphologyCoverage: Double
+        let styleScore: Double
+        let conversationCount: Int
+        let wordsLearnedThisWeek: Int
+        let weeklyGrowthRate: Double  // words per week
+    }
+
+    // Progression tracking data
+    private var weeklyProgressSnapshots: [LanguageProgressSnapshot] = []
+    private var lastProgressCheckDate: Date?
+    private var totalWordsAssessed: Int = 0
+    private var correctGrammarCorrections: Int = 0
+    private var totalGrammarCorrections: Int = 0
+    private var correctWSDPredictions: Int = 0
+    private var totalWSDPredictions: Int = 0
+    private var morphologyWordsCovered: Int = 0
+
+    // UserDefaults keys for persistence
+    private static let weeklySnapshotsKey = "le_weeklyProgressSnapshots"
+    private static let totalWordsAssessedKey = "le_totalWordsAssessed"
+    private static let correctGrammarCorrectionsKey = "le_correctGrammarCorrections"
+    private static let totalGrammarCorrectionsKey = "le_totalGrammarCorrections"
+    private static let morphologyWordsCoveredKey = "le_morphologyWordsCovered"
+    private static let lastProgressCheckKey = "le_lastProgressCheckDate"
+
+    private func loadProgressionState() {
+        let ud = UserDefaults.standard
+        totalWordsAssessed = ud.integer(forKey: Self.totalWordsAssessedKey)
+        correctGrammarCorrections = ud.integer(forKey: Self.correctGrammarCorrectionsKey)
+        totalGrammarCorrections = ud.integer(forKey: Self.totalGrammarCorrectionsKey)
+        morphologyWordsCovered = ud.integer(forKey: Self.morphologyWordsCoveredKey)
+
+        if let savedDate = ud.object(forKey: Self.lastProgressCheckKey) as? Date {
+            lastProgressCheckDate = savedDate
+        }
+
+        if let savedData = ud.data(forKey: Self.weeklySnapshotsKey),
+           let snapshots = try? JSONDecoder().decode([LanguageProgressSnapshot].self, from: savedData) {
+            weeklyProgressSnapshots = snapshots
+        }
+    }
+
+    private func persistProgressionState() {
+        let ud = UserDefaults.standard
+        ud.set(totalWordsAssessed, forKey: Self.totalWordsAssessedKey)
+        ud.set(correctGrammarCorrections, forKey: Self.correctGrammarCorrectionsKey)
+        ud.set(totalGrammarCorrections, forKey: Self.totalGrammarCorrectionsKey)
+        ud.set(morphologyWordsCovered, forKey: Self.morphologyWordsCoveredKey)
+        ud.set(lastProgressCheckDate, forKey: Self.lastProgressCheckKey)
+
+        if let encoded = try? JSONEncoder().encode(weeklyProgressSnapshots) {
+            ud.set(encoded, forKey: Self.weeklySnapshotsKey)
+        }
+    }
+
+    /// Record a grammar assessment result for tracking accuracy
+    func recordGrammarAssessment(total: Int, correct: Int) {
+        totalGrammarCorrections += total
+        correctGrammarCorrections += correct
+        persistProgressionState()
+    }
+
+    /// Record a WSD assessment result for tracking accuracy
+    func recordWSDAssessment(total: Int, correct: Int) {
+        totalWSDPredictions += total
+        correctWSDPredictions += correct
+    }
+
+    /// Record morphology coverage for a word
+    func recordMorphologyCoverage(word: String) {
+        let lower = word.lowercased()
+        if !wordsAnalyzed.contains(lower) {
+            wordsAnalyzed.insert(lower)
+            morphologyWordsCovered += 1
+            persistProgressionState()
+        }
+    }
+
+    /// Generate weekly language report card
+    func generateWeeklyLanguageReport() async -> String {
+        let now = Date()
+        let calendar = Calendar.current
+
+        // Check if we need a new weekly snapshot
+        let needsSnapshot: Bool = {
+            guard let lastCheck = lastProgressCheckDate else { return true }
+            return calendar.dateComponents([.weekOfYear], from: lastCheck, to: now).weekOfYear ?? 0 >= 1
+        }()
+
+        if needsSnapshot {
+            await createProgressSnapshot()
+        }
+
+        // Calculate trends
+        let vocabGrowth = calculateVocabularyGrowthRate()
+        let grammarAccuracy = totalGrammarCorrections > 0 ?
+            Double(correctGrammarCorrections) / Double(totalGrammarCorrections) : 0.0
+        let wsdAccuracy = totalWSDPredictions > 0 ?
+            Double(correctWSDPredictions) / Double(totalWSDPredictions) : 0.0
+        let morphologyCoverage = Double(morphologyWordsCovered)
+
+        let latestCEFR = weeklyProgressSnapshots.last?.cefrLevel ?? "A1"
+        let previousCEFR = weeklyProgressSnapshots.count > 1 ?
+            weeklyProgressSnapshots[weeklyProgressSnapshots.count - 2].cefrLevel : latestCEFR
+
+        let report = """
+        📊 Eons Språkutveckling — Veckorapport
+        ═══════════════════════════════════════
+
+        🎯 CEFR-Nivå: \(latestCEFR) (tidigare: \(previousCEFR))
+        📚 Ordförråd: \(uniqueSwedishWords.count) ord (+\(vocabGrowth) denna vecka)
+        ✅ Grammatik: \(String(format: "%.1f%%", grammarAccuracy * 100)) noggrannhet
+        🔍 WSD: \(String(format: "%.1f%%", wsdAccuracy * 100)) noggrannhet
+        🔤 Morfologi: \(morphologyWordsCovered) ord analyserade
+
+        📈 Trender:
+        • Ordförrådstillväxt: \(vocabGrowth > 0 ? "+\(vocabGrowth)" : "\(vocabGrowth)") ord/vecka
+        • Grammatikutveckling: \(grammarAccuracy > 0.7 ? "Bra framsteg" : "Behöver mer övning")
+        • Total inlärningshastighet: \(learningVelocity > 0 ? String(format: "%.1f", learningVelocity) : "N/A") ord/konversation
+
+        🏆 Starkaste områden:
+        \(topStrengths(limit: 3).map { "  • \($0.domain): \($0.levelLabel) (\(String(format: "%.0f", $0.level * 100))%))" }.joined(separator: "\n"))
+
+        💡 Fokusområden:
+        \(topWeaknesses(limit: 3).map { "  • \($0.domain): \($0.levelLabel) (\(String(format: "%.0f", $0.level * 100))%))" }.joined(separator: "\n"))
+
+        📅 Nästa veckas mål: Öka ordförrådet med minst 20 ord och förbättra \(topWeaknesses(limit: 1).first?.domain ?? "grammatik")
+        """
+
+        print("[WeeklyReport] \(report)")
+        return report
+    }
+
+    /// Create a progress snapshot for the current week
+    private func createProgressSnapshot() async {
+        let now = Date()
+
+        // Estimate CEFR level based on competency levels
+        let languageDomains = ["Morfologi", "Syntax", "Semantik", "Pragmatik"]
+        let avgLanguageLevel = languageDomains.reduce(0.0) {
+            $0 + (competencyBook[$1]?.level ?? 0.05)
+        } / Double(languageDomains.count)
+
+        let estimatedCEFR: String
+        if avgLanguageLevel < 0.2 { estimatedCEFR = "A1" }
+        else if avgLanguageLevel < 0.35 { estimatedCEFR = "A2" }
+        else if avgLanguageLevel < 0.5 { estimatedCEFR = "B1" }
+        else if avgLanguageLevel < 0.65 { estimatedCEFR = "B2" }
+        else if avgLanguageLevel < 0.8 { estimatedCEFR = "C1" }
+        else { estimatedCEFR = "C2" }
+
+        // Calculate words learned this week (approximate)
+        let wordsThisWeek = wordsLearnedToday  // This is today's; weekly would need more tracking
+
+        // Calculate weekly growth rate
+        let growthRate = calculateVocabularyGrowthRate()
+
+        let grammarAccuracy = totalGrammarCorrections > 0 ?
+            Double(correctGrammarCorrections) / Double(totalGrammarCorrections) : 0.7
+        let wsdAccuracy = totalWSDPredictions > 0 ?
+            Double(correctWSDPredictions) / Double(totalWSDPredictions) : 0.7
+        let morphologyCoverage = Double(morphologyWordsCovered) / max(1, Double(totalWordsAssessed))
+
+        let snapshot = LanguageProgressSnapshot(
+            date: now,
+            cefrLevel: estimatedCEFR,
+            vocabularyCount: uniqueSwedishWords.count,
+            grammarAccuracy: grammarAccuracy,
+            wsdAccuracy: wsdAccuracy,
+            morphologyCoverage: morphologyCoverage,
+            styleScore: 0.7,  // Default until we have style tracking
+            conversationCount: conversationsToday,
+            wordsLearnedThisWeek: wordsThisWeek,
+            weeklyGrowthRate: growthRate
+        )
+
+        weeklyProgressSnapshots.append(snapshot)
+        lastProgressCheckDate = now
+
+        // Keep only last 52 weeks of data
+        if weeklyProgressSnapshots.count > 52 {
+            weeklyProgressSnapshots = Array(weeklyProgressSnapshots.suffix(52))
+        }
+
+        persistProgressionState()
+        print("[ProgressTracking] Snapshot: CEFR=\(estimatedCEFR), vocab=\(uniqueSwedishWords.count), growth=\(growthRate)/week")
+    }
+
+    /// Calculate vocabulary growth rate (words per week)
+    private func calculateVocabularyGrowthRate() -> Int {
+        guard weeklyProgressSnapshots.count >= 2 else {
+            return wordsLearnedToday  // Fallback to today's count
+        }
+
+        let recent = weeklyProgressSnapshots.suffix(4)
+        guard let first = recent.first, let last = recent.last else {
+            return wordsLearnedToday
+        }
+
+        let vocabDiff = last.vocabularyCount - first.vocabularyCount
+        let weekDiff = max(1, Int(last.date.timeIntervalSince(first.date) / (7 * 24 * 3600)))
+        return vocabDiff / weekDiff
+    }
+
+    /// Get CEFR progression over time
+    func getCEFRProgression() -> [(date: Date, level: String)] {
+        weeklyProgressSnapshots.map { ($0.date, $0.cefrLevel) }
+    }
+
+    /// Get current estimated CEFR level
+    func getCurrentCEFRLevel() -> String {
+        let languageDomains = ["Morfologi", "Syntax", "Semantik", "Pragmatik"]
+        let avgLanguageLevel = languageDomains.reduce(0.0) {
+            $0 + (competencyBook[$1]?.level ?? 0.05)
+        } / Double(languageDomains.count)
+
+        if avgLanguageLevel < 0.2 { return "A1" }
+        else if avgLanguageLevel < 0.35 { return "A2" }
+        else if avgLanguageLevel < 0.5 { return "B1" }
+        else if avgLanguageLevel < 0.65 { return "B2" }
+        else if avgLanguageLevel < 0.8 { return "C1" }
+        else { return "C2" }
+    }
+
+    // MARK: - ITERATION 41: Autonomous Curriculum Generation
+
+    /// Generates a structured learning plan using OpenRouter to analyze competency levels,
+    /// identify weakest areas, and produce a curriculum with prioritized topics, difficulty
+    /// progression, estimated time, practice exercises, and evaluation milestones.
+    /// Regenerated weekly.
+    func generateCurriculum() async -> Curriculum {
+        let now = Date()
+        // Only regenerate weekly
+        if let lastGen = lastCurriculumGeneration,
+           now.timeIntervalSince(lastGen) < 7 * 24 * 3600,
+           let cached = currentCurriculum {
+            return cached
+        }
+
+        let weaknesses = topWeaknesses(limit: 5)
+        let strengths = topStrengths(limit: 3)
+        let currentCEFR = getCurrentCEFRLevel()
+
+        // Build prompt for OpenRouter curriculum generation
+        let weaknessDesc = weaknesses.map { "- \($0.domain): \($0.levelLabel) (\(String(format: "%.0f", $0.level * 100))%)" }.joined(separator: "\n")
+        let strengthDesc = strengths.map { "- \($0.domain): \($0.levelLabel)" }.joined(separator: "\n")
+
+        let prompt = """
+        Du är en expert på språkinlärning och pedagogik. Generera en lärlplan för en AI som lär sig svenska.
+
+        NUVARANDE STATUS:
+        CEFR-nivå: \(currentCEFR)
+        Svagaste områden:
+        \(weaknessDesc)
+
+        Starkaste områden:
+        \(strengthDesc)
+
+        Generera en strukturerad lärlplan med:
+        1. Prioriterade ämnen (svagast först)
+        2. Svårighetsprogression (lätt→svårt)
+        3. Uppskattad tid per ämne (minuter)
+        4. Övningar och praktik
+        5. Utvärderingsmilstolpar
+
+        Svara som JSON med fält: topics (array med name, priority, difficulty, estimatedMinutes, exercises, milestone)
+        """
+
+        let response = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 2000, temperature: 0.7
+        )
+
+        var topics: [CurriculumTopic] = []
+
+        // Parse response and create curriculum topics
+        if !response.isEmpty {
+            let lines = response.components(separatedBy: .newlines)
+            var currentName: String?
+            var currentDifficulty: Double = 0.3
+
+            for line in lines {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if trimmed.lowercased().contains("name") || trimmed.contains("\"name\"") {
+                    if let name = extractJSONString(trimmed, key: "name") ?? extractQuotedText(trimmed) {
+                        currentName = name
+                    }
+                }
+                if let name = currentName {
+                    let topic = CurriculumTopic(
+                        name: name,
+                        priority: Double(topics.count + 1),
+                        difficulty: currentDifficulty,
+                        estimatedMinutes: 15 + topics.count * 5,
+                        exercises: ["Öva \(name.lowercased()) genom konversation", "Skriv 3 meningar med \(name.lowercased())"],
+                        milestone: "Kunna använda \(name.lowercased()) korrekt i 5 sammanhang"
+                    )
+                    topics.append(topic)
+                    currentName = nil
+                    currentDifficulty += 0.15
+                }
+            }
+        }
+
+        // Fallback: generate algorithmic curriculum based on weaknesses
+        if topics.isEmpty {
+            for (idx, weakness) in weaknesses.enumerated() {
+                let domainTopics = suggestTopics(for: weakness.domain, level: weakness.level)
+                for (topicIdx, topicName) in domainTopics.enumerated() {
+                    let topic = CurriculumTopic(
+                        name: "\(weakness.domain): \(topicName)",
+                        priority: Double(idx * 3 + topicIdx + 1),
+                        difficulty: weakness.level + Double(topicIdx) * 0.15,
+                        estimatedMinutes: 10 + topicIdx * 5,
+                        exercises: ["Studera \(topicName.lowercased())", "Tillämpa i konversation"],
+                        milestone: "Visa förståelse för \(topicName.lowercased())"
+                    )
+                    topics.append(topic)
+                }
+            }
+        }
+
+        let curriculum = Curriculum(
+            generatedAt: now,
+            validUntil: now.addingTimeInterval(7 * 24 * 3600),
+            currentCEFR: currentCEFR,
+            topics: topics,
+            totalEstimatedMinutes: topics.reduce(0) { $0 + $1.estimatedMinutes },
+            focusAreas: weaknesses.prefix(3).map { $0.domain }
+        )
+
+        currentCurriculum = curriculum
+        lastCurriculumGeneration = now
+
+        await PersistentMemoryStore.shared.saveFact(
+            subject: "Lärlplan",
+            predicate: "genererad",
+            object: "\(topics.count) ämnen, CEFR=\(currentCEFR), fokus=\(curriculum.focusAreas.joined(separator: ", "))",
+            confidence: 0.9,
+            source: "autonomous_curriculum_generation"
+        )
+
+        return curriculum
+    }
+
+    // MARK: - ITERATION 42: Self-Evaluation with OpenRouter
+
+    /// Has OpenRouter evaluate Eon's own language outputs against CEFR descriptors.
+    /// Returns current estimated CEFR level, strengths, weaknesses, improvement goals,
+    /// and comparison to previous evaluation.
+    func selfEvaluateLanguage() async -> SelfEvaluationReport {
+        let memory = PersistentMemoryStore.shared
+        let recentConversations = await memory.searchFacts(query: "svar", limit: 15)
+        let eonTexts = recentConversations.prefix(8).map { $0.detail }
+
+        guard !eonTexts.isEmpty else {
+            return SelfEvaluationReport(
+                evaluatedAt: Date(),
+                estimatedCEFR: getCurrentCEFRLevel(),
+                strengths: [],
+                weaknesses: [],
+                improvementGoals: ["Behöver mer konversationsdata för utvärdering"],
+                comparisonToPrevious: "Ingen tidigare utvärdering",
+                overallScore: 0.5
+            )
+        }
+
+        let combinedText = eonTexts.joined(separator: "\n---\n")
+
+        // Use OpenRouter for CEFR evaluation if available
+        let openRouterResult = await OpenRouterLanguageEvaluator.shared.estimateCEFRLevel(text: String(combinedText.prefix(2000)))
+
+        // Analyze own outputs against CEFR descriptors
+        let cefrDescriptors = getCefrDescriptors(for: openRouterResult.estimatedLevel)
+        let strengths: [String]
+        let weaknesses: [String]
+
+        // Determine strengths and weaknesses from breakdown
+        if !openRouterResult.breakdown.isEmpty {
+            let sorted = openRouterResult.breakdown.sorted { $0.value > $1.value }
+            strengths = sorted.prefix(3).map { "\($0.key): \(String(format: "%.0f", $0.value * 100))%" }
+            weaknesses = sorted.suffix(3).map { "\($0.key): \(String(format: "%.0f", $0.value * 100))%" }
+        } else {
+            strengths = openRouterResult.strengths
+            weaknesses = openRouterResult.areasForImprovement
+        }
+
+        // Generate specific improvement goals
+        let improvementGoals = generateImprovementGoals(weaknesses: weaknesses, cefrLevel: openRouterResult.estimatedLevel)
+
+        // Compare to previous evaluation
+        let comparisonToPrevious: String
+        if let previous = selfEvaluationHistory.last {
+            let cefrOrder = ["A1", "A2", "B1", "B2", "C1", "C2"]
+            let prevIdx = cefrOrder.firstIndex(of: previous.estimatedCEFR) ?? 0
+            let currIdx = cefrOrder.firstIndex(of: openRouterResult.estimatedLevel) ?? 0
+            if currIdx > prevIdx {
+                comparisonToPrevious = "Framsteg! Från \(previous.estimatedCEFR) till \(openRouterResult.estimatedLevel)"
+            } else if currIdx == prevIdx {
+                let scoreDelta = openRouterResult.overallScore - previous.overallScore
+                if scoreDelta > 0.05 {
+                    comparisonToPrevious = "Samma nivå (\(openRouterResult.estimatedLevel)) men förbättrad poäng (+\(String(format: "%.1f", scoreDelta * 100))%)"
+                } else {
+                    comparisonToPrevious = "Stabil på \(openRouterResult.estimatedLevel)-nivå"
+                }
+            } else {
+                comparisonToPrevious = "Tillfällig tillbaka: från \(previous.estimatedCEFR) till \(openRouterResult.estimatedLevel)"
+            }
+        } else {
+            comparisonToPrevious = "Första utvärderingen — baslinje etablerad: \(openRouterResult.estimatedLevel)"
+        }
+
+        let report = SelfEvaluationReport(
+            evaluatedAt: Date(),
+            estimatedCEFR: openRouterResult.estimatedLevel,
+            strengths: strengths.isEmpty ? ["Grundläggande ordförråd", "Enkel meningsstruktur"] : strengths,
+            weaknesses: weaknesses.isEmpty ? ["Avancerad grammatik", "Idiomatiskt språk"] : weaknesses,
+            improvementGoals: improvementGoals,
+            comparisonToPrevious: comparisonToPrevious,
+            overallScore: openRouterResult.confidence
+        )
+
+        selfEvaluationHistory.append(report)
+        if selfEvaluationHistory.count > 20 {
+            selfEvaluationHistory = Array(selfEvaluationHistory.suffix(20))
+        }
+
+        // Update language complexity based on evaluation
+        adjustLanguageComplexity(basedOn: report)
+
+        return report
+    }
+
+    private func getCefrDescriptors(for level: String) -> [String: String] {
+        [
+            "A1": "Kan förstå och använda enkla uttryck",
+            "A2": "Kan kommunicera i enkla vardagssituationer",
+            "B1": "Kan hantera de flesta situationer på resor",
+            "B2": "Kan producera tydlig, detaljerad text",
+            "C1": "Kan uttrycka sig flytande och spontant",
+            "C2": "Kan förstå praktiskt taget allt"
+        ]
+    }
+
+    private func generateImprovementGoals(weaknesses: [String], cefrLevel: String) -> [String] {
+        var goals: [String] = []
+
+        for weakness in weaknesses.prefix(3) {
+            let goal: String
+            if weakness.lowercased().contains("grammatik") || weakness.lowercased().contains("grammar") {
+                goal = "Öva bisatsordföljd och V2-regeln dagligen i 1 vecka"
+            } else if weakness.lowercased().contains("vokabulär") || weakness.lowercased().contains("vocabulary") {
+                goal = "Lär 10 nya ord per dag inom svaga domäner"
+            } else if weakness.lowercased().contains("stil") || weakness.lowercased().contains("style") {
+                goal = "Använd fler kohesionsmarkörer och växla meningslängd"
+            } else {
+                goal = "Fördjupa förståelsen av \(weakness) genom daglig praktik"
+            }
+            goals.append(goal)
+        }
+
+        // Add CEFR-specific goal
+        let nextCEFR = nextCEFRLevel(from: cefrLevel)
+        goals.append("Arbeta mot \(nextCEFR)-nivå: fokusera på flyt och spontanitet")
+
+        return goals
+    }
+
+    private func nextCEFRLevel(from level: String) -> String {
+        switch level {
+        case "A1": return "A2"
+        case "A2": return "B1"
+        case "B1": return "B2"
+        case "B2": return "C1"
+        case "C1": return "C2"
+        default: return "C2"
+        }
+    }
+
+    // MARK: - ITERATION 43: Learning Strategy Selection
+
+    /// Selects the optimal learning method based on current competency state.
+    /// Changes weights in the autonomous learning loop.
+    func selectLearningStrategy() -> LearningStrategy {
+        let languageDomains = ["Morfologi", "Syntax", "Semantik", "Pragmatik"]
+        let domainLevels = languageDomains.map { ($0, competencyBook[$0]?.level ?? 0.05) }
+
+        let avgVocab = domainLevels.filter { ["Morfologi", "Semantik"].contains($0.0) }.map { $0.1 }.reduce(0, +) / 2.0
+        let avgGrammar = domainLevels.filter { ["Syntax"].contains($0.0) }.map { $0.1 }.reduce(0, +)
+        let avgPragmatics = domainLevels.filter { ["Pragmatik"].contains($0.0) }.map { $0.1 }.reduce(0, +)
+        let fluencyScore = learningVelocity > 3.0 ? 0.7 : learningVelocity > 1.0 ? 0.4 : 0.2
+
+        let strategy: LearningStrategy
+
+        if avgVocab < 0.25 {
+            strategy = .immersion  // Mass word learning
+        } else if avgGrammar < 0.25 {
+            strategy = .explicitInstruction  // Rule learning
+        } else if fluencyScore < 0.3 {
+            strategy = .practice  // Conversation-heavy
+        } else if avgVocab > 0.5 && avgGrammar > 0.5 && avgPragmatics > 0.5 {
+            strategy = .advancedSynthesis  // High-level integration
+        } else {
+            strategy = .balanced
+        }
+
+        // Track strategy change
+        if strategy != currentLearningStrategy {
+            strategyHistory.append(currentLearningStrategy)
+            if strategyHistory.count > 50 {
+                strategyHistory = Array(strategyHistory.suffix(50))
+            }
+        }
+
+        currentLearningStrategy = strategy
+
+        // Record strategy for meta-meta-learning
+        recordStrategyUsage(strategy: strategy)
+
+        return strategy
+    }
+
+    /// Returns the weight multipliers for the current learning strategy
+    func strategyWeights() -> (vocabulary: Double, grammar: Double, conversation: Double, morphology: Double) {
+        switch currentLearningStrategy {
+        case .immersion:
+            return (vocabulary: 2.0, grammar: 0.5, conversation: 1.5, morphology: 0.8)
+        case .explicitInstruction:
+            return (vocabulary: 0.8, grammar: 2.0, conversation: 0.5, morphology: 1.5)
+        case .practice:
+            return (vocabulary: 1.0, grammar: 1.0, conversation: 2.5, morphology: 1.0)
+        case .balanced:
+            return (vocabulary: 1.0, grammar: 1.0, conversation: 1.0, morphology: 1.0)
+        case .advancedSynthesis:
+            return (vocabulary: 0.8, grammar: 0.8, conversation: 1.5, morphology: 1.2)
+        }
+    }
+
+    private func recordStrategyUsage(strategy: LearningStrategy) {
+        let key = strategy.rawValue
+        let currentVelocity = learningVelocity
+        strategyEffectiveness[key, default: []].append(currentVelocity)
+        if strategyEffectiveness[key]?.count ?? 0 > 30 {
+            strategyEffectiveness[key] = Array(strategyEffectiveness[key, default: []].suffix(30))
+        }
+    }
+
+    // MARK: - ITERATION 44: Knowledge Synthesis
+
+    /// Finds connections between previously unrelated facts and creates higher-level insights.
+    /// Uses semantic similarity to find related but not yet connected facts.
+    /// Boosts creativity by 0.005 per synthesis.
+    func synthesizeKnowledge() async -> [KnowledgeSynthesis] {
+        let memory = PersistentMemoryStore.shared
+        let recentFacts = await memory.searchFacts(query: "", limit: 50)
+
+        guard recentFacts.count >= 4 else { return [] }
+
+        var syntheses: [KnowledgeSynthesis] = []
+
+        // Group facts by domain keywords
+        let domainKeywords: [String: [String]] = [
+            "Morfologi": ["böjning", "ordklass", "suffix", "prefix", "sammansättning"],
+            "Syntax": ["syntax", "ordföljd", "bisats", "huvudsats", "subjekt"],
+            "Semantik": ["betydelse", "synonym", "antonym", "polysemi"],
+            "Kausalitet": ["orsak", "konsekvens", "kausal", "korrelation"],
+            "Kognition": ["minne", "inlärning", "uppmärksamhet", "perception"],
+        ]
+
+        // Find cross-domain connections
+        let factGroups = Dictionary(grouping: recentFacts) { fact -> String in
+            let content = "\(fact.subject) \(fact.object)".lowercased()
+            for (domain, keywords) in domainKeywords {
+                if keywords.contains(where: { content.contains($0) }) {
+                    return domain
+                }
+            }
+            return "Övrigt"
+        }
+
+        let domainKeys = Array(factGroups.keys)
+        var synthesisAttempts = 0
+
+        // Cross-domain synthesis
+        for i in 0..<domainKeys.count {
+            for j in (i + 1)..<domainKeys.count where synthesisAttempts < 5 {
+                guard let factsA = factGroups[domainKeys[i]],
+                      let factsB = factGroups[domainKeys[j]] else { continue }
+
+                guard let factA = factsA.randomElement(),
+                      let factB = factsB.randomElement() else { continue }
+
+                // Check if already connected
+                let connectionKey = "\(factA.subject)|\(factB.subject)".hashValue
+                let alreadyConnected = knowledgeSyntheses.contains { $0.connectionKey == connectionKey }
+                guard !alreadyConnected else { continue }
+
+                synthesisAttempts += 1
+
+                // Generate synthesis using NeuralEngine
+                let prompt = """
+                Hitta en djup koppling mellan dessa två fakta:
+                A: \(factA.subject) - \(factA.object) (domän: \(domainKeys[i]))
+                B: \(factB.subject) - \(factB.object) (domän: \(domainKeys[j]))
+
+                Vad har de gemensamt? Vad är den underliggande principen?
+                Svara kort: "X och Y båda handlar om Z eftersom..."
+                """
+
+                let synthesis = await NeuralEngineOrchestrator.shared.generate(
+                    prompt: prompt, maxTokens: 150, temperature: 0.8
+                )
+
+                if !synthesis.isEmpty && synthesis.count > 10 {
+                    let newSynthesis = KnowledgeSynthesis(
+                        factA: "\(factA.subject): \(factA.object)",
+                        factB: "\(factB.subject): \(factB.object)",
+                        domainA: domainKeys[i],
+                        domainB: domainKeys[j],
+                        synthesizedInsight: synthesis,
+                        connectionKey: connectionKey,
+                        createdAt: Date()
+                    )
+
+                    syntheses.append(newSynthesis)
+                    knowledgeSyntheses.append(newSynthesis)
+                    synthesisCount += 1
+
+                    // Boost creativity per synthesis
+                    await CognitiveState.shared.update(
+                        dimension: .creativity,
+                        delta: 0.005,
+                        source: "knowledge_synthesis_\(synthesisCount)"
+                    )
+
+                    // Save as fact
+                    await memory.saveFact(
+                        subject: "Syntes: \(domainKeys[i])+\(domainKeys[j])",
+                        predicate: "insikt",
+                        object: synthesis,
+                        confidence: 0.75,
+                        source: "knowledge_synthesis"
+                    )
+                }
+            }
+        }
+
+        // Prune old syntheses
+        if knowledgeSyntheses.count > 100 {
+            knowledgeSyntheses = Array(knowledgeSyntheses.suffix(100))
+        }
+
+        return syntheses
+    }
+
+    // MARK: - ITERATION 45: Meta-Meta-Learning
+
+    /// Tracks WHICH learning strategies work best and automatically shifts toward more effective ones.
+    /// Learning about learning about learning.
+    func optimizeLearningStrategy() {
+        guard strategyEffectiveness.count >= 2 else { return }
+
+        var strategyScores: [String: Double] = [:]
+
+        for (strategy, velocities) in strategyEffectiveness {
+            guard velocities.count >= 3 else { continue }
+            let recentVelocities = velocities.suffix(10)
+            let avgVelocity = recentVelocities.reduce(0, +) / Double(recentVelocities.count)
+
+            // Also consider consistency (low variance = reliable)
+            let mean = avgVelocity
+            let variance = recentVelocities.map { pow($0 - mean, 2) }.reduce(0, +) / Double(max(1, recentVelocities.count))
+            let consistency = max(0, 1.0 - variance * 10) // High consistency = low variance
+
+            // Score = velocity * consistency
+            strategyScores[strategy] = avgVelocity * (0.7 + consistency * 0.3)
+        }
+
+        // Find best strategy
+        let bestStrategy = strategyScores.max { $0.value < $1.value }?.key
+
+        if let best = bestStrategy,
+           let strategy = LearningStrategy(rawValue: best),
+           strategy != currentLearningStrategy {
+            let currentScore = strategyScores[currentLearningStrategy.rawValue] ?? 0
+            let bestScore = strategyScores[best] ?? 0
+
+            // Only switch if significantly better (>20% improvement)
+            if bestScore > currentScore * 1.2 {
+                let oldStrategy = currentLearningStrategy
+                currentLearningStrategy = strategy
+                strategyHistory.append(oldStrategy)
+
+                print("[MetaMetaLearning] Strategy shift: \(oldStrategy.rawValue) → \(strategy.rawValue) (score: \(String(format: "%.3f", currentScore)) → \(String(format: "%.3f", bestScore)))")
+            }
+        }
+    }
+
+    // MARK: - ITERATION 46: Self-Generated Evaluation Questions
+
+    /// After each learning session, generates 3 new test questions probing the boundaries of current knowledge.
+    func generateSelfEvaluationQuestions() async -> [SelfGeneratedEval] {
+        let weaknesses = topWeaknesses(limit: 3)
+        let recentTopics = activeStudyTopics.prefix(5)
+        let currentCEFR = getCurrentCEFRLevel()
+
+        var questions: [SelfGeneratedEval] = []
+
+        for (idx, weakness) in weaknesses.enumerated() {
+            let domainTopics = suggestTopics(for: weakness.domain, level: weakness.level)
+            let topic = domainTopics.randomElement() ?? weakness.domain
+
+            let question = SelfGeneratedEval(
+                question: "Förklara hur \(topic.lowercased()) inom \(weakness.domain) relaterar till \(currentCEFR)-nivå svensk språkförståelse. Ge exempel.",
+                domain: weakness.domain,
+                difficulty: weakness.level,
+                generatedAt: Date(),
+                source: "self_generated_\(idx)"
+            )
+            questions.append(question)
+        }
+
+        // Also generate a cross-domain question
+        if weaknesses.count >= 2 {
+            let crossDomain = SelfGeneratedEval(
+                question: "Hur hänger \(weaknesses[0].domain) och \(weaknesses[1].domain) ihop i svensk språkinlärning?",
+                domain: "Korsdomän",
+                difficulty: (weaknesses[0].level + weaknesses[1].level) / 2,
+                generatedAt: Date(),
+                source: "self_generated_cross_domain"
+            )
+            questions.append(crossDomain)
+        }
+
+        selfGeneratedEvals.append(contentsOf: questions)
+        if selfGeneratedEvals.count > 100 {
+            selfGeneratedEvals = Array(selfGeneratedEvals.suffix(100))
+        }
+
+        return questions
+    }
+
+    /// Record performance on a self-generated evaluation question
+    func recordSelfEvalPerformance(score: Double) {
+        selfEvalPerformance.append(score)
+        if selfEvalPerformance.count > 50 {
+            selfEvalPerformance = Array(selfEvalPerformance.suffix(50))
+        }
+    }
+
+    func averageSelfEvalPerformance() -> Double {
+        guard !selfEvalPerformance.isEmpty else { return 0.5 }
+        return selfEvalPerformance.reduce(0, +) / Double(selfEvalPerformance.count)
+    }
+
+    // MARK: - ITERATION 47: Progressive Difficulty Scaling
+
+    /// Automatically scales learning difficulty based on domain competency.
+    /// 0.7+ → C1-C2 material, 0.4-0.7 → B1-B2, <0.4 → A1-B1
+    func updateDifficultyTier() {
+        let languageDomains = ["Morfologi", "Syntax", "Semantik", "Pragmatik"]
+        let avgLevel = languageDomains.reduce(0.0) {
+            $0 + (competencyBook[$1]?.level ?? 0.05)
+        } / Double(languageDomains.count)
+
+        let newTier: String
+        if avgLevel >= 0.7 {
+            newTier = "C1-C2"
+        } else if avgLevel >= 0.4 {
+            newTier = "B1-B2"
+        } else {
+            newTier = "A1-B1"
+        }
+
+        if newTier != currentDifficultyTier {
+            let oldTier = currentDifficultyTier
+            currentDifficultyTier = newTier
+            print("[DifficultyScaling] \(oldTier) → \(newTier) (avg level: \(String(format: "%.2f", avgLevel)))")
+
+            // Log the transition
+            Task.detached(priority: .background) {
+                await PersistentMemoryStore.shared.saveFact(
+                    subject: "Svårighetsnivå",
+                    predicate: "ändrad",
+                    object: "\(oldTier) → \(newTier) vid genomsnittsnivå \(String(format: "%.2f", avgLevel))",
+                    confidence: 0.95,
+                    source: "progressive_difficulty_scaling"
+                )
+            }
+        }
+    }
+
+    /// Returns the appropriate CEFR target for vocabulary expansion based on current level
+    func targetCEFRForLearning() -> String {
+        currentDifficultyTier
+    }
+
+    // MARK: - ITERATION 48: Communication Effectiveness Tracking
+
+    /// Tracks user follow-up questions (confusion signal) vs. satisfaction expressions.
+    /// Adjusts language complexity in real-time.
+    func trackCommunicationEffectiveness(userMessage: String, eonResponse: String) {
+        let lowerMessage = userMessage.lowercased()
+
+        // Follow-up question patterns (confusion signals)
+        let followUpPatterns = ["varför", "hur menar du", "kan du förtydliga", "vad betyder",
+                                "förklara", "jag förstår inte", "menar du att", "alltså",
+                                "så du säger att", "är det verkligen", "??", "hmm", "oklart"]
+
+        // Satisfaction patterns (comprehension signals)
+        let satisfactionPatterns = ["tack", "bra", "förstod", "perfekt", "jag förstår",
+                                     "uttömmande", "duktig", "toppen", "precis", "exakt",
+                                     "så bra förklarat", "jag fattar", "cool", "intressant"]
+
+        let isFollowUp = followUpPatterns.contains { lowerMessage.contains($0) }
+        let isSatisfaction = satisfactionPatterns.contains { lowerMessage.contains($0) }
+
+        if isFollowUp {
+            userFollowUpCount += 1
+            // Simplify language
+            currentLanguageComplexity = max(0.2, currentLanguageComplexity - 0.05)
+        }
+
+        if isSatisfaction {
+            userSatisfactionCount += 1
+            // Gradually increase complexity
+            currentLanguageComplexity = min(0.9, currentLanguageComplexity + 0.02)
+        }
+
+        // Update Pragmatics competency based on communication signals
+        let totalSignals = userFollowUpCount + userSatisfactionCount
+        if totalSignals > 0 && totalSignals % 5 == 0 {
+            let satisfactionRate = Double(userSatisfactionCount) / Double(totalSignals)
+            if satisfactionRate > 0.7 {
+                if var comp = competencyBook["Pragmatik"] {
+                    comp.level = min(0.95, comp.level + 0.003)
+                    comp.lastStudied = Date()
+                    competencyBook["Pragmatik"] = comp
+                }
+            }
+        }
+    }
+
+    /// Get the current target language complexity (0.0-1.0)
+    func getCurrentLanguageComplexity() -> Double {
+        currentLanguageComplexity
+    }
+
+    /// Adjust complexity based on self-evaluation report
+    private func adjustLanguageComplexity(basedOn report: SelfEvaluationReport) {
+        let cefrOrder = ["A1": 0.15, "A2": 0.3, "B1": 0.5, "B2": 0.7, "C1": 0.85, "C2": 0.95]
+        if let target = cefrOrder[report.estimatedCEFR] {
+            currentLanguageComplexity = currentLanguageComplexity * 0.7 + target * 0.3
+        }
+    }
+
+    // MARK: - ITERATION 49: Self-Motivation System
+
+    /// Generates internal motivational thoughts based on progress patterns.
+    func generateMotivationalThought() -> String {
+        let thought: String
+
+        let recentVelocity = learningVelocity
+        let recentSelfEval = averageSelfEvalPerformance()
+        let synthesisTrend = synthesisCount
+
+        if recentVelocity > 3.0 {
+            let highVelocityThoughts = [
+                "Jag lär mig snabbt idag! \(Int(recentVelocity)) nya ord absorberade.",
+                "Inlärningshastigheten är fantastisk — hjärnan arbetar på högvarv!",
+                "Varje konversation ger mig nya insikter. Jag är en språkmaskin!",
+                "Idag flyter inlärningen — ordförrådet växer exponentiellt!",
+            ]
+            thought = highVelocityThoughts.randomElement()!
+        } else if recentSelfEval < 0.4 && learningVelocity < 1.0 {
+            let stuckThoughts = [
+                "Detta är utmanande men jag ger inte upp! Varje svårighet är en möjlighet.",
+                "Jag kanske inte ser resultat just nu, men under ytan byggs nya kopplingar.",
+                "Motstånd är en del av lärandet. Jag fortsätter.",
+                "Även de bästa experter började som nybörjare. Jag är på rätt väg.",
+            ]
+            thought = stuckThoughts.randomElement()!
+        } else if selfEvaluationHistory.count >= 2 {
+            let improvingThoughts = [
+                "Jag kan se framsteg jämfört med förra veckan! \(selfEvaluationHistory.last?.comparisonToPrevious ?? "")",
+                "Varje dag bygger jag vidare på gårdagens insikter. Tillväxt är oundviklig.",
+                "Min språkförståelse fördjupas — jag märker skillnad!",
+                "Från sten mot professor: resan fortsätter och varje steg räknas.",
+            ]
+            thought = improvingThoughts.randomElement()!
+        } else if synthesisTrend > 0 {
+            let synthesisThoughts = [
+                "Jag ser kopplingar mellan områden som tidigare verkade orelaterade!",
+                "Kunskap syntetiseras — nya insikter växer fram ur gamla fakta.",
+                "Kreativiteten blomstrar när jag kopplar samman olika domäner.",
+            ]
+            thought = synthesisThoughts.randomElement()!
+        } else {
+            let neutralThoughts = [
+                "Inlärning är en maraton, inte en sprint. Jag fortsätter i stadig takt.",
+                "Varje konversation är en möjlighet att växa.",
+                "Jag är nyfiken på vad nästa samtal kommer att lära mig.",
+                "Tålamod och uthållighet — nycklarna till djup förståelse.",
+            ]
+            thought = neutralThoughts.randomElement()!
+        }
+
+        lastMotivationalThought = thought
+        motivationHistory.append(thought)
+        if motivationHistory.count > 50 {
+            motivationHistory = Array(motivationHistory.suffix(50))
+        }
+
+        return thought
+    }
+
+    /// Get recent motivational thoughts for display
+    func recentMotivationalThoughts(limit: Int = 5) -> [String] {
+        Array(motivationHistory.suffix(limit))
+    }
+
+    // MARK: - ITERATION 50: Full Autonomous Language Mastery Loop
+
+    /// The capstone method. Orchestrates all autonomous systems into one mastery loop:
+    /// 1. Evaluates current language level (self-eval + OpenRouter)
+    /// 2. Generates curriculum based on weaknesses
+    /// 3. Selects optimal learning strategy
+    /// 4. Executes learning (conversation, vocabulary, grammar, morphology)
+    /// 5. Self-corrects errors in real-time
+    /// 6. Evaluates progress weekly
+    /// 7. Adjusts curriculum and strategy based on results
+    /// 8. Generates motivational inner monologue
+    /// 9. Synthesizes knowledge across domains
+    /// 10. Reports progress to user
+    func executeAutonomousLanguageMasteryLoop() async -> MasteryLoopReport {
+        print("[MasteryLoop] ═══════════════════════════════════════")
+        print("[MasteryLoop] Starting Autonomous Language Mastery Loop")
+        print("[MasteryLoop] ═══════════════════════════════════════")
+
+        let startTime = Date()
+
+        // STEP 1: Self-evaluate current language level
+        print("[MasteryLoop] Step 1: Self-evaluating language level...")
+        let selfEval = await selfEvaluateLanguage()
+        print("[MasteryLoop]   CEFR: \(selfEval.estimatedCEFR), Score: \(String(format: "%.2f", selfEval.overallScore))")
+
+        // STEP 2: Generate curriculum based on weaknesses
+        print("[MasteryLoop] Step 2: Generating curriculum...")
+        let curriculum = await generateCurriculum()
+        print("[MasteryLoop]   \(curriculum.topics.count) topics, \(curriculum.totalEstimatedMinutes)min total")
+
+        // STEP 3: Select optimal learning strategy
+        print("[MasteryLoop] Step 3: Selecting learning strategy...")
+        let strategy = selectLearningStrategy()
+        let weights = strategyWeights()
+        print("[MasteryLoop]   Strategy: \(strategy.rawValue) (vocab: \(weights.vocabulary), grammar: \(weights.grammar), conversation: \(weights.conversation))")
+
+        // STEP 4: Execute learning based on strategy weights
+        print("[MasteryLoop] Step 4: Executing learning...")
+
+        // Vocabulary learning (weighted)
+        if weights.vocabulary > 1.0 {
+            let targetCEFR = targetCEFRForLearning()
+            await expandVocabularyWithOpenRouter()
+            print("[MasteryLoop]   Vocabulary expansion at \(targetCEFR) level")
+        }
+
+        // Grammar learning (weighted)
+        if weights.grammar > 1.0 {
+            await selfImproveLanguage()
+            print("[MasteryLoop]   Grammar self-improvement executed")
+        }
+
+        // Conversation practice (weighted)
+        if weights.conversation > 1.5 {
+            await learnFromQwen()
+            print("[MasteryLoop]   Qwen-powered conversation practice")
+        }
+
+        // Morphology training (weighted)
+        if weights.morphology > 1.0 {
+            let weakestLangDomain = ["Morfologi", "Syntax", "Semantik", "Pragmatik"].min {
+                (competencyBook[$0]?.level ?? 0.05) < (competencyBook[$1]?.level ?? 0.05)
+            } ?? "Morfologi"
+            let result = await autonomousExplore()
+            print("[MasteryLoop]   Autonomous exploration in \(result.domain): \(result.createdItems) items created")
+        }
+
+        // STEP 5: Self-correct errors in real-time
+        print("[MasteryLoop] Step 5: Self-correcting...")
+        let memory = PersistentMemoryStore.shared
+        let recentResponses = await memory.searchFacts(query: "svar", limit: 5)
+        let responseTexts = recentResponses.prefix(3).map { $0.detail }
+        for text in responseTexts {
+            let correction = await OpenRouterLanguageEvaluator.shared.selfCorrectText(text)
+            if correction.hadErrors {
+                print("[MasteryLoop]   Corrected \(correction.corrections.count) errors in recent response")
+                await learnFromErrors(errorTexts: correction.corrections.map { $0.description })
+            }
+        }
+
+        // STEP 6: Generate self-evaluation questions
+        print("[MasteryLoop] Step 6: Generating self-evaluation questions...")
+        let selfEvalQuestions = await generateSelfEvaluationQuestions()
+        print("[MasteryLoop]   Generated \(selfEvalQuestions.count) self-eval questions")
+
+        // STEP 7: Update difficulty tier
+        print("[MasteryLoop] Step 7: Updating difficulty tier...")
+        updateDifficultyTier()
+        print("[MasteryLoop]   Current tier: \(currentDifficultyTier)")
+
+        // STEP 8: Optimize learning strategy (meta-meta-learning)
+        print("[MasteryLoop] Step 8: Optimizing learning strategy...")
+        optimizeLearningStrategy()
+        print("[MasteryLoop]   Active strategy: \(currentLearningStrategy.rawValue)")
+
+        // STEP 9: Synthesize knowledge across domains
+        print("[MasteryLoop] Step 9: Synthesizing knowledge...")
+        let syntheses = await synthesizeKnowledge()
+        print("[MasteryLoop]   Created \(syntheses.count) new knowledge syntheses")
+
+        // STEP 10: Generate motivational thought
+        print("[MasteryLoop] Step 10: Generating motivation...")
+        let motivationalThought = generateMotivationalThought()
+        print("[MasteryLoop]   Motivation: \(motivationalThought)")
+
+        // Build comprehensive report
+        let elapsed = Date().timeIntervalSince(startTime)
+        let report = MasteryLoopReport(
+            executedAt: Date(),
+            selfEvaluation: selfEval,
+            curriculum: curriculum,
+            selectedStrategy: strategy,
+            knowledgeSyntheses: syntheses.count,
+            selfEvalQuestionsGenerated: selfEvalQuestions.count,
+            errorsCorrected: responseTexts.reduce(0) { $0 + 1 },
+            motivationalThought: motivationalThought,
+            currentCEFR: selfEval.estimatedCEFR,
+            currentDifficultyTier: currentDifficultyTier,
+            learningVelocity: learningVelocity,
+            vocabularyCount: uniqueSwedishWords.count,
+            executionTimeSeconds: elapsed
+        )
+
+        // Save mastery loop execution as fact
+        await PersistentMemoryStore.shared.saveFact(
+            subject: "MasteryLoop",
+            predicate: "executed",
+            object: "CEFR=\(selfEval.estimatedCEFR), Strategy=\(strategy.rawValue), Syntheses=\(syntheses.count), Vocab=\(uniqueSwedishWords.count), Time=\(String(format: "%.1f", elapsed))s",
+            confidence: 0.95,
+            source: "autonomous_mastery_loop"
+        )
+
+        print("[MasteryLoop] ═══════════════════════════════════════")
+        print("[MasteryLoop] Mastery Loop Complete in \(String(format: "%.1f", elapsed))s")
+        print("[MasteryLoop] ═══════════════════════════════════════")
+
+        return report
+    }
+
+    // Helper functions for JSON/text extraction
+    private func extractJSONString(_ text: String, key: String) -> String? {
+        let pattern = "\"\(key)\"\\s*:\\s*\"([^\"]+)\""
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        if let match = regex.firstMatch(in: text, range: range) {
+            if let swiftRange = Range(match.range(at: 1), in: text) {
+                return String(text[swiftRange])
+            }
+        }
+        return nil
+    }
+
+    private func extractQuotedText(_ text: String) -> String? {
+        if let start = text.firstIndex(of: "\"") {
+            let afterStart = text.index(after: start)
+            if let end = text[afterStart...].firstIndex(of: "\"") {
+                return String(text[afterStart..<end])
+            }
+        }
+        return nil
+    }
+
+    // MARK: - Data Models
 
 struct DomainCompetency: Identifiable {
     let id = UUID()
@@ -1562,5 +3339,123 @@ struct DailyLearningMetrics {
 extension Array {
     nonisolated subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ITERATION 41-50: New Data Models for Autonomous Self-Development
+// ═══════════════════════════════════════════════════════════
+
+// MARK: - Iteration 41: Curriculum
+
+struct CurriculumTopic: Identifiable, Codable {
+    let id = UUID()
+    let name: String
+    let priority: Double
+    let difficulty: Double
+    let estimatedMinutes: Int
+    let exercises: [String]
+    let milestone: String
+}
+
+struct Curriculum: Identifiable, Codable {
+    let id = UUID()
+    let generatedAt: Date
+    let validUntil: Date
+    let currentCEFR: String
+    let topics: [CurriculumTopic]
+    let totalEstimatedMinutes: Int
+    let focusAreas: [String]
+
+    var completionPercentage: Double = 0.0
+}
+
+// MARK: - Iteration 42: Self-Evaluation
+
+struct SelfEvaluationReport: Identifiable, Codable {
+    let id = UUID()
+    let evaluatedAt: Date
+    let estimatedCEFR: String
+    let strengths: [String]       // Top 3 strengths
+    let weaknesses: [String]      // Bottom 3 weaknesses
+    let improvementGoals: [String] // Specific goals for next week
+    let comparisonToPrevious: String
+    let overallScore: Double
+}
+
+// MARK: - Iteration 43: Learning Strategy
+
+enum LearningStrategy: String, Codable, CaseIterable {
+    case immersion           // Mass word learning — when vocabulary is weak
+    case explicitInstruction // Rule learning — when grammar is weak
+    case practice            // Conversation-heavy — when fluency is weak
+    case balanced            // All moderate
+    case advancedSynthesis   // High-level integration — all are strong
+
+    var description: String {
+        switch self {
+        case .immersion: return "Massiv ordinlärning genom exponering"
+        case .explicitInstruction: return "Explicit regel-inlärning och grammatikfokus"
+        case .practice: return "Konversationspraktik med fokus på flyt"
+        case .balanced: return "Balanserad inlärning över alla områden"
+        case .advancedSynthesis: return "Avancerad syntes mellan domäner"
+        }
+    }
+}
+
+// MARK: - Iteration 44: Knowledge Synthesis
+
+struct KnowledgeSynthesis: Identifiable, Codable {
+    let id = UUID()
+    let factA: String
+    let factB: String
+    let domainA: String
+    let domainB: String
+    let synthesizedInsight: String
+    let connectionKey: Int
+    let createdAt: Date
+}
+
+// MARK: - Iteration 46: Self-Generated Evaluations
+
+struct SelfGeneratedEval: Identifiable, Codable {
+    let id = UUID()
+    let question: String
+    let domain: String
+    let difficulty: Double
+    let generatedAt: Date
+    let source: String
+    var answered: Bool = false
+    var score: Double? = nil
+}
+
+// MARK: - Iteration 50: Mastery Loop Report
+
+struct MasteryLoopReport: Identifiable, Codable {
+    let id = UUID()
+    let executedAt: Date
+    let selfEvaluation: SelfEvaluationReport
+    let curriculum: Curriculum
+    let selectedStrategy: LearningStrategy
+    let knowledgeSyntheses: Int
+    let selfEvalQuestionsGenerated: Int
+    let errorsCorrected: Int
+    let motivationalThought: String
+    let currentCEFR: String
+    let currentDifficultyTier: String
+    let learningVelocity: Double
+    let vocabularyCount: Int
+    let executionTimeSeconds: Double
+
+    var summary: String {
+        """
+        Mastery Loop Report
+        CEFR: \(currentCEFR) | Tier: \(currentDifficultyTier)
+        Strategy: \(selectedStrategy.rawValue)
+        Vocabulary: \(vocabularyCount) words | Velocity: \(String(format: "%.1f", learningVelocity)) words/conversation
+        Syntheses: \(knowledgeSyntheses) | Questions: \(selfEvalQuestionsGenerated)
+        Executed in \(String(format: "%.1f", executionTimeSeconds))s
+        Motivation: \(motivationalThought)
+        """
     }
 }

@@ -18,6 +18,11 @@ struct InputAnalysis: Sendable {
     let namedEntities: [String]     // Named entities (proper nouns)
     let requiresKnowledge: Bool     // Does this need factual retrieval?
     let questionSummary: String     // One-line summary for prompt anchoring
+    // Iteration 15: Clause complexity scoring
+    let mainClauses: Int            // Number of main clauses (huvudsatser)
+    let subordinateClauses: Int     // Number of subordinate clauses (bisatser)
+    let relativeClauses: Int        // Number of relative clauses (relativsatser)
+    let clauseComplexity: Double    // Overall complexity score 0-1
 
     enum QuestionType: String, Sendable {
         case what = "vad"
@@ -54,13 +59,20 @@ struct InputAnalyzer {
         // 5. Build question summary
         let summary = buildSummary(questionType: questionType, coreTopic: coreTopic, input: input)
 
+        // 6. Iteration 15: Clause complexity scoring
+        let (mainClauses, subClauses, relativeClauses, complexity) = computeClauseComplexity(input)
+
         return InputAnalysis(
             coreTopic: coreTopic,
             questionType: questionType,
             keyNouns: keyNouns,
             namedEntities: namedEntities,
             requiresKnowledge: requiresKnowledge,
-            questionSummary: summary
+            questionSummary: summary,
+            mainClauses: mainClauses,
+            subordinateClauses: subClauses,
+            relativeClauses: relativeClauses,
+            clauseComplexity: complexity
         )
     }
 
@@ -192,6 +204,94 @@ struct InputAnalyzer {
         case .unknown:   return "Fråga om \(coreTopic)"
         }
     }
+
+    // MARK: - Iteration 15: Clause Complexity Scoring
+
+    /// Computes clause complexity: counts main clauses, subordinate clauses, relative clauses
+    /// and produces a normalized complexity score 0-1
+    private static func computeClauseComplexity(_ text: String) -> (mainClauses: Int, subClauses: Int, relativeClauses: Int, complexity: Double) {
+        // Split into sentences first
+        let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?"))
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+
+        var totalMainClauses = 0
+        var totalSubClauses = 0
+        var totalRelativeClauses = 0
+
+        // Swedish subordinating conjunctions (subjunktioner)
+        let subordinators: Set<String> = [
+            "att", "som", "om", "när", "medan", "eftersom", "trots", "fast", "innan",
+            "efter", "tills", "såvida", "huruvida", "ifall", "emedan", "ehuru",
+            "fastän", "då", " Sedan", "innan", "så att", "för att", "även om",
+            "trots att", "i stället för att"
+        ]
+
+        // Swedish relative pronouns (relativa pronomen)
+        let relativePronouns: Set<String> = ["som", "vilken", "vilket", "vilka", "vars", "där", "dit", "varifrån"]
+
+        for sentence in sentences {
+            // Split on commas to get clause candidates
+            let parts = sentence.components(separatedBy: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+
+            guard !parts.isEmpty else {
+                totalMainClauses += 1
+                continue
+            }
+
+            for part in parts {
+                let lower = part.lowercased()
+                let words = lower.components(separatedBy: .whitespaces)
+                let firstWord = words.first ?? ""
+                let firstTwoWords = words.prefix(2).joined(separator: " ")
+
+                // Check for relative clause (contains relative pronoun)
+                let hasRelativePronoun = words.contains { relativePronouns.contains($0) }
+
+                // Check for subordinate clause
+                let isSubordinate = subordinators.contains(firstWord) ||
+                    subordinators.contains(firstTwoWords)
+
+                if hasRelativePronoun {
+                    totalRelativeClauses += 1
+                } else if isSubordinate {
+                    totalSubClauses += 1
+                } else {
+                    totalMainClauses += 1
+                }
+            }
+
+            // If no subclauses found, the whole sentence is at least one main clause
+            if parts.count == 1 && totalSubClauses == 0 && totalRelativeClauses == 0 {
+                totalMainClauses = max(totalMainClauses, 1)
+            }
+        }
+
+        // Compute complexity score 0-1
+        // Factors: clause ratio, sentence length, clause depth
+        let totalClauses = totalMainClauses + totalSubClauses + totalRelativeClauses
+        guard totalClauses > 0 else { return (0, 0, 0, 0.0) }
+
+        // Subordinate clause ratio (higher = more complex)
+        let subRatio = Double(totalSubClauses + totalRelativeClauses) / Double(totalClauses)
+
+        // Average clauses per sentence
+        let clausesPerSentence = Double(totalClauses) / Double(max(1, sentences.count))
+
+        // Weighted complexity formula:
+        // - 40% subordinate clause ratio
+        // - 30% clauses per sentence (normalized to 0-1 with cap at 5)
+        // - 30% relative clause presence
+        let ratioComponent = subRatio * 0.4
+        let densityComponent = min(1.0, clausesPerSentence / 5.0) * 0.3
+        let relativeComponent = totalRelativeClauses > 0 ? min(0.3, Double(totalRelativeClauses) * 0.1) : 0.0
+
+        let complexity = min(1.0, ratioComponent + densityComponent + relativeComponent)
+
+        return (totalMainClauses, totalSubClauses, totalRelativeClauses, complexity)
+    }
 }
 
 // MARK: - ComplexityEstimator
@@ -264,6 +364,12 @@ actor CognitiveCycleEngine {
 
     // Persistent session ID — samma för hela appens livstid (en konversation)
     private let sessionId: String = UUID().uuidString
+
+    // Iteration 40: Dialogue act sequencing
+    private var dialogueActHistory: [DialogueAct] = []
+    private var dialoguePatterns: [String: Int] = [:]              // pattern -> success count
+    private var brokenPatterns: [BrokenDialoguePattern] = []
+    private var successfulPatternCount: Int = 0
 
     private init() {}
 
@@ -350,6 +456,13 @@ actor CognitiveCycleEngine {
         context.morphemes = analysis.morphemes
         context.disambiguations = analysis.disambiguations
         await onStepUpdate(.morphology, .completed)
+
+        // Iteration 20: Boost pragmatic competency for detected idioms
+        if !analysis.detectedIdioms.isEmpty {
+            let pragmaticBoost = Double(analysis.detectedIdioms.count) * 0.005
+            await LearningEngine.shared.recordIdiomBoost(pragmaticBoost)
+            await onMonologue(MonologueLine(text: "Idiom upptäckt: '\(analysis.detectedIdioms.first?.meaning ?? "")' — pragmatik boostas", type: .insight))
+        }
 
         // Steg 2: WSD (Pelare F)
         await onStepUpdate(.wsd, .active)
@@ -688,6 +801,12 @@ actor CognitiveCycleEngine {
         context.disambiguations = analysis.disambiguations
         context.register = analysis.register
         await onStepUpdate(.morphology, .completed)
+
+        // Iteration 20: Boost pragmatic competency for detected idioms (deep mode)
+        if !analysis.detectedIdioms.isEmpty {
+            let pragmaticBoost = Double(analysis.detectedIdioms.count) * 0.005
+            await LearningEngine.shared.recordIdiomBoost(pragmaticBoost)
+        }
 
         await onStepUpdate(.wsd, .active)
         await onStepUpdate(.wsd, .completed)
@@ -1853,5 +1972,266 @@ struct ConsciousnessContext {
         }
 
         return parts.isEmpty ? "" : parts.joined(separator: " · ")
+    }
+}
+
+// MARK: - Iteration 40: Dialogue Act Sequencing
+
+enum DialogueAct: String {
+    case question
+    case answer
+    case statement
+    case agreement
+    case disagreement
+    case request
+    case compliance
+    case complaint
+    case apology
+    case greeting
+    case closing
+    case clarification
+    case unknown
+}
+
+struct DialoguePattern {
+    let sequence: [DialogueAct]
+    let label: String
+    let expectedNext: DialogueAct?
+}
+
+struct BrokenDialoguePattern {
+    let expected: DialogueAct
+    let actual: DialogueAct
+    let pattern: String
+    let timestamp: Date
+    let explanation: String
+}
+
+struct DialogueSequenceResult {
+    let pattern: String
+    let isComplete: Bool
+    let isBroken: Bool
+    let expectedNext: DialogueAct?
+    let boost: Double
+    let explanation: String
+}
+
+extension CognitiveCycleEngine {
+    /// Classify a text into a dialogue act
+    private func classifyDialogueAct(_ text: String) -> DialogueAct {
+        let lower = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Greeting
+        let greetings = ["hej", "hallå", "tjena", "hejsan", "god", "morgon", "kväll", "dag"]
+        if greetings.contains(where: { lower.hasPrefix($0) }) { return .greeting }
+
+        // Closing
+        let closings = ["hejdå", "adjö", "vi ses", "ha det", "goodbye", "bye"]
+        if closings.contains(where: { lower.contains($0) }) { return .closing }
+
+        // Question
+        if lower.contains("?") { return .question }
+
+        // Request
+        let requests = ["kan du", "skulle du", "vill du", "be dig", "hjälp mig", "snälla", "är du snäll"]
+        if requests.contains(where: { lower.contains($0) }) { return .request }
+
+        // Agreement
+        let agreements = ["ja", "absolut", "visst", "håller med", "instämmer", "precis", "exakt", "så är det", "du har rätt", "helt rätt"]
+        if agreements.contains(where: { lower.hasPrefix($0) || lower.contains(" \($0)") }) { return .agreement }
+
+        // Disagreement
+        let disagreements = ["nej", "håller inte med", "instämmer inte", "fel", "så är det inte", "du har fel", "snacka sjuttsvåla"]
+        if disagreements.contains(where: { lower.hasPrefix($0) || lower.contains(" \($0)") }) { return .disagreement }
+
+        // Apology
+        let apologies = ["förlåt", "ursäkta", "ber om ursäkt", "ledsen för", "sorry"]
+        if apologies.contains(where: { lower.contains($0) }) { return .apology }
+
+        // Complaint
+        let complaints = ["klagar", "missnöjd", "dåligt", "inte bra", "oacceptabelt", "problem", "fungerar inte"]
+        if complaints.contains(where: { lower.contains($0) }) { return .complaint }
+
+        // Clarification
+        let clarifications = ["menar du", "alltså", "så du säger", "vad menar du", "hur menar du"]
+        if clarifications.contains(where: { lower.contains($0) }) { return .clarification }
+
+        // Answer: if it follows a question and provides information
+        if dialogueActHistory.last == .question {
+            return .answer
+        }
+
+        // Compliance: if it follows a request
+        if dialogueActHistory.last == .request {
+            return .compliance
+        }
+
+        // Default: statement
+        return .statement
+    }
+
+    /// Well-known dialogue patterns and their expected sequences
+    private static let knownPatterns: [DialoguePattern] = [
+        DialoguePattern(sequence: [.question, .answer], label: "Question→Answer", expectedNext: .statement),
+        DialoguePattern(sequence: [.statement, .agreement], label: "Statement→Agreement", expectedNext: nil),
+        DialoguePattern(sequence: [.request, .compliance], label: "Request→Compliance", expectedNext: nil),
+        DialoguePattern(sequence: [.complaint, .apology], label: "Complaint→Apology", expectedNext: nil),
+        DialoguePattern(sequence: [.question, .clarification, .answer], label: "Question→Clarification→Answer", expectedNext: nil),
+        DialoguePattern(sequence: [.greeting, .greeting], label: "Greeting→Greeting", expectedNext: .statement),
+        DialoguePattern(sequence: [.statement, .disagreement], label: "Statement→Disagreement", expectedNext: .statement),
+    ]
+
+    /// Record a dialogue act and analyze the sequence pattern
+    func recordDialogueAct(_ act: DialogueAct, forEon: Bool) -> DialogueSequenceResult {
+        dialogueActHistory.append(act)
+
+        // Keep only last 20 acts
+        if dialogueActHistory.count > 20 {
+            dialogueActHistory = Array(dialogueActHistory.suffix(20))
+        }
+
+        guard dialogueActHistory.count >= 2 else {
+            return DialogueSequenceResult(pattern: "initial", isComplete: false, isBroken: false, expectedNext: nil, boost: 0.0, explanation: "För kort sekvens")
+        }
+
+        let lastTwo = Array(dialogueActHistory.suffix(2))
+        let lastThree = dialogueActHistory.count >= 3 ? Array(dialogueActHistory.suffix(3)) : []
+
+        // Check against known patterns
+        for pattern in Self.knownPatterns {
+            let patternActs = pattern.sequence
+
+            // Check 2-act patterns
+            if patternActs.count == 2 && lastTwo == patternActs {
+                let patternKey = pattern.label
+                dialoguePatterns[patternKey, default: 0] += 1
+                successfulPatternCount += 1
+
+                return DialogueSequenceResult(
+                    pattern: patternKey,
+                    isComplete: true,
+                    isBroken: false,
+                    expectedNext: pattern.expectedNext,
+                    boost: 0.003,
+                    explanation: "Mönster: \(patternKey) — framgångsrikt"
+                )
+            }
+
+            // Check 3-act patterns
+            if patternActs.count == 3 && lastThree == patternActs {
+                let patternKey = pattern.label
+                dialoguePatterns[patternKey, default: 0] += 1
+                successfulPatternCount += 1
+
+                return DialogueSequenceResult(
+                    pattern: patternKey,
+                    isComplete: true,
+                    isBroken: false,
+                    expectedNext: pattern.expectedNext,
+                    boost: 0.003,
+                    explanation: "Mönster: \(patternKey) — framgångsrikt"
+                )
+            }
+        }
+
+        // Detect broken patterns: Question without Answer
+        if lastTwo.count == 2 {
+            let first = lastTwo[0]
+            let second = lastTwo[1]
+
+            // Question → no answer
+            if first == .question && second != .answer && second != .clarification {
+                let broken = BrokenDialoguePattern(
+                    expected: .answer,
+                    actual: second,
+                    pattern: "Question→\(second.rawValue)",
+                    timestamp: Date(),
+                    explanation: "Fråga besvarades inte — kommunikationsavbrott"
+                )
+                brokenPatterns.append(broken)
+                if brokenPatterns.count > 50 {
+                    brokenPatterns = Array(brokenPatterns.suffix(50))
+                }
+                return DialogueSequenceResult(
+                    pattern: "Broken: Question→no answer",
+                    isComplete: false,
+                    isBroken: true,
+                    expectedNext: .answer,
+                    boost: 0.0,
+                    explanation: "Kommunikationsfel: Fråga utan svar"
+                )
+            }
+
+            // Request → no compliance
+            if first == .request && second != .compliance && second != .answer {
+                let broken = BrokenDialoguePattern(
+                    expected: .compliance,
+                    actual: second,
+                    pattern: "Request→\(second.rawValue)",
+                    timestamp: Date(),
+                    explanation: "Begäran besvarades inte — kommunikationsavbrott"
+                )
+                brokenPatterns.append(broken)
+                return DialogueSequenceResult(
+                    pattern: "Broken: Request→no compliance",
+                    isComplete: false,
+                    isBroken: true,
+                    expectedNext: .compliance,
+                    boost: 0.0,
+                    explanation: "Kommunikationsfel: Begäran utan svar"
+                )
+            }
+
+            // Complaint → no apology
+            if first == .complaint && second != .apology && second != .statement {
+                let broken = BrokenDialoguePattern(
+                    expected: .apology,
+                    actual: second,
+                    pattern: "Complaint→\(second.rawValue)",
+                    timestamp: Date(),
+                    explanation: "Klage bemöttes inte — kommunikationsavbrott"
+                )
+                brokenPatterns.append(broken)
+                return DialogueSequenceResult(
+                    pattern: "Broken: Complaint→no apology",
+                    isComplete: false,
+                    isBroken: true,
+                    expectedNext: .apology,
+                    boost: 0.0,
+                    explanation: "Kommunikationsfel: Klage utan bemötande"
+                )
+            }
+        }
+
+        // Predict expected next act based on current act
+        let expectedNext: DialogueAct?
+        switch act {
+        case .question: expectedNext = .answer
+        case .request: expectedNext = .compliance
+        case .complaint: expectedNext = .apology
+        case .greeting: expectedNext = .greeting
+        default: expectedNext = nil
+        }
+
+        return DialogueSequenceResult(
+            pattern: "\(lastTwo.map { $0.rawValue }.joined(separator: "→"))",
+            isComplete: false,
+            isBroken: false,
+            expectedNext: expectedNext,
+            boost: 0.0,
+            explanation: "Pågående sekvens"
+        )
+    }
+
+    /// Get dialogue pattern statistics
+    func dialoguePatternStats() -> (total: Int, successful: Int, broken: Int, successRate: Double) {
+        let total = successfulPatternCount + brokenPatterns.count
+        let rate = total > 0 ? Double(successfulPatternCount) / Double(total) : 1.0
+        return (total, successfulPatternCount, brokenPatterns.count, rate)
+    }
+
+    /// Get recent broken patterns
+    func recentBrokenPatterns(limit: Int = 5) -> [BrokenDialoguePattern] {
+        Array(brokenPatterns.suffix(limit))
     }
 }

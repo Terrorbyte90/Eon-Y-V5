@@ -99,6 +99,14 @@ final class ConsciousnessEngine: ObservableObject {
     @Published var currentSelfReflection: String = ""
     @Published var languageImprovementGoal: String = ""
 
+    // ═══════════════════════════════════════════════════════════
+    // ITERATION 41-50: Autonomous Self-Development Integration
+    // ═══════════════════════════════════════════════════════════
+    @Published var lastMasteryLoopReport: String = ""
+    @Published var currentLearningStrategyLabel: String = "Balanserad"
+    @Published var currentCurriculumProgress: Double = 0.0
+    @Published var knowledgeSynthesisCount: Int = 0
+
     // MARK: - Consciousness Tests (30 tests, 15-min intervals)
     @Published var consciousnessTests: [ConsciousnessTest] = ConsciousnessTest.allTests
     @Published var lastTestRunTime: Date? = nil

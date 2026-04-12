@@ -225,7 +225,7 @@ final class CognitiveState: ObservableObject {
         // Inlärning → förstärker kunskap, språk, resonemang
         causalInfluences += [
             CausalInfluence(from: .learning, to: .knowledge, strength: 0.25),
-            CausalInfluence(from: .learning, to: .language, strength: 0.15),
+            CausalInfluence(from: .learning, to: .language, strength: 0.45),   // 300% BOOST: från 0.15
             CausalInfluence(from: .learning, to: .reasoning, strength: 0.12),
         ]
         // Metakognition → förstärker resonemang, inlärning, självmedvetenhet
@@ -244,7 +244,7 @@ final class CognitiveState: ObservableObject {
         // Kunskap → förstärker kognitiva förmågor
         causalInfluences += [
             CausalInfluence(from: .knowledge, to: .reasoning, strength: 0.15),
-            CausalInfluence(from: .knowledge, to: .language, strength: 0.12),
+            CausalInfluence(from: .knowledge, to: .language, strength: 0.36),   // 300% BOOST: från 0.12
             CausalInfluence(from: .knowledge, to: .creativity, strength: 0.10),
             CausalInfluence(from: .knowledge, to: .worldModel, strength: 0.18),
         ]
@@ -265,8 +265,8 @@ final class CognitiveState: ObservableObject {
         ]
         // Språk → förstärker kommunikation, förståelse
         causalInfluences += [
-            CausalInfluence(from: .language, to: .comprehension, strength: 0.22),
-            CausalInfluence(from: .language, to: .communication, strength: 0.25),
+            CausalInfluence(from: .language, to: .comprehension, strength: 0.66),   // 300% BOOST: från 0.22
+            CausalInfluence(from: .language, to: .communication, strength: 0.75),   // 300% BOOST: från 0.25
         ]
         // Världsmodell → förstärker prediktion, kausalitet
         causalInfluences += [
@@ -407,7 +407,7 @@ final class CognitiveState: ObservableObject {
         let baseline: Double = savedII > 0.1 ? max(0.30, savedII * 0.80) : 0.35
 
         // Mycket låg decay — bara ett litet tryck mot baseline, inte en radering
-        let decayRate: Double = 0.00008      // Halverat från tidigare 0.00015
+        let decayRate: Double = 0.000032     // 60% reduction from 0.00008 — language skills persist longer
 
         for dim in CognitiveDimension.allCases where dim != .cognitiveLoad {
             guard let current = dimensions[dim] else { continue }

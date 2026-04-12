@@ -522,7 +522,7 @@ final class EonLiveAutonomy: ObservableObject {
         // v15: Log language phase activity to brain
         brain.appendLanguageLog("Språkfas cykel \(workDone + 1) startar")
 
-        switch workDone % 5 {
+        switch workDone % 7 {  // UTÖKAD: från 5 till 7 operationer
         case 0:
             if isLanguageExpEnabled && !brain.isThinking {
                 await runLanguageExperiment(brain: brain)
@@ -542,6 +542,17 @@ final class EonLiveAutonomy: ObservableObject {
         case 4:
             // v15: Sentence complexity assessment
             await runSentenceComplexityCheck(brain: brain)
+        case 5:
+            // v30: OpenRouter-utvärdera språk (varannan cykel)
+            if workDone % 14 == 5 {  // Var 14:e cykel = varannan gång case 5 träffas
+                await runOpenRouterLanguageEvaluation(brain: brain)
+            }
+        case 6:
+            // v30: Språklig självförbättring (var 6:e cykel)
+            if workDone % 21 == 6 {  // Var 21:a cykel
+                await LearningEngine.shared.selfImproveLanguage()
+                await LearningEngine.shared.expandVocabularyWithOpenRouter()
+            }
         default:
             break
         }
@@ -673,6 +684,78 @@ final class EonLiveAutonomy: ObservableObject {
         }
     }
 
+    // MARK: - OpenRouter Language Evaluation (v30)
+
+    /// Utvärdera Eons språk med OpenRouter och förbättra baserat på resultaten
+    private func runOpenRouterLanguageEvaluation(brain: EonBrain) async {
+        guard !shouldSkipAutonomousWork() else { return }
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+
+        brain.appendLanguageLog("OpenRouter-språkutvärdering startar")
+
+        // 1. Hämta senaste svaren
+        let memory = PersistentMemoryStore.shared
+        let recentFacts = await memory.searchFacts(query: "svar", limit: 15)
+        let texts = recentFacts.prefix(8).map { $0.detail }
+
+        guard !texts.isEmpty else {
+            brain.appendLanguageLog("OpenRouter: Inga texter att utvärdera")
+            return
+        }
+
+        // 2. Hämta WSD-ord att förbättra
+        let wsdWords = await SwedishLanguageCore.shared.getAllWSDWords().prefix(20)
+        let wordContextPairs: [(word: String, context: String)] = wsdWords.map { word in
+            (word, texts.joined(separator: " ").prefix(200))
+        }
+
+        // 3. Kör batch-utvärdering
+        let evaluation = await OpenRouterLanguageEvaluator.shared.runBatchEvaluation(
+            texts: Array(texts),
+            words: Array(wsdWords),
+            wordContexts: wordContextPairs,
+            domain: "svenska"
+        )
+
+        // 4. Tillämpa förbättringar
+        let state = CognitiveState.shared
+        let overallGain = min(0.015, evaluation.overallScore * 0.005)
+
+        state.update(dimension: .language, delta: overallGain, source: "OpenRouterEval")
+        state.update(dimension: .comprehension, delta: overallGain * 0.5, source: "OpenRouterEval")
+        state.update(dimension: .communication, delta: overallGain * 0.7, source: "OpenRouterEval")
+
+        // 5. Logga resultat
+        let summary = String(format: "OpenRouter: overall=%.1f, grammar=%d, wsd=%d, style=%d",
+                             evaluation.overallScore * 100,
+                             evaluation.grammarResults.count,
+                             evaluation.wsdResults.count,
+                             evaluation.styleResults.count)
+        brain.appendLanguageLog(summary)
+
+        // 6. Spara rekommendationer som lärdomar
+        for rec in evaluation.recommendations.prefix(5) {
+            let fact = ExtractedFact(
+                subject: "Språkförbättring",
+                detail: rec,
+                confidence: 0.8,
+                timestamp: Date(),
+                source: "openrouter-eval"
+            )
+            await memory.saveFact(fact)
+        }
+
+        // 7. Uppdatera hjärnans språkmetriker
+        brain.languagePhaseActive = true
+        let morphologyGain = min(0.005, Double(evaluation.wsdResults.count) * 0.0002)
+        let syntaxGain = min(0.005, Double(evaluation.grammarResults.count) * 0.0003)
+        brain.morphologyMastery = min(0.95, brain.morphologyMastery + morphologyGain)
+        brain.syntaxMastery = min(0.95, brain.syntaxMastery + syntaxGain)
+
+        print("[OpenRouterEval] \(summary)")
+        print("[OpenRouterEval] Rekommendationer: \(evaluation.recommendations.count)")
+    }
+
     private func runRestPhaseWork(brain: EonBrain) async {
         let workDone = phaseWorkDone[.rest] ?? 0
         phaseWorkDone[.rest] = workDone + 1
@@ -789,6 +872,135 @@ final class EonLiveAutonomy: ObservableObject {
                 let trend = await EonEvaluator.shared.trendAnalysis()
                 let text = "📊 Eval klar: betyg=\(run.grade) · score=\(String(format: "%.2f", run.overallScore)) · \(trend.message)"
                 brain.innerMonologue.append(MonologueLine(text: text, type: .insight))
+            }
+
+            // ═══════════════════════════════════════════════════════
+            // ITERATION 50: Autonomous Language Mastery Loop
+            // Runs every ~120 cycles (~10 hours) — the capstone loop
+            // ═══════════════════════════════════════════════════════
+            if maintenanceCycle % 120 == 0 {
+                brain.innerMonologue.append(MonologueLine(
+                    text: "🔄 Startar autonom språkmästeriloop (Iterations 41-50)...",
+                    type: .loopTrigger
+                ))
+                let report = await LearningEngine.shared.executeAutonomousLanguageMasteryLoop()
+
+                // Add motivational thought to inner monologue
+                brain.innerMonologue.append(MonologueLine(
+                    text: "💭 \(report.motivationalThought)",
+                    type: .insight
+                ))
+
+                // Log key results
+                let summaryLine = MonologueLine(
+                    text: "📈 Mastery Loop: CEFR=\(report.currentCEFR), Vocab=\(report.vocabularyCount), Strategi=\(report.selectedStrategy.rawValue), Synteser=\(report.knowledgeSyntheses)",
+                    type: .insight
+                )
+                brain.innerMonologue.append(summaryLine)
+
+                // Update cognitive dimensions based on report
+                let state = CognitiveState.shared
+                await state.update(dimension: .language, delta: 0.008, source: "mastery_loop")
+                await state.update(dimension: .learning, delta: 0.005, source: "mastery_loop")
+                await state.update(dimension: .metacognition, delta: 0.004, source: "mastery_loop")
+            }
+
+            // ═══════════════════════════════════════════════════════
+            // ITERATION 41: Weekly curriculum generation
+            // ═══════════════════════════════════════════════════════
+            if maintenanceCycle % 144 == 0 { // ~12 hours check, regenerates weekly internally
+                let curriculum = await LearningEngine.shared.generateCurriculum()
+                if !curriculum.topics.isEmpty {
+                    brain.innerMonologue.append(MonologueLine(
+                        text: "📚 Ny lärlplan: \(curriculum.topics.count) ämnen, fokus på \(curriculum.focusAreas.joined(separator: ", "))",
+                        type: .insight
+                    ))
+                }
+            }
+
+            // ═══════════════════════════════════════════════════════
+            // ITERATION 42: Periodic self-evaluation
+            // ═══════════════════════════════════════════════════════
+            if maintenanceCycle % 48 == 0 { // ~4 hours
+                let selfEval = await LearningEngine.shared.selfEvaluateLanguage()
+                brain.innerMonologue.append(MonologueLine(
+                    text: "🔍 Självutvärdering: \(selfEval.estimatedCEFR) — \(selfEval.comparisonToPrevious)",
+                    type: .insight
+                ))
+                if !selfEval.improvementGoals.isEmpty {
+                    brain.innerMonologue.append(MonologueLine(
+                        text: "🎯 Mål: \(selfEval.improvementGoals.first ?? "Fortsätt lära")",
+                        type: .thought
+                    ))
+                }
+            }
+
+            // ═══════════════════════════════════════════════════════
+            // ITERATION 43: Learning strategy selection
+            // ═══════════════════════════════════════════════════════
+            if maintenanceCycle % 24 == 0 { // ~2 hours
+                let strategy = await LearningEngine.shared.selectLearningStrategy()
+                let weights = await LearningEngine.shared.strategyWeights()
+                brain.innerMonologue.append(MonologueLine(
+                    text: "🎯 Strategi: \(strategy.description) (vocab: \(String(format: "%.1f", weights.vocabulary)), conv: \(String(format: "%.1f", weights.conversation)))",
+                    type: .thought
+                ))
+            }
+
+            // ═══════════════════════════════════════════════════════
+            // ITERATION 44: Knowledge synthesis (periodic)
+            // ═══════════════════════════════════════════════════════
+            if maintenanceCycle % 36 == 0 { // ~3 hours
+                let syntheses = await LearningEngine.shared.synthesizeKnowledge()
+                if !syntheses.isEmpty {
+                    for synthesis in syntheses.prefix(2) {
+                        brain.innerMonologue.append(MonologueLine(
+                            text: "💡 Syntes: \(synthesis.synthesizedInsight.prefix(100))...",
+                            type: .insight
+                        ))
+                    }
+                }
+            }
+
+            // ═══════════════════════════════════════════════════════
+            // ITERATION 45: Meta-meta-learning optimization
+            // ═══════════════════════════════════════════════════════
+            if maintenanceCycle % 72 == 0 { // ~6 hours
+                await LearningEngine.shared.optimizeLearningStrategy()
+            }
+
+            // ═══════════════════════════════════════════════════════
+            // ITERATION 46: Self-generated evaluation questions
+            // ═══════════════════════════════════════════════════════
+            if maintenanceCycle % 30 == 0 {
+                let questions = await LearningEngine.shared.generateSelfEvaluationQuestions()
+                let perf = await LearningEngine.shared.averageSelfEvalPerformance()
+                if perf > 0 {
+                    brain.innerMonologue.append(MonologueLine(
+                        text: "❓ Själv-genererade frågor: \(questions.count) st, snittpoäng: \(String(format: "%.2f", perf))",
+                        type: .thought
+                    ))
+                }
+            }
+
+            // ═══════════════════════════════════════════════════════
+            // ITERATION 47: Progressive difficulty scaling
+            // ═══════════════════════════════════════════════════════
+            if maintenanceCycle % 18 == 0 {
+                await LearningEngine.shared.updateDifficultyTier()
+                let tier = await LearningEngine.shared.targetCEFRForLearning()
+                brain.appendLanguageLog("Svårighetsnivå: \(tier)")
+            }
+
+            // ═══════════════════════════════════════════════════════
+            // ITERATION 49: Self-motivation thought
+            // ═══════════════════════════════════════════════════════
+            if maintenanceCycle % 15 == 0 {
+                let thought = await LearningEngine.shared.generateMotivationalThought()
+                brain.innerMonologue.append(MonologueLine(
+                    text: "💭 \(thought)",
+                    type: .insight
+                ))
             }
 
             // Sleep 5 minutes between maintenance cycles (thermal-aware)
@@ -1658,7 +1870,7 @@ final class EonLiveAutonomy: ObservableObject {
             }
         }
 
-        guard let result else {
+        guard var result else {
             brain.innerMonologue.append(MonologueLine(
                 text: "❌ Språkbanken: alla 3 försök misslyckades — fortsätter med intern kunskap",
                 type: .revision
@@ -1667,6 +1879,10 @@ final class EonLiveAutonomy: ObservableObject {
             await runLanguageExperiment(brain: brain)
             return
         }
+
+        // MARK: - Iteration 28: OpenRouter-Enhanced Sprakbanken
+        // After fetching from Sprakbanken, enrich results with OpenRouter
+        await enrichSprakbankenWithOpenRouter(result: &result, brain: brain)
 
         let line = MonologueLine(
             text: "⟁ Språkbanken[\(fetchType.label)]: \(result.summary)",
@@ -1686,6 +1902,104 @@ final class EonLiveAutonomy: ObservableObject {
                     source: "sprakbanken"
                 )
             }
+        }
+    }
+
+    // MARK: - Iteration 28: OpenRouter-Enhanced Sprakbanken Enrichment
+    /// After fetching data from Sprakbanken, pass results through OpenRouter for enrichment:
+    /// add definitions, example sentences, collocations, and CEFR levels
+    private func enrichSprakbankenWithOpenRouter(result: inout SprakbankenResult, brain: EonBrain) async {
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+
+        // Extract words from Sprakbanken results to enrich
+        let wordsToEnrich = result.facts.prefix(10).compactMap { fact -> String? in
+            let word = fact.subject.trimmingCharacters(in: .whitespacesAndNewlines)
+            return word.count > 2 && word.count < 30 ? word : nil
+        }
+
+        guard !wordsToEnrich.isEmpty else { return }
+
+        brain.innerMonologue.append(MonologueLine(
+            text: "🔍 OpenRouter-berikning: fördjupar \(wordsToEnrich.count) ord från Språkbanken...",
+            type: .thought
+        ))
+
+        // Call OpenRouter to enrich the Sprakbanken data
+        let enriched = await OpenRouterLanguageEvaluator.shared.enrichSprakbankenData(Array(wordsToEnrich))
+
+        var enrichedCount = 0
+        for enrichment in enriched {
+            // Save enriched data as enhanced facts
+            await PersistentMemoryStore.shared.saveFact(
+                subject: enrichment.word,
+                predicate: "openrouter_definition",
+                object: enrichment.definition,
+                confidence: 0.9,
+                source: "sprakbanken_openrouter_enriched"
+            )
+
+            // Save example sentences
+            for (i, example) in enrichment.exampleSentences.prefix(2).enumerated() {
+                await PersistentMemoryStore.shared.saveFact(
+                    subject: enrichment.word,
+                    predicate: "exempel_mening_\(i + 1)",
+                    object: example,
+                    confidence: 0.85,
+                    source: "sprakbanken_openrouter_enriched"
+                )
+            }
+
+            // Save collocations
+            for collocation in enrichment.collocations.prefix(3) {
+                await PersistentMemoryStore.shared.saveFact(
+                    subject: enrichment.word,
+                    predicate: "kollokation_med",
+                    object: collocation,
+                    confidence: 0.75,
+                    source: "sprakbanken_openrouter_enriched"
+                )
+            }
+
+            // Save CEFR level
+            await PersistentMemoryStore.shared.saveFact(
+                subject: enrichment.word,
+                predicate: "cefr_nivå",
+                object: enrichment.cefrLevel,
+                confidence: 0.8,
+                source: "sprakbanken_openrouter_enriched"
+            )
+
+            // Save semantic field
+            await PersistentMemoryStore.shared.saveFact(
+                subject: enrichment.word,
+                predicate: "semantiskt_fält",
+                object: enrichment.semanticField,
+                confidence: 0.75,
+                source: "sprakbanken_openrouter_enriched"
+            )
+
+            // Record the word in vocabulary
+            await LearningEngine.shared.recordSwedishWord(enrichment.word)
+
+            enrichedCount += 1
+        }
+
+        if enrichedCount > 0 {
+            result.summary += " | OpenRouter-berikning: \(enrichedCount) ord fördjupade"
+            result.nodeCount += enrichedCount * 3  // Each enriched word adds ~3 knowledge nodes
+
+            // Boost semantic competency for enriched vocabulary
+            if var comp = await LearningEngine.shared.competencyBook()["Semantik"] {
+                let enrichmentBoost = min(0.02, Double(enrichedCount) * 0.001)
+                comp.level = min(0.95, comp.level + enrichmentBoost)
+                comp.lastStudied = Date()
+                await LearningEngine.shared.updateCompetency(comp, domain: "Semantik")
+            }
+
+            brain.innerMonologue.append(MonologueLine(
+                text: "✓ OpenRouter-berikning klar: \(enrichedCount) ord med definitioner, exempel och kollokationer",
+                type: .insight
+            ))
         }
     }
 
