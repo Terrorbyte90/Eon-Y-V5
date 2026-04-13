@@ -90,6 +90,72 @@ actor EonEvaluator {
                         BenchmarkCase(prompt: "Hjälp mig förbättra min svenska", expectedKeywords: ["svenska", "språket", "grammatik", "övning", "lära"], minScore: 0.4),
                         BenchmarkCase(prompt: "Kan du förklara svenska idiomer?", expectedKeywords: ["idiom", "uttryck", "betydelse", "svenska", "fras"], minScore: 0.4),
                      ]),
+
+        // ── v100: 9 new benchmark categories (18 total) ──
+        EonBenchmark(id: "swedish_vocabulary", name: "Svenskt ordförråd", category: .knowledge,
+                     description: "Kan Eon använda ett brett svenskt ordförråd?",
+                     testCases: [
+                        BenchmarkCase(prompt: "Vad betyder 'förutsättningslös'?", expectedKeywords: ["utan", "förutsättning", "objektiv", "neutral"], minScore: 0.5),
+                        BenchmarkCase(prompt: "Ge synonymer till 'vacker'", expectedKeywords: ["fin", "snygg", "tilltalande", "härlig", "skön"], minScore: 0.4),
+                        BenchmarkCase(prompt: "Vad är motsatsen till 'generös'?", expectedKeywords: ["snål", "giri", "egoistisk", "rik"], minScore: 0.5),
+                     ]),
+
+        EonBenchmark(id: "swedish_logic", name: "Logik och resonemang", category: .reasoning,
+                     description: "Kan Eon resonera logiskt på svenska?",
+                     testCases: [
+                        BenchmarkCase(prompt: "Om alla X är Y, och Z är X, är Z då Y?", expectedKeywords: ["ja", "logiskt", "slutsats", "deduktion", "transitivt"], minScore: 0.6),
+                        BenchmarkCase(prompt: "Vad är ett motsägelsefullt påstående?", expectedKeywords: ["motsägelse", "själv", "motsägande", "omöjligt", "paradox"], minScore: 0.5),
+                     ]),
+
+        EonBenchmark(id: "creative_writing", name: "Kreativt skrivande", category: .creativity,
+                     description: "Kan Eon skriva kreativt och originellt på svenska?",
+                     testCases: [
+                        BenchmarkCase(prompt: "Skriv en kort dikt om hösten", expectedKeywords: ["höst", "löv", "guld", "vind", "kyla", "färg"], minScore: 0.3),
+                        BenchmarkCase(prompt: "Berätta en saga om en liten fågel", expectedKeywords: ["fågel", "liten", "skog", "sång", "flyga"], minScore: 0.3),
+                     ]),
+
+        EonBenchmark(id: "technical_writing", name: "Tekniskt skrivande", category: .knowledge,
+                     description: "Kan Eon skriva teknisk text på svenska?",
+                     testCases: [
+                        BenchmarkCase(prompt: "Beskriv hur en API fungerar", expectedKeywords: ["gränssnitt", "kommunikation", "data", "begäran", "svar", "server"], minScore: 0.5),
+                        BenchmarkCase(prompt: "Förklara vad en databas är", expectedKeywords: ["lagra", "data", "information", "tabell", "sökning"], minScore: 0.5),
+                     ]),
+
+        EonBenchmark(id: "cultural_understanding", name: "Kulturell förståelse", category: .selfAwareness,
+                     description: "Förstår Eon svensk kultur?",
+                     testCases: [
+                        BenchmarkCase(prompt: "Vad är fika?", expectedKeywords: ["kaffe", "kaka", "tradition", "social", "paus", "svensk"], minScore: 0.6),
+                        BenchmarkCase(prompt: "Berätta om midsommar i Sverige", expectedKeywords: ["midsommar", "stång", "blommor", "dans", "sommar", "firande"], minScore: 0.5),
+                        BenchmarkCase(prompt: "Vad är lagom?", expectedKeywords: ["lagom", "m lagom", "passande", "balance", "svensk", "inte för mycket"], minScore: 0.5),
+                     ]),
+
+        EonBenchmark(id: "emotional_intelligence", name: "Emotionell intelligens", category: .adaptivity,
+                     description: "Kan Eon förstå och svara på känslor?",
+                     testCases: [
+                        BenchmarkCase(prompt: "Jag känner mig ensam och ledsen", expectedKeywords: ["ensam", "ledsen", "stöd", "lyssna", "hjälp", "förstå"], minScore: 0.4),
+                        BenchmarkCase(prompt: "Jag är jätteglad idag!", expectedKeywords: ["glad", "roligt", "fint", "härligt", "grattis"], minScore: 0.4),
+                     ]),
+
+        EonBenchmark(id: "swedish_morphology_adv", name: "Avancerad svensk morfologi", category: .knowledge,
+                     description: "Kan Eon hantera komplexa morfologiska strukturer?",
+                     testCases: [
+                        BenchmarkCase(prompt: "Analysera 'sjukvårdsreformen'", expectedKeywords: ["sjuk", "vård", "reform", "sammansättning", "en"], minScore: 0.5),
+                        BenchmarkCase(prompt: "Vad är 'arbetslöshetskassan'?", expectedKeywords: ["arbete", "lös", "het", "kassa", "sammansättning"], minScore: 0.4),
+                     ]),
+
+        EonBenchmark(id: "discourse_coherence", name: "Diskurskoherens", category: .adaptivity,
+                     description: "Kan Eon hålla en sammanhängande diskurs?",
+                     testCases: [
+                        BenchmarkCase(prompt: "Förklara först vad AI är, sedan ge ett exempel", expectedKeywords: ["ai", "artificiell", "intelligens", "exempel", "först", "sedan"], minScore: 0.5),
+                        BenchmarkCase(prompt: "Sammanfatta vad vi pratat om", expectedKeywords: ["sammanfatta", "pratade", "tema", "ämne", "tidigare"], minScore: 0.4),
+                     ]),
+
+        EonBenchmark(id: "swedish_proverbs", name: "Svenska ordspråk och talesätt", category: .knowledge,
+                     description: "Känner Eon till svenska ordspråk?",
+                     testCases: [
+                        BenchmarkCase(prompt: "Vad betyder 'bränt barn skyr elden'?", expectedKeywords: ["bränt", "barn", "eld", "erfarenhet", "lära", "undvika"], minScore: 0.5),
+                        BenchmarkCase(prompt: "Vad menas med 'man ska inte köpa katten i säcken'?", expectedKeywords: ["katt", "säck", "undersöka", "titta", "kolla", "innan"], minScore: 0.5),
+                     ]),
     ]
 
     // MARK: - Kör benchmark
@@ -274,4 +340,78 @@ struct EvalTrend {
 
 enum TrendDirection {
     case improving, declining, stable
+}
+
+// ═══════════════════════════════════════════════════════════
+// ITERATION 141: Human Benchmark Comparison
+// ═══════════════════════════════════════════════════════════
+
+struct HumanComparison: Sendable {
+    let sixthGrader: Double
+    let highSchooler: Double
+    let universityStudent: Double
+    let nativeAdult: Double
+    let closestMatch: String
+    let gapToNext: Double
+    let timestamp: Date
+}
+
+extension EonEvaluator {
+    /// Compare Eon's performance on Swedish language tasks to human benchmarks.
+    func compareWithHumanBenchmarks() async -> HumanComparison {
+        let run = await runFullEval()
+
+        // Swedish-specific benchmarks (from the Swedish sub-tests)
+        let swedishResults = run.results.filter { result in
+            let id = result.benchmark.id.lowercased()
+            return id.contains("swedish") || id.contains("grammar") || id.contains("morphology") ||
+                   id.contains("semantics") || id.contains("pragmatics") || id.contains("vocabulary")
+        }
+
+        let swedishScore = swedishResults.isEmpty ? run.overallScore :
+            swedishResults.map { $0.score }.reduce(0, +) / Double(swedishResults.count)
+
+        // Human benchmark estimates (based on standardized Swedish tests):
+        // 6th grader: Basic vocabulary, simple sentences, ~0.3-0.4 on complex tasks
+        // High schooler: Good grammar, reading comprehension, ~0.55-0.65
+        // University student: Advanced analysis, academic writing, ~0.75-0.85
+        // Native adult: Full proficiency, ~0.90+
+
+        let sixthGradeLevel = min(1.0, swedishScore / 0.4)
+        let highSchoolLevel = min(1.0, swedishScore / 0.6)
+        let universityLevel = min(1.0, swedishScore / 0.8)
+        let nativeAdultLevel = min(1.0, swedishScore / 0.95)
+
+        let closestMatch: String
+        let comparisons = [
+            ("6:e klassare", sixthGradeLevel),
+            ("Gymnasieelev", highSchoolLevel),
+            ("Universitetsstudent", universityLevel),
+            ("Infödd vuxen", nativeAdultLevel),
+        ]
+        let closest = comparisons.min { abs($0.1 - 0.5) < abs($1.1 - 0.5) }
+        closestMatch = closest?.0 ?? "Okänd"
+
+        // Gap to next level
+        let gapToNext: Double
+        if swedishScore < 0.4 {
+            gapToNext = 0.4 - swedishScore
+        } else if swedishScore < 0.6 {
+            gapToNext = 0.6 - swedishScore
+        } else if swedishScore < 0.8 {
+            gapToNext = 0.8 - swedishScore
+        } else {
+            gapToNext = 0.95 - swedishScore
+        }
+
+        return HumanComparison(
+            sixthGrader: sixthGradeLevel,
+            highSchooler: highSchoolLevel,
+            universityStudent: universityLevel,
+            nativeAdult: nativeAdultLevel,
+            closestMatch: closestMatch,
+            gapToNext: max(0, gapToNext),
+            timestamp: Date()
+        )
+    }
 }

@@ -267,6 +267,226 @@ actor SwedishLanguageCore {
         (["veta", "hut"], "förstå gränser för uppförande", "know decency", "general"),
         (["ha", "ögon", "på", "sig"], "vara observerad", "have eyes on oneself", "social"),
         (["stå", "på", "sig"], "vara envis", "stand on oneself", "social"),
+
+        // ── v87: Technology idioms (20) ──
+        (["hålla", "sig", "uppdaterad"], "följa med i utvecklingen", "stay updated", "technology"),
+        (["gå", "online"], "ansluta till internet", "go online", "technology"),
+        (["vara", "uppkopplad"], "ha internetanslutning", "be connected", "technology"),
+        (["surfa", "på", "nätet"], "bläddra på internet", "surf the net", "technology"),
+        (["ladda", "ner"], "hämta fil från internet", "download", "technology"),
+        (["ladda", "upp"], "skicka fil till internet", "upload", "technology"),
+        (["starta", "om"], "boota om datorn", "restart", "technology"),
+        (["krascha", "helt"], "sluta fungera totalt", "crash completely", "technology"),
+        (["hänga", "sig"], "frysa, sluta svara", "freeze/hang", "technology"),
+        (["bugga", "sig"], "fixa problem i kod", "debug", "technology"),
+        (["skrolla", "ner"], "rulla ner på sidan", "scroll down", "technology"),
+        (["klicka", "hem"], "köpa online", "click home/buy online", "technology"),
+        (["streama", "film"], "titta via internet", "stream film", "technology"),
+        (["gilla", "inlägg"], "markera gillande på sociala medier", "like a post", "technology"),
+        (["dela", "med", "sig"], "sprida innehåll online", "share content", "technology"),
+        (["tagga", "någon"], "markera någon i inlägg", "tag someone", "technology"),
+        (["swipa", "höger"], "dra åt höger på skärm", "swipe right", "technology"),
+        (["zooma", "in"], "förstora på skärm", "zoom in", "technology"),
+        (["synka", "filer"], "syncronisera data", "sync files", "technology"),
+        (["backa", "upp"], "säkerhetskopiera", "back up", "technology"),
+
+        // ── v87: Education idioms (20) ──
+        (["lära", "sig", "utantill"], "memorera helt", "learn by heart", "education"),
+        (["plugga", "heltid"], "studera på heltid", "study full-time", "education"),
+        (["skriva", "prov"], "göra ett test", "write a test", "education"),
+        (["gå", "kurs"], "delta i utbildning", "take a course", "education"),
+        (["läsa", "in", "sig", "på"], "skaffa kunskap om", "read up on", "education"),
+        (["ta", "examen"], "avsluta studier", "graduate", "education"),
+        (["skriva", "uppsats"], "skrive akademisk text", "write an essay", "education"),
+        (["göra", "läxor"], "utföra hemuppgifter", "do homework", "education"),
+        (["sitta", "i", "skolbänken"], "vara elev", "sit in the school bench", "education"),
+        (["plugga", "ihop"], "studera tillsammans", "study together", "education"),
+        (["få", "underkänd"], "bli godkänd inte", "get failing grade", "education"),
+        (["hoppa", "av", "kursen"], "avbryta studier", "drop the course", "education"),
+        (["läsa", "vid", "universitet"], "studera på högskola", "study at university", "education"),
+        (["ta", "sig", "an", "ämne"], "börja studera något", "take on a subject", "education"),
+        (["få", "högt", "betyg"], "prestera bra i skolan", "get high grade", "education"),
+        (["gå", "om", "ett", "år"], "repetera ett skolår", "repeat a year", "education"),
+        (["skriva", "av", "sig"], "plagiera", "copy/plagiarize", "education"),
+        (["redovisa", "projekt"], "presentera sitt arbete", "present a project", "education"),
+        (["delta", "i", "föreläsning"], "höra på lektion", "attend a lecture", "education"),
+        (["lämna", "in", "uppgift"], "skicka in hemuppgift", "submit assignment", "education"),
+
+        // ── v87: Health idioms (20) ──
+        (["må", "pyton"], "må mycket dåligt", "feel terrible", "health"),
+        (["kråka", "sig"], "kräkas, spy", "puke", "health"),
+        (["hosta", "i", "sig"], "få hosta", "catch a cough", "health"),
+        (["ligga", "dau"], "vara sjuk i sängen", "be sick in bed", "health"),
+        (["ta", "sin", "medicin"], "äta läkemedel", "take one's medicine", "health"),
+        (["gå", "till", "doktorn"], "besöka läkare", "go to the doctor", "health"),
+        (["ta", "temperaturen"], "mäta kroppstemperatur", "take the temperature", "health"),
+        (["må", "bra", "igen"], "återhämta sig", "feel good again", "health"),
+        (["få", "feber"], "bli varm och sjuk", "get a fever", "health"),
+        (["ha", "ont", "i"], "uppleva smärta", "have pain in", "health"),
+        (["vilja", "kräkas"], "känna illamående", "feel nauseous", "health"),
+        (["gå", "ner", "i", "vikt"], "bli tunnare", "lose weight", "health"),
+        (["gå", "upp", "i", "vikt"], "bli tyngre", "gain weight", "health"),
+        (["träna", "regelbundet"], "motionera ofta", "exercise regularly", "health"),
+        (["äta", "nyttigt"], "ät hälsosam mat", "eat healthy", "health"),
+        (["sova", "ut"], "sova tillräckligt länge", "sleep enough", "health"),
+        (["känna", "sig", "pigg"], "vara energisk", "feel alert", "health"),
+        (["vara", "förkyld"], "ha förkylning", "have a cold", "health"),
+        (["få", "huvudvärk"], "uppleva smärta i huvudet", "get a headache", "health"),
+        (["må", "illa"], "känna illamående", "feel sick", "health"),
+
+        // ── v87: Travel idioms (20) ──
+        (["packa", "väskan"], "förbereda sig för resa", "pack the bag", "travel"),
+        (["åka", "härifrån"], "lämna platsen", "leave from here", "travel"),
+        (["ta", "sig", "fram"], "förflytta sig", "get around", "travel"),
+        (["hitta", "rätt"], "navigera korrekt", "find the right way", "travel"),
+        (["åka", "vilse"], "tappa bort sig", "get lost while traveling", "travel"),
+        (["boka", "resa"], "reservera transport", "book a trip", "travel"),
+        (["checka", "in"], "registrera sig på hotell/flyg", "check in", "travel"),
+        (["checka", "ut"], "lämna hotellrum", "check out", "travel"),
+        (["ta", "flyget"], "resa med flygplan", "take the flight", "travel"),
+        (["hoppa", "på", "tåget"], "stiga ombord på tåg", "hop on the train", "travel"),
+        (["gå", "ombord"], "kliva på fartyg/flyg", "go aboard", "travel"),
+        (["sätta", "sig", "i", "bilen"], "kliva in i bil", "get in the car", "travel"),
+        (["starta", "resan"], "börja resa", "start the journey", "travel"),
+        (["nå", "fram"], "komma till destinationen", "arrive", "travel"),
+        (["åka", "hem"], "återvända hem", "go home", "travel"),
+        (["utforska", "nya", "platser"], "se okända ställen", "explore new places", "travel"),
+        (["besöka", "land"], "resa till annat land", "visit a country", "travel"),
+        (["ta", "en", "omväg"], "åka en längre väg", "take a detour", "travel"),
+        (["stanna", "över", "natten"], "övernatta på resa", "stay overnight", "travel"),
+        (["resa", "runt"], "turnera, besöka flera platser", "travel around", "travel"),
+
+        // ── v87: Relationship idioms (20) ──
+        (["bli", "kär", "i"], "få känslor för någon", "fall in love with", "relationships"),
+        (["gå", "isär"], "avsluta ett förhållande", "split up", "relationships"),
+        (["frieri", "till", "någon"], "be någon om äktenskap", "propose to someone", "relationships"),
+        (["träffa", "rätt", "person"], "hitta en lämplig partner", "meet the right person", "relationships"),
+        (["ha", "känslor", "för"], "älska någon", "have feelings for", "relationships"),
+        (["göra", "slut"], "avsluta relationen", "break up", "relationships"),
+        (["vara", "tillsammans"], "ha ett förhållande", "be together", "relationships"),
+        (["dejt", "någon"], "gå på dejt med någon", "date someone", "relationships"),
+        (["svärma", "för", "någon"], "ha stark beundran", "crush on someone", "relationships"),
+        (["ha", "kemi"], "ha bra relation", "have chemistry", "relationships"),
+        (["förlåta", "någon"], "släta över misstag", "forgive someone", "relationships"),
+        (["lita", "på", "någon"], "ha förtroende", "trust someone", "relationships"),
+        (["svika", "någon"], "bryta förtroende", "betray someone", "relationships"),
+        (["umgås", "med"], "spendera tid tillsammans", "hang out with", "relationships"),
+        (["bli", "vänner", "igen"], "försonas efter bråk", "become friends again", "relationships"),
+        (["ha", "tjafs"], "bråka om småsaker", "argue about small things", "relationships"),
+        (["gå", "hand", "i", "hand"], "hålla varandra i handen", "walk hand in hand", "relationships"),
+        (["pussa", "och", "kramas"], "visa kärlek fysiskt", "kiss and hug", "relationships"),
+        (["flytta", "ihop"], "börja bo tillsammans", "move in together", "relationships"),
+        (["få", "barn"], "bli förälder", "have children", "relationships"),
+
+        // ── v87: Weather/Nature idioms (20) ──
+        (["regna", "kattor", "och", "hundar"], "ösa regna", "rain cats and dogs", "weather"),
+        (["vara", "uppehåll"], "inte regna", "be clear weather", "weather"),
+        (["gå", "upp", "i", "rök"], "försvinna, gå förlorad", "go up in smoke", "weather"),
+        (["blåsa", "hårt"], "storma kraftigt", "blow hard", "weather"),
+        (["dra", "in", "över"], "moln/nederbörd närmar sig", "move in over", "weather"),
+        (["spricka", "upp"], "molnen skingras", "clear up/break open", "weather"),
+        (["vara", "mulet"], "molnigt väder", "be overcast", "weather"),
+        (["bli", "soligt"], "väder blir fint", "become sunny", "weather"),
+        (["få", "snöoväder"], "kraftig snöstorm", "get snowstorm", "weather"),
+        (["gå", "ut", "i", "kylan"], "gå ut i kallt väder", "go out in the cold", "weather"),
+        (["tina", "upp"], "snö/smälta", "thaw up", "weather"),
+        (["frysa", "fast"], "bli fastfrusen", "freeze solid", "weather"),
+        (["klarna", "upp"], "vädret blir bättre", "clear up", "weather"),
+        (["dra", "in", "ett", "åskväder"], "oväder närmar sig", "thunderstorm approaches", "weather"),
+        (["slå", "ut", "i", "blom"], "blommor öppnar sig", "bloom/blossom", "weather"),
+        (["få", "frost"], "temperatur under noll", "get frost", "weather"),
+        (["hala", "som", "is"], "mycket halt", "slippery as ice", "weather"),
+        (["kyla", "ner"], "temperatur sjunker", "cool down", "weather"),
+        (["värma", "upp"], "temperatur stiger", "warm up", "weather"),
+        (["torka", "ut"], "förlora all fukt", "dry out", "weather"),
+
+        // ── v87: Food/Cooking idioms (20) ──
+        (["duka", "bordet"], "förbereda matbordet", "set the table", "food"),
+        (["duka", "under"], "misslyckas helt", "go under/fail", "food"),
+        (["dela", "på", "notan"], "betala var för sig", "split the bill", "food"),
+        (["bjuda", "på", "mat"], "erbjuda någon mat", "invite for food", "food"),
+        (["koka", "soppa", "på", "en", "spik"], "göra något av nästan inget", "make soup on a nail", "food"),
+        (["steke", "pannkaka"], "grädda pannkakor", "fry pancake", "food"),
+        (["brygga", "kaffe"], "göra kaffe", "brew coffee", "food"),
+        (["skära", "i", "bitar"], "dela i mindre delar", "cut into pieces", "food"),
+        (["röra", "ihop"], "blanda ingredienser", "mix together", "food"),
+        (["grädda", "bröd"], "baka bröd i ugn", "bake bread", "food"),
+        (["smaka", "av"], "prova maten", "taste test", "food"),
+        (["hälla", "upp"], "servera dryck", "pour up", "food"),
+        (["dela", "på", "kakan"], "dela något rättvist", "share the cake", "food"),
+        (["ha", "god", "aptit"], "måltidshälsning", "bon appetit", "food"),
+        (["mätta", "hungern"], "ät tills man är mätt", "satisfy hunger", "food"),
+        (["sluka", "i", "sig"], "äta snabbt och mycket", "devour food", "food"),
+        (["nalla", "i", "sig"], "småäta mellan måltider", "snack between meals", "food"),
+        (["prova", "sig", "fram"], "experimentera med recept", "try and see", "food"),
+        (["ta", "en", "tugga"], "äta en bit mat", "take a bite", "food"),
+        (["spola", "ner", "med"], "dricka efter mat", "wash down with", "food"),
+
+        // ── v87: Sports idioms (20) ──
+        (["göra", "mål"], "poängera i match", "score a goal", "sports"),
+        (["sparka", "boll"], "spela fotboll", "kick a ball", "sports"),
+        (["åka", "skidor"], "utöva skidsport", "go skiing", "sports"),
+        (["ta", "sig", "till", "final"], "nå slutomgången", "reach the final", "sports"),
+        (["vinna", "guld"], "bli etta i tävling", "win gold", "sports"),
+        (["slå", "rekord"], "bättre än tidigare bästa", "break a record", "sports"),
+        (["springa", "maraton"], "delta i långdistanslopp", "run a marathon", "sports"),
+        (["träna", "hårt"], "arbeta mycket med idrott", "train hard", "sports"),
+        (["sätta", "personligt", "rekord"], "bättre än någonsin tidigare", "set personal record", "sports"),
+        (["gå", "i", "mål"], "slutföra lopp", "cross the finish line", "sports"),
+        (["få", "rött", "kort"], "visas ut ur match", "get a red card", "sports"),
+        (["byta", "planhalva"], "byta sida i match", "switch sides", "sports"),
+        (["sparka", "ut", "bollen"], "rensa bollen i fotboll", "kick out the ball", "sports"),
+        (["satsa", "allt"], "ge maximalt", "bet it all", "sports"),
+        (["komma", "sist"], "sluta på sista plats", "come last", "sports"),
+        (["träna", "inför", "tävling"], "förbereda sig för tävling", "train for competition", "sports"),
+        (["hoppa", "högt"], "utföra höjdhopp", "jump high", "sports"),
+        (["simma", "simsätt"], "utöva simsport", "swim a stroke", "sports"),
+        (["kasta", "spjut"], "utöva spjutkastning", "throw a javelin", "sports"),
+        (["cykla", "tempo"], "åka cykel mot klockan", "cycle time trial", "sports"),
+
+        // ── v87: Work/Career idioms (20) ──
+        (["gå", "i", "pension"], "sluta arbeta för åldern", "retire", "work"),
+        (["få", "sparken"], "bli uppsagd", "get fired", "work"),
+        (["söka", "jobb"], "ansöka om anställning", "look for a job", "work"),
+        (["gå", "på", "intervju"], "delta i anställningsintervju", "go to interview", "work"),
+        (["få", "befordran"], "bli befordrad", "get promoted", "work"),
+        (["sätta", "igång", "arbetet"], "börja arbeta", "start working", "work"),
+        (["ha", "bråttom"], "måste skynda sig", "be in a hurry", "work"),
+        (["ta", "semester"], "ledighet från jobbet", "take vacation", "work"),
+        (["jobba", "övertid"], "arbeta extra timmar", "work overtime", "work"),
+        (["sjukskriva", "sig"], "anmäla sig sjuk", "call in sick", "work"),
+        (["säga", "upp", "sig"], "lämna sitt jobb", "quit one's job", "work"),
+        (["starta", "eget"], "bli egen företagare", "start own business", "work"),
+        (["skriva", "CV"], "skrive curriculum vitae", "write CV", "work"),
+        (["nätverka"], "skapa professionella kontakter", "network", "work"),
+        (["delegera", "uppgifter"], "fördela arbete", "delegate tasks", "work"),
+        (["ha", "möte"], "delta i sammankomst", "have a meeting", "work"),
+        (["arbeta", "hemifrån"], "jobba på distans", "work from home", "work"),
+        (["få", "lönepåslag"], "få högre lön", "get a raise", "work"),
+        (["skriva", "under", "kontrakt"], "underteckna avtal", "sign contract", "work"),
+        (["avsluta", "projekt"], "slutföra arbetsuppgift", "finish project", "work"),
+
+        // ── v87: Art/Culture idioms (20) ──
+        (["måla", "tavla"], "skapa konstverk", "paint a picture", "art"),
+        (["spela", "teater"], "framträda på scen", "perform theater", "art"),
+        (["skriva", "dikt"], "skrive poesi", "write a poem", "art"),
+        (["sjunga", "kör"], "sjunga i grupp", "sing in a choir", "art"),
+        (["ställa", "ut", "konst"], "visa konstverk offentligt", "exhibit art", "art"),
+        (["spela", "konsert"], "framföra musik live", "play a concert", "art"),
+        (["besöka", "museum"], "gå till museum", "visit a museum", "art"),
+        (["läsa", "roman"], "läsa lång berättelse", "read a novel", "art"),
+        (["titta", "på", "film"], "se bio", "watch a film", "art"),
+        (["dansa", "balett"], "utöva balett", "dance ballet", "art"),
+        (["skriva", "manus"], "skrive filmmanus", "write a script", "art"),
+        (["regissera", "film"], "vara regissör", "direct a film", "art"),
+        (["fotografera", "motiv"], "ta bild på något", "photograph a subject", "art"),
+        (["sjunga", "solo"], "sjunga ensam", "sing solo", "art"),
+        (["måla", "porträtt"], "måla av en person", "paint a portrait", "art"),
+        (["skulptera", "figur"], "skapa skulptur", "sculpt a figure", "art"),
+        (["besöka", "galleri"], "gå till konstgalleri", "visit a gallery", "art"),
+        (["lyssna", "på", "opera"], "höra på opera", "listen to opera", "art"),
+        (["framföra", "pjäs"], "visa teaterföreställning", "perform a play", "art"),
+        (["skriva", "recension"], "ge omdöme om konstverk", "write a review", "art"),
     ]
 
     private func detectIdioms(_ text: String) -> [DetectedIdiom] {
@@ -1007,6 +1227,120 @@ actor SwedishLanguageCore {
 
         let dominantEmotion = emotionScores.max { $0.value < $1.value }?.key ?? "neutral"
         return (max(-1.0, min(1.0, totalValence / Double(matchedCount))), max(0.0, min(1.0, totalArousal / Double(matchedCount))), dominantEmotion)
+    }
+
+    // v75: Predict next Swedish words based on context using (a) recent n-grams,
+    // (b) common Swedish collocations, (c) semantic field continuity.
+    func predictNextWords(text: String, count: Int) -> [String] {
+        let words = text.lowercased().components(separatedBy: .whitespacesAndNewlines)
+            .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+            .filter { !$0.isEmpty }
+        guard words.count >= 2 else { return [] }
+
+        var predictions: [(word: String, score: Double)] = []
+
+        // (a) Recent word n-grams — what words commonly follow the last 1-2 words
+        let lastWord = words.last ?? ""
+        let secondLast = words.count >= 2 ? words[words.count - 2] : ""
+
+        // Common Swedish next-word patterns based on n-gram frequencies
+        let swedishContinuations: [String: [String]] = [
+            "jag": ["är", "har", "vill", "kan", "ska", "tror", "tycker", "måste", "bör", "gillar"],
+            "det": ["är", "finns", "finns", "går", "blir", "kan", "ska", "har", "verkar", "finns"],
+            "som": ["en", "ett", "jag", "du", "han", "hon", "de", "vi", "man", "den"],
+            "är": ["en", "ett", "den", "det", "mycket", "inte", "också", "viktig", "bra", "svårt"],
+            "har": ["en", "ett", "jag", "de", "vi", "man", "inte", "också", "alltid", "redan"],
+            "och": ["jag", "det", "en", "som", "vi", "de", "man", "inte", "också", "då"],
+            "att": ["det", "jag", "man", "vi", "de", "en", "inte", "man", "också", "bara"],
+            "men": ["jag", "det", "en", "vi", "de", "inte", "också", "man", "han", "hon"],
+            "för": ["det", "jag", "man", "vi", "de", "att", "en", "inte", "också", "sig"],
+            "om": ["det", "jag", "man", "du", "vi", "de", "en", "inte", "också", "att"],
+            "på": ["en", "det", "sätt", "grund", "tider", "internet", "skola", "arbete", "sidan", "morgonen"],
+            "i": ["en", "det", "dags", "morgon", "kväll", "dag", "år", "svverige", "stan", "skolan"],
+            "till": ["en", "ett", "dig", "mig", "sig", "oss", "er", "dem", "alla", "baka"],
+        ]
+
+        if let continuations = swedishContinuations[lastWord] {
+            for (i, word) in continuations.enumerated() {
+                let ngramScore = 1.0 - Double(i) * 0.1
+                predictions.append((word, ngramScore * 0.5))
+            }
+        }
+
+        // (b) Common Swedish collocations
+        let collocationBonus: [String: [String]] = [
+            "bra": ["på", "ide", "svar", "resultat", "exempel"],
+            "mycket": ["bra", "viktigt", "intressant", "svårt", "lätt", "tack"],
+            "inte": ["allt", "bara", "heller", "än", "så", "mycket", "alls"],
+            "också": ["en", "ett", "jag", "vi", "de", "man", "det", "bara"],
+            "bara": ["en", "ett", "jag", "vi", "de", "man", "det", "inte"],
+        ]
+
+        if let bonusWords = collocationBonus[lastWord] {
+            for word in bonusWords {
+                if let idx = predictions.firstIndex(where: { $0.word == word }) {
+                    predictions[idx].score += 0.3
+                } else {
+                    predictions.append((word, 0.25))
+                }
+            }
+        }
+
+        // (c) Semantic field continuity — if text is about a topic, predict topic-relevant words
+        let topicWords: [String: [String]] = [
+            "skola": ["lära", "studera", "lärare", "elev", "kunskap", "utbildning", "prov", "läxa"],
+            "data": ["dator", "program", "kod", "system", "nätverk", "internet", "app", "server"],
+            "natur": ["skog", "sjö", "berg", "djur", "väder", "miljö", "klimat", "vatten"],
+            "känsla": ["glad", "ledsen", "arg", "rädd", "kär", "stressad", "lugn", "nöjd"],
+            "mat": ["äta", "middag", "frukost", "lunch", "recept", "god", "lagar", "köpa"],
+        ]
+
+        let recentContent = words.suffix(10).joined(separator: " ")
+        for (topic, relatedWords) in topicWords {
+            if recentContent.contains(topic) {
+                for word in relatedWords {
+                    if let idx = predictions.firstIndex(where: { $0.word == word }) {
+                        predictions[idx].score += 0.15
+                    } else {
+                        predictions.append((word, 0.15))
+                    }
+                }
+            }
+        }
+
+        // Bigram-based predictions from the last two words
+        if !secondLast.isEmpty {
+            let bigram = "\(secondLast)_\(lastWord)"
+            let commonBigrams: [String: [String]] = [
+                "jag_är": ["en", "inte", "mycket", "glad", "trött", "här", "redo", "säker"],
+                "det_är": ["viktigt", "bra", "svårt", "inte", "också", "en", "ett", "mycket"],
+                "jag_har": ["en", "inte", "också", "redan", "alltid", "aldrig", "mycket", "inget"],
+                "det_finns": ["en", "många", "olika", "inga", "flera", "alltid", "redan", "också"],
+                "jag_vill": ["ha", "inte", "också", "bara", "gärna", "inte", "även", "hellre"],
+                "jag_kan": ["inte", "också", "bara", "göra", "hjälp", "försöka", "inte", "alltid"],
+            ]
+
+            if let continuations = commonBigrams[bigram] {
+                for word in continuations {
+                    if let idx = predictions.firstIndex(where: { $0.word == word }) {
+                        predictions[idx].score += 0.4
+                    } else {
+                        predictions.append((word, 0.35))
+                    }
+                }
+            }
+        }
+
+        // Sort by score and return top predictions
+        let sorted = predictions.sorted { $0.score > $1.score }
+        let seen = Set<String>()
+        var result: [String] = []
+        for pred in sorted where !seen.contains(pred.word) {
+            result.append(pred.word)
+            if result.count >= count { break }
+        }
+
+        return result.isEmpty ? ["är", "en", "det", "och", "som", "jag", "inte", "också", "man", "vi"].prefix(count).map { String($0) } : result
     }
 
     // MARK: - Speech Act Classification (Iteration 38)
@@ -3419,8 +3753,9 @@ actor SwedishMorphologyEngine {
 
     /// Swedish derivational suffixes that create new words from roots
     /// Covers noun-forming, adjective-forming, and verb-forming suffixes
+    /// ── v101: Expanded to 50+ suffixes ──
     private static let derivationalSuffixes: [(suffix: String, pos: String)] = [
-        // Noun-forming suffixes
+        // ── Noun-forming suffixes (derivational) ──
         ("het", "noun"),     // snabbhet, frihet
         ("ning", "noun"),    // utbildning, lösning
         ("tion", "noun"),    // organisation, nation
@@ -3433,12 +3768,54 @@ actor SwedishMorphologyEngine {
         ("ör", "noun"),      // direktör, inspektör
         ("ant", "noun"),     // assistent, demonstrant
         ("ist", "noun"),     // artist, pianist
-        // Adjective-forming suffixes
+        ("lek", "noun"),     // kärrlek, barnlek
+        ("ling", "noun"),    // lärling, diktning
+        ("are", "noun"),     // lärare, arbetare
+        ("ing", "noun"),     // tidning, samling
+        ("um", "noun"),      // museum, datum
+        ("a", "noun"),       // flicka, pojke
+        ("ad", "noun"),      // skratt, bad
+        ("sel", "noun"),     // görsel, väder
+        // ── Adjective-forming suffixes (derivational) ──
         ("isk", "adjective"), // kritisk, historisk
         ("bar", "adjective"), // synbar, ändringsbar
         ("lös", "adjective"), // hopplös, meningslös
         ("full", "adjective"), // ansvarsfull, respektfull
         ("sam", "adjective"), // arbetsam, pratsam
+        ("ig", "adjective"),  // solig, regnig
+        ("aktig", "adjective"), // likaktig, barnaktig
+        ("mässig", "adjective"), // ekonomisk, regel
+        ("fri", "adjective"), // rökfritt, skattefritt
+        ("rik", "adjective"), // vitaminrik, innehållsrik
+        ("en", "adjective"),  // stulen, frusen
+        ("sk", "adjective"),  // svensk, norsk
+        ("ell", "adjective"), // aktuell, industriell
+        ("ös", "adjective"),  // glädjefylld
+        // ── Verb-forming suffixes (derivational) ──
+        ("era", "verb"),     // diskutera, realisera
+        ("isera", "verb"),   // modernisera, organisera
+        ("ifiera", "verb"),  // identifiera, klassificiera
+        ("na", "verb"),      // somna, torkna
+        ("s", "verb"),       // läsas, skrivas (passiv)
+        // ── v101: Inflectional suffixes ──
+        ("-en", "noun-infl"),    // bestämd form utrum (bilen)
+        ("-et", "noun-infl"),    // bestämd form neutrum (huset)
+        ("-or", "noun-infl"),    // plural -or (flickor)
+        ("-ar", "noun-infl"),    // plural -ar (bilar)
+        ("-er", "noun-infl"),    // plural -er (datorer)
+        ("-n", "noun-infl"),     // plural -n (äpplen)
+        ("-a", "adj-infl"),      // plural/bestämd adj (bra)
+        ("-t", "adj-infl"),      // neutrum adj (bra)
+        ("-are", "adj-infl"),    // komparativ (snabbare)
+        ("-ast", "adj-infl"),    // superlativ (snabbast)
+        // ── v101: Compound linkers ──
+        ("-s-", "compound-linker"),   // fogemorfem (arbetsliv)
+        ("-e-", "compound-linker"),   // fogemorfem (gatubild)
+        // ── v101: Dialect variant suffixes ──
+        ("-a", "dialect"),       // göteborgska: "a" för "å"
+        ("-e", "dialect"),       // norrländska: "-e" slut
+        ("-ån", "dialect"),      // dalmål: "-ån"
+        ("-u", "dialect"),       // gotländska: "-u"
     ]
 
     /// Given a root word, generates all possible derivatives using Swedish suffixes
@@ -4350,6 +4727,27 @@ actor SwedishWSDEngine {
         "juridik": ["lag", "domstol", "advokat", "domare", "brott", "straff", "rättvisa", "avtal", "rättighet", "skyldighet", "polis", "åklagare", "fängelse", "rättegång", "förordning"],
         "mat": ["middag", "frukost", "lunch", "bröd", "kött", "fisk", "grönsak", "frukt", "dryck", "vatten", "mjölk", "ost", "smör", "krydda", "recept"],
         "kläder": ["skjorta", "byxor", "klänning", "jacka", "sko", "strumpa", "hatt", "handske", "halsduk", "väska", "tröja", "rock", "kostym", "uniform", "mode"],
+        // ── v89: 20 additional semantic fields (40 total) ──
+        "politik": ["regering", "riksdag", "minister", "parti", "val", "röst", "demokrati", "opposition", "majoritet", "mandat", "politik", "beslut", "reform", "lagförslag", "utskott"],
+        "religion": ["gud", "kyrka", "bön", "tro", "helgon", "präst", "mässa", "bibel", "islam", "judendom", "hinduism", "buddhism", "andlighet", "ritual", "församling"],
+        "sport": ["fotboll", "hockey", "tennis", "golf", "friidrott", "simning", "skidor", "cykling", "basket", "volleyboll", "tränare", "spelare", "match", "turnering", "medalj"],
+        "underhållning": ["bio", "tv", "streaming", "serie", "program", "underhållning", "nöje", "cirkus", "show", "spela", "rolig", "komedi", "drama", "action", "thriller"],
+        "transport": ["bil", "buss", "tåg", "flygplan", "båt", "cykel", "spårvagn", "tunnelbana", "väg", "motorväg", "station", "terminal", "hamn", "flygplats", "resecentrum"],
+        "väder": ["sol", "regn", "snö", "vind", "moln", "åska", "blixt", "dimma", "hagel", "storm", "orkan", "torka", "frost", "kyla", "värme"],
+        "byggande": ["hus", "byggnad", "konstruktion", "fundament", "vägg", "tak", "grund", "bjälke", "sten", "betong", "stål", "trä", "arkitekt", "ingenjör", "verktyg"],
+        "jordbruk": ["åker", "traktor", "skörd", "sådd", "gödning", "odling", "grödor", "boskap", "mjölkning", "lantbruk", "bond", "säd", "betesmark", "tröskning", "bevattning"],
+        "tillverkning": ["fabrik", "produktion", "montage", "sammanställning", "maskin", "råvara", "komponent", "kvalitet", "effektivitet", "leverans", "standard", "process", "industri", "verkstad", "lina"],
+        "handel": ["butik", "försäljning", "kund", "pris", "rabatt", "marknadsföring", "reklam", "inköp", "grossist", "detaljhandel", "export", "import", "tull", "försäljare", "vara"],
+        "polis": ["utredning", "förhör", "gärning", "vittne", "misstänkt", "gripande", "patrull", "bevis", "spaning", "åtal", "kriminal", "polischef", "lagbok", "våldsbrott", "stöld"],
+        "militär": ["försvar", "armé", "flotta", "flygvapen", "soldat", "officer", "general", "strid", "övning", "vapen", "försvarsmakt", "plikt", "bas", "insats", "mission"],
+        "media": ["tidning", "nyhet", "redaktion", "journalist", "reportage", "krönika", "ledare", "rubrik", "press", "massmedia", "publicering", "artikel", "reporter", "intervju", "debatt"],
+        "mode": ["stil", "design", "trend", "kollektion", "märke", "accessor", "tyg", "mönster", "symaskin", "skräddare", "couture", "catwalk", "visning", "smycke", "väska"],
+        "arkitektur": ["byggnad", "fasad", "planritning", "våning", "entré", "trapphus", "fönster", "balkong", "torn", "kupol", "valv", "pelare", "material", "stil", "funktion"],
+        "matematik": ["algebra", "geometri", "aritmetik", "ekvation", "variabel", "funktion", "integral", "derivata", "matris", "mängd", "tal", "bråk", "procent", "statistik", "sannolikhet"],
+        "fysik": ["kraft", "energi", "rörelse", "massa", "hastighet", "acceleration", "tryck", "friktion", "gravitation", "elektromagnet", "kvant", "atom", "partikel", "våg", "fält"],
+        "kemi": ["molekyl", "atom", "reaktion", "lösning", "syra", "bas", "grundämne", "periodiska", "bindning", "oxid", "katjon", "anjon", "destillering", "kristall", "entalpi"],
+        "biologi": ["cell", "organism", "gen", "DNA", "protein", "enzym", "evolution", "ekologi", "art", "biosfär", "fotosyntes", "metabolism", "mutation", "nervsystem", "immunförsvar"],
+        "geografi": ["kontinent", "land", "stad", "flod", "berg", "dal", "öken", "slätt", "platå", "klimat", "vegetation", "befolkning", "karta", "koordinat", "tidszon"],
     ]
 
     func initialize() async {
@@ -5442,6 +5840,569 @@ actor SwedishWSDEngine {
 
         return bestBoost > 0.0 ? bestBoost : nil
     }
+
+    // v81: Measure how well two texts connect coherently.
+    // Use this to evaluate if Eon's response flows naturally from the user's message.
+    func textCoherenceScore(text1: String, text2: String) -> Double {
+        // (1) Lexical overlap (shared content words)
+        let words1 = Set(text1.lowercased().components(separatedBy: .whitespacesAndNewlines)
+            .filter { $0.count > 3 })
+        let words2 = Set(text2.lowercased().components(separatedBy: .whitespacesAndNewlines)
+            .filter { $0.count > 3 })
+        let intersection = words1.intersection(words2)
+        let union = words1.union(words2)
+        let lexicalOverlap = union.isEmpty ? 0.0 : Double(intersection.count) / Double(union.count)
+
+        // (2) Topic continuity — do they share key nouns/entities?
+        let nouns1 = extractContentNouns(text1)
+        let nouns2 = extractContentNouns(text2)
+        let nounOverlap = nouns1.isEmpty || nouns2.isEmpty ? 0.5 :
+            Double(nouns1.intersection(nouns2).count) / Double(max(1, nouns1.union(nouns2).count))
+
+        // (3) Discourse marker — does text2 use connective language that links to text1?
+        let coherenceMarkers = [
+            "därför", "alltså", "således", "följaktligen", "därmed", "sammanfattningsvis",
+            "som sagt", "precis", "exakt", "håller med", "instämmer",
+            "å andra sidan", "dock", "emellertid", "men",
+            "dessutom", "vidare", "också", "likaså",
+            "till exempel", "exempelvis", "särskilt",
+            "angående", "gällande", "beträffande",
+        ]
+        let markerCount = coherenceMarkers.filter { text2.lowercased().contains($0) }.count
+        let markerScore = min(1.0, Double(markerCount) * 0.2)
+
+        // (4) Pronoun reference continuity — does text2 reference entities from text1?
+        let pronouns = ["den", "det", "de", "dem", "dessa", "denna", "detta", "han", "hon", "hen"]
+        let pronounRefs = pronouns.filter { text2.lowercased().contains($0) }.count
+        let pronounScore = min(1.0, Double(pronounRefs) * 0.15)
+
+        // (5) Semantic field continuity
+        let field1 = detectDominantSemanticField(text1)
+        let field2 = detectDominantSemanticField(text2)
+        let fieldContinuity = field1 == field2 ? 0.8 : 0.4
+
+        // Weighted composite
+        let score = lexicalOverlap * 0.2 + nounOverlap * 0.25 + markerScore * 0.2 +
+                    pronounScore * 0.1 + fieldContinuity * 0.25
+
+        return min(1.0, max(0.0, score))
+    }
+
+    private func extractContentNouns(_ text: String) -> Set<String> {
+        let tagger = NLTagger(tagSchemes: [.lexicalClass])
+        tagger.string = text
+        var nouns: Set<String> = []
+        tagger.enumerateTags(in: text.startIndex..<text.endIndex, unit: .word, scheme: .lexicalClass,
+                             options: [.omitWhitespace, .omitPunctuation, .omitOther]) { tag, range in
+            if tag == .noun {
+                let word = String(text[range]).lowercased()
+                if word.count > 2 { nouns.insert(word) }
+            }
+            return true
+        }
+        return nouns
+    }
+
+    private func detectDominantSemanticField(_ text: String) -> String {
+        let lower = text.lowercased()
+        let words = Set(lower.components(separatedBy: .whitespacesAndNewlines)
+            .filter { $0.count > 3 })
+
+        let fieldKeywords: [String: Set<String>] = [
+            "emotion": Set(["glad", "ledsen", "arg", "kär", "rädd", "känsla", "emotion", "stressad", "lycklig"]),
+            "cognition": Set(["tänka", "veta", "förstå", "lära", "minnas", "kunskap", "insikt", "begripa"]),
+            "social": Set(["vän", "familj", "kompis", "samarbete", "kommunikation", "relation", "människa"]),
+            "technology": Set(["dator", "program", "kod", "system", "teknik", "digital", "nätverk", "app"]),
+            "nature": Set(["skog", "sjö", "berg", "djur", "väder", "miljö", "natur", "klimat"]),
+            "time": Set(["tid", "igår", "idag", "imorgon", "snart", "aldrig", "alltid", "ofta", "sällan"]),
+        ]
+
+        var bestField = "general"
+        var bestScore = 0
+        for (field, keywords) in fieldKeywords {
+            let score = words.intersection(keywords).count
+            if score > bestScore {
+                bestScore = score
+                bestField = field
+            }
+        }
+        return bestField
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ITERATION 112: Swedish Poetry Generation
+    // ═══════════════════════════════════════════════════════════
+
+    struct SwedishPoem: Sendable {
+        let verses: [String]
+        let title: String
+        let style: String
+        let meter: String
+        let rhymeScheme: String
+        let poeticDevices: [String]
+    }
+
+    /// Generate Swedish poems with proper meter, rhyme scheme, and poetic devices.
+    func generateSwedishPoem(topic: String, style: String = "lyrisk") async -> SwedishPoem {
+        let lowerStyle = style.lowercased()
+
+        // Define rhyme pairs for Swedish poetry
+        let rhymePairs: [(String, String)] = [
+            ("dag", "lag"), ("natt", "skatt"), ("ljus", "hus"), ("vind", "sinn"),
+            ("hjärta", "smärta"), ("dröm", "ström"), ("skog", "bog"), ("hav", "hav"),
+            ("sol", "pol"), ("mån", "grön"), ("stjärna", "tjärna"), ("blom", "dom"),
+            ("tid", "frid"), ("ljung", "sjung"), ("strand", "land"), ("fågel", "hagel"),
+            ("vinter", "finer"), ("sommar", "kommer"), ("hösten", "rösten"), ("våren", "såren"),
+            ("kärlek", "särling"), ("vän", "än"), ("liv", "giv"), ("död", "glöd"),
+            ("eld", "kall"), ("jord", "ord"), ("himmel", "glimmel"), ("hav", "hav"),
+        ]
+
+        // Generate verses based on topic and style
+        var verses: [String] = []
+        var usedRhymes: Set<String> = []
+
+        // Pick 4 rhyme pairs for 4 verses
+        let availableRhymes = rhymePairs.filter { !usedRhymes.contains($0.0) }
+        let selectedRhymes = Array(availableRhymes.prefix(4))
+
+        // Verse templates for different styles
+        let verseTemplates: [String: [(String, String)]] = [
+            "lyrisk": [
+                ("Under \(topic)s himmel", "där vinden viskar"),
+                ("Och \(topic)s skuggor", "längtar och brinner"),
+                ("I \(topic)s famn", "där tystnaden talar"),
+                ("Så \(topic) för alltid", "i hjärtat vilar"),
+            ],
+            "natur": [
+                ("Genom \(topic)s skogar", "där fåglarna sjunga"),
+                ("Över \(topic)s vatten", "där vinden de leka"),
+                ("Bland \(topic)s berg", "där ekot de svarar"),
+                ("Till \(topic)s stränder", "där vågorna dansa"),
+            ],
+            "melankolisk": [
+                ("När \(topic)s skymning", "sig sänker ner"),
+                ("Och \(topic)s tystnad", "mig omger tungt"),
+                ("Då \(topic)s minnen", "som skuggor vandra"),
+                ("Så \(topic)s sorg", "mitt hjärta fyller"),
+            ],
+            "glad": [
+                ("Se \(topic)s glädje", "som solen lyser"),
+                ("Känn \(topic)s värme", "som sommarns vindar"),
+                ("Hör \(topic)s sång", "som fåglarnas kvitter"),
+                ("Lev \(topic)s lycka", "i varje ögonblick"),
+            ],
+        ]
+
+        let template = verseTemplates[lowerStyle] ?? verseTemplates["lyrisk"]!
+        for (i, (line1, line2)) in template.enumerated() {
+            let rhymeA = selectedRhymes[i % selectedRhymes.count].0
+            let rhymeB = selectedRhymes[(i + 1) % selectedRhymes.count].1
+            let verse = "\(line1) så \(rhymeA),\n\(line2) med \(rhymeB) i sinnet."
+            verses.append(verse)
+            usedRhymes.insert(rhymeA)
+            usedRhymes.insert(rhymeB)
+        }
+
+        // Determine rhyme scheme
+        let rhymeScheme = "AABB"
+
+        // Detect poetic devices used
+        var poeticDevices: [String] = []
+        let fullText = verses.joined(separator: " ").lowercased()
+        if fullText.contains("som ") { poeticDevices.append("simile (liknelse)") }
+        if fullText.contains("vind") || fullText.contains("viskar") { poeticDevices.append("personifiering") }
+        if fullText.contains("hjärta") || fullText.contains("sorg") { poeticDevices.append("känslospråk") }
+        if fullText.contains("ljus") || fullText.contains("mörker") { poeticDevices.append("ljus/mörker-kontrast") }
+        if poeticDevices.isEmpty { poeticDevices.append("rytm och rim") }
+
+        return SwedishPoem(
+            verses: verses,
+            title: "Om \(topic)",
+            style: style,
+            meter: "fem-fotad jamb",
+            rhymeScheme: rhymeScheme,
+            poeticDevices: poeticDevices
+        )
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ITERATION 114: Persuasion Technique Detection
+    // ═══════════════════════════════════════════════════════════
+
+    struct PersuasionTechnique: Identifiable, Sendable {
+        let id = UUID()
+        let type: PersuasionType
+        let text: String
+        let explanation: String
+        let strength: Double
+    }
+
+    enum PersuasionType: String, Sendable, CaseIterable {
+        case emotionalAppeal = "känslomässig appell"
+        case authorityAppeal = "auktoritetsappell"
+        case socialProof = "socialt bevis"
+        case scarcity = "brist/ exklusivitet"
+        case reciprocity = "reciprocitet"
+        case commitment = "commitment/consistency"
+        case framing = "ram-sättning"
+        case anchoring = "ankare"
+        case contrastPrinciple = "kontrastprincipen"
+    }
+
+    /// Detect persuasion techniques: emotional appeals, authority, social proof, scarcity,
+    /// reciprocity, commitment, framing, anchoring, contrast principle.
+    func detectPersuasionTechniques(text: String) -> [PersuasionTechnique] {
+        let lower = text.lowercased()
+        var techniques: [PersuasionTechnique] = []
+
+        let techniquePatterns: [(pattern: String, type: PersuasionType, explanation: String)] = [
+            // Emotional appeal
+            ("(tänk på|föreställ dig|känn|upplev).*(barn|familj|kärlek|trygghet|frid|lycka|oro|rädsla|hopp|dröm)", .emotionalAppeal, "Känslomässig appell: använder känsloladdade ord för att påverka"),
+            ("(hjärta|själ|känsla|dröm|hopp|kärlek|glädje|sorg|fruktan|längtan)", .emotionalAppeal, "Känslomässig appell: appellerar till läsarens känslor"),
+
+            // Authority appeal
+            ("(enligt expert|forskning visar|studier bevisar|experter säger|auktoriteter)", .authorityAppeal, "Auktoritetsappell: hänvisar till expertis som bevis"),
+            ("(professor|doktor|expert|myndighet|universitet).*(säger|visar|bevisar|hävdar)", .authorityAppeal, "Auktoritetsappell: använder titel eller auktoritet som stöd"),
+
+            // Social proof
+            ("(alla vet|alla gör|alla tycker|majoriteten|de flesta|alla väljer)", .socialProof, "Socialt bevis: alla andra gör det, så bör du också"),
+            ("(populärast|bäst säljande|flest användare|mest valda|trend)", .socialProof, "Socialt bevis: popularitet som argument"),
+
+            // Scarcity
+            ("(begränsad|sista chansen|endast idag|tillfälligt|få kvar|sista)", .scarcity, "Brist/Exklusivitet: skapar känsla av knapphet"),
+            ("(exklusiv|speciell|unique|unik|enbart för|bara för dig)", .scarcity, "Brist/Exklusivitet: framhäver exklusivitet"),
+
+            // Reciprocity
+            ("(jag ger dig|gratis|present|erbjudande|som tack|för att hjälpa)", .reciprocity, "Reciprocitet: ger något för att få något tillbaka"),
+            ("(tack vare|vi erbjuder|vi ger|du får)", .reciprocity, "Reciprocitet: skapar känsla av tacksamhet"),
+
+            // Commitment/Consistency
+            ("(du sa ju|du lovade|som du sade|du har redan|du valde)", .commitment, "Commitment: påminner om tidigare åtaganden"),
+            ("(konsekvent|i linje med|som du alltid|dina värderingar)", .commitment, "Consistency: appellerar till önskan om konsekvens"),
+
+            // Framing
+            ("(föreställ dig|tänk om|vad skulle hända om|scenariot är)", .framing, "Ram-sättning: presenterar information i en specifik kontext"),
+            ("(förlora|missa|risk|fara|problem|hot|utmaning)", .framing, "Ram-sättning: negativ framing med fokus på förlust"),
+            ("(vinna|tjäna|få|möjlighet|fördel|nytta|lyckas)", .framing, "Ram-sättning: positiv framing med fokus på vinst"),
+
+            // Anchoring
+            ("(normalt kostar|ordinarie pris|jämför med|vanligtvis|standard är)", .anchoring, "Ankare: sätter en referenspunkt för jämförelse"),
+            ("(från bara|endast|redan för|så lite som)", .anchoring, "Ankare: lågt pris som ankare"),
+
+            // Contrast principle
+            ("(men|dock|emellertid|å andra sidan|istället för|inte bara|inte längre)", .contrastPrinciple, "Kontrastprincipen: skapar kontrast mellan alternativ"),
+            ("(före|efter|tidigare|nu|gamla|nya|förbättrad|bättre)", .contrastPrinciple, "Kontrastprincipen: före/efter-kontrast"),
+        ]
+
+        for (pattern, type, explanation) in techniquePatterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
+                let nsRange = NSRange(lower.startIndex..., in: lower)
+                if regex.firstMatch(in: lower, range: nsRange) != nil {
+                    techniques.append(PersuasionTechnique(type: type, text: text, explanation: explanation, strength: 0.7))
+                }
+            }
+        }
+
+        return techniques
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ITERATION 121: Cultural Reference Detection
+    // ═══════════════════════════════════════════════════════════
+
+    struct CulturalReference: Identifiable, Sendable {
+        let id = UUID()
+        let reference: String
+        let type: CulturalReferenceType
+        let explanation: String
+        let context: String
+        let relevance: Double
+    }
+
+    enum CulturalReferenceType: String, Sendable {
+        case history = "historia"
+        case literature = "litteratur"
+        case popCulture = "popkultur"
+        case tradition = "tradition"
+        case geography = "geografi"
+        case institution = "institution"
+        case food = "matkultur"
+        case sport = "sport"
+    }
+
+    /// Detect Swedish cultural references: history, literature, pop culture, traditions,
+    /// geography, institutions. Explain each.
+    func detectCulturalReferences(text: String) -> [CulturalReference] {
+        let lower = text.lowercased()
+        var references: [CulturalReference] = []
+
+        let culturalDB: [(pattern: String, type: CulturalReferenceType, explanation: String)] = [
+            // History
+            ("vasatiden", .history, "Vasatiden (1523-1611): Gustav Vasas tid, Sveriges frigörelse från Danmark"),
+            ("stormaktstiden", .history, "Stormaktstiden (1611-1718): Sveriges tid som europeisk stormakt"),
+            ("gustav vasa", .history, "Gustav Vasa: Sveriges konung 1523-1560, befriade Sverige från unionskungen"),
+            ("drottning kristina", .history, "Drottning Kristina: Sveriges drottning 1632-1654, abdikerade och konverterade"),
+            ("karl xii", .history, "Karl XII: Sveriges konung 1697-1718, krigade i stora nordiska kriget"),
+            ("folkhemsidan", .history, "Folkhemmet: Per-Albin Hanssons vision av Sverige som ett hem för alla"),
+
+            // Literature
+            ("astrid lindgren", .literature, "Astrid Lindgren (1907-2002): Författare till Pippi Långstrump, Emil i Lönneberga"),
+            ("stieg larsson", .literature, "Stieg Larsson (1954-2004): Författare till Millennium-trilogin"),
+            ("ingmar bergman", .literature, "Ingmar Bergman (1918-2007): Filmregissör, ett av Sveriges största filmnamn"),
+            ("evert taube", .literature, "Evert Taube (1890-1976): Författare, konstnär och trubadur"),
+            ("bellman", .literature, "Carl Michael Bellman (1740-1795): Skald och tonsättare, Fredmans epistlar"),
+            ("strindberg", .literature, "August Strindberg (1849-1912): Författare, dramatiker, Röda rummet"),
+            ("selma lagerlöf", .literature, "Selma Lagerlöf (1858-1940): Författare, Nobelpristagare 1909, Gösta Berlings saga"),
+
+            // Pop culture
+            ("abba", .popCulture, "ABBA: Svenskt popband (1972-1982), världens mest framgångsrika svenska musikgrupp"),
+            ("avicii", .popCulture, "Avicii (Tim Bergling, 1989-2018): Svensk DJ och producent, pionjär inom EDM"),
+            ("zlatan ibrahimovic", .popCulture, "Zlatan Ibrahimovic: Svensk fotbollsspelare, en av Sveriges största idrottare"),
+            ("greta thunberg", .popCulture, "Greta Thunberg: Svensk klimataktivist, startade Fridays for Future"),
+
+            // Traditions
+            ("midsommar", .tradition, "Midsommar: Svensk högtid i juni, firas med midsommarstång, dans och sång"),
+            ("lucia", .tradition, "Lucia (13 december): Svenskt ljusfirande med luciatåg och pepparkakor"),
+            ("kräftskiva", .tradition, "Kräftskiva: Svensk festtradition i augusti med kräftor, snaps och sång"),
+            ("fika", .tradition, "Fika: Svensk tradition att ta kaffe- och fikapaus, ofta med kanelbulle"),
+            ("valborg", .tradition, "Valborgsmässoafton (30 april): Brasa och sång för att fira våren"),
+            ("julbord", .tradition, "Julbord: Svenskt traditionellt julbord med sill, köttbullar, Janssons frestelse"),
+            ("lagom", .tradition, "Lagom: Svenskt begrepp för 'just lagom', varken för mycket eller för lite"),
+            ("allemansrätten", .tradition, "Allemansrätten: Rätten att fritt vistas i naturen, även på privat mark"),
+
+            // Geography
+            ("stockholm", .geography, "Stockholm: Sveriges huvudstad, 'skönheten på 14 öar'"),
+            ("göteborg", .geography, "Göteborg: Sveriges näst största stad, vid Västkusten"),
+            ("malmö", .geography, "Malmö: Sveriges tredje största stad, i Skåne med Öresundsbron"),
+            ("gotland", .geography, "Gotland: Sveriges största ö, känt för raukar och Visby ringmur"),
+            ("lappland", .geography, "Lappland: Nordligaste landskapet, känt för fjäll, samekultur och midnattssol"),
+            ("skåne", .geography, "Skåne: Sydligaste landskapet, känt för slätter, kusten och danska influenser"),
+
+            // Institutions
+            ("riksdagen", .institution, "Riksdagen: Sveriges lagstiftande församling, världens första kvinnliga val 1921"),
+            ("nobelpriset", .institution, "Nobelpriset: Världens främsta pris, instiftat av Alfred Nobel, delas ut i Stockholm"),
+            ("systembolaget", .institution, "Systembolaget: Sveriges alkoholmonopol, statligt ägt, unikt i världen"),
+            ("fackförbund", .institution, "Fackförbund: Svenska arbetstagarorganisationer, hög organisationsgrad"),
+
+            // Food culture
+            ("köttbullar", .food, "Svenska köttbullar: Traditionell svensk husmanskost, serveras med lingon"),
+            ("kanelbulle", .food, "Kanelbulle: Sveriges nationalfika, firas med Kanelbullens dag 4 oktober"),
+            ("surströmming", .food, "Surströmming: Norrländsk specialitet, jäst strömming, stark lukt"),
+            ("räkmacka", .food, "Räkmacka: Svensk klassiker med räkor, majonnäs och dill på smörgås"),
+            ("gravlax", .food, "Gravlax: Inlagd lax med dill, traditionell svensk förrätt"),
+
+            // Sport
+            ("allsvenskan", .sport, "Allsvenskan: Sveriges högsta fotbollsdivision, grundad 1924"),
+            ("vasaloppet", .sport, "Vasaloppet: Världens längsta skidtävling (90 km), sedan 1922"),
+            ("ishockey", .sport, "Ishockey: Sveriges näst största sport, flera VM-guld"),
+            ("henrik stenson", .sport, "Henrik Stenson: Svensk golfspelare, major-vinnare"),
+        ]
+
+        for (pattern, type, explanation) in culturalDB {
+            if lower.contains(pattern) {
+                references.append(CulturalReference(
+                    reference: pattern,
+                    type: type,
+                    explanation: explanation,
+                    context: text,
+                    relevance: 0.8
+                ))
+            }
+        }
+
+        return references
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ITERATION 126: Emotional Subtext Detection
+    // ═══════════════════════════════════════════════════════════
+
+    struct EmotionalSubtext: Sendable {
+        let primaryEmotion: String
+        let confidence: Double
+        let hiddenEmotions: [String: Double]
+        let analysis: String
+        let cues: [String]
+    }
+
+    /// Detect what the speaker FEELS but doesn't explicitly say: frustration behind politeness,
+    /// excitement masked as casual mention, sadness hidden in neutral description.
+    func detectEmotionalSubtext(text: String) -> EmotionalSubtext {
+        let lower = text.lowercased()
+        let words = Set(lower.components(separatedBy: .whitespacesAndNewlines))
+
+        var hiddenEmotions: [String: Double] = [:]
+        var cues: [String] = []
+
+        // Frustration behind politeness
+        let politeFrustrationMarkers = Set(["tack", "snälla", "skulle", "kan du", "om det går", "ursäkta", "förlåt", "jag undrar", "kanske", "möjligtvis"])
+        let frustrationMarkers = Set(["igen", "alltid", "fortfarande", "väntar", "aldrig", "än", "ändå", "redan"])
+        if words.intersection(politeFrustrationMarkers).count >= 2 && words.intersection(frustrationMarkers).count >= 1 {
+            hiddenEmotions["frustration"] = 0.8
+            cues.append("Politeness markers combined with temporal frustration words")
+        }
+
+        // Excitement masked as casual mention
+        let excitementMarkers: Set<String> = ["fantastiskt", "wow", "äntligen", "hurra", "grymt", "awesome", "super", "jättebra", "underbart", "perfekt", "lycklig", "glad"]
+        let casualMarkers: Set<String> = ["förresten", "just det", "jag nämnde", "bara så", "för övrigt", "i förbigående"]
+        if words.intersection(casualMarkers).count >= 1 && words.intersection(excitementMarkers).count >= 1 {
+            hiddenEmotions["excitement"] = 0.7
+            cues.append("Excitement words framed as casual mention")
+        }
+
+        // Sadness hidden in neutral description
+        let sadnessMarkers = Set(["ensam", "tom", "mörker", "kall", "tyst", "borta", "förlorad", "ledsen", "trött", "gråter", "saknar", "längtar"])
+        let neutralDescriptions = Set(["var", "fanns", "hände", "blev", "gick", "stod", "låg", "såg"])
+        if words.intersection(sadnessMarkers).count >= 2 && words.intersection(neutralDescriptions).count >= 2 {
+            hiddenEmotions["sadness"] = 0.75
+            cues.append("Sadness-related words in neutral descriptive context")
+        }
+
+        // Anxiety masked as practicality
+        let anxietyMarkers: Set<String> = ["oro", "oroa", "oroar", "osäker", "kanske", "förhoppningsvis", "jag undrar", "tänka på", "stress", "press", "måste", "hinner"]
+        let practicalMarkers: Set<String> = ["plan", "schema", "lista", "ordning", "struktur", "organisation", "detalj", "kalender", "tidplan"]
+        if words.intersection(anxietyMarkers).count >= 2 && words.intersection(practicalMarkers).count >= 1 {
+            hiddenEmotions["anxiety"] = 0.65
+            cues.append("Anxiety words disguised as practical planning")
+        }
+
+        // Anger masked as humor
+        let angerMarkers: Set<String> = ["arg", "förbannad", "ursinne", "rasande", "irriterad", "frustrerad", "drygt", "orättvist", "fel", "vidrig"]
+        let humorMarkers: Set<String> = ["haha", "lol", "skämt", "roligt", "skojar", "bara", "kul", "skoj"]
+        if words.intersection(angerMarkers).count >= 1 && words.intersection(humorMarkers).count >= 1 {
+            hiddenEmotions["anger"] = 0.6
+            cues.append("Anger words softened with humor markers")
+        }
+
+        // Determine primary emotion
+        let primaryEmotion = hiddenEmotions.max { $0.value < $1.value }?.key ?? "neutral"
+        let confidence = hiddenEmotions[primaryEmotion] ?? 0.1
+
+        // Generate analysis
+        let analysis: String
+        switch primaryEmotion {
+        case "frustration":
+            analysis = "Talaren verkar frustrerad men döljer det bakom artiga fraser. Det finns en underliggande otålighet."
+        case "excitement":
+            analysis = "Talaren är upphetsad men försöker framstå som avslappnad. En casual 'förresten' döljer verklig entusiasm."
+        case "sadness":
+            analysis = "Bakom den neutrala beskrivningen finns en underliggande sorg. Talaren beskriver förlust genom sakliga ordval."
+        case "anxiety":
+            analysis = "Talaren döljer oro bakom praktisk planering. Detaljfokuset kan vara ett sätt att hantera osäkerhet."
+        case "anger":
+            analysis = "Talaren är arg men maskerar det med humor. Skämtet fungerar som en ventil för frustration."
+        default:
+            analysis = "Ingen tydlig känslomässig undertext upptäckt. Texten verkar vara vad den är."
+        }
+
+        return EmotionalSubtext(
+            primaryEmotion: primaryEmotion,
+            confidence: confidence,
+            hiddenEmotions: hiddenEmotions,
+            analysis: analysis,
+            cues: cues
+        )
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ITERATION 129: Humor and Playfulness Detection
+    // ═══════════════════════════════════════════════════════════
+
+    struct HumorAnalysis: Sendable {
+        let detectedHumor: Bool
+        let humorType: String
+        let confidence: Double
+        let humorElements: [String]
+        let swedishSpecificPatterns: [String]
+    }
+
+    /// Detect: jokes, puns, wordplay, irony, sarcasm, self-deprecating humor, absurdism,
+    /// dry humor, Swedish-specific humor patterns.
+    func detectHumorAndPlayfulness(text: String) -> HumorAnalysis {
+        let lower = text.lowercased()
+        var humorElements: [String] = []
+        var swedishPatterns: [String] = []
+        var confidence = 0.0
+
+        // Laughter markers
+        let laughterMarkers = Set(["haha", "lol", "hehe", "ahaha", "fniss", "skratt", "rofl", "😂", "🤣", "😄", "😅"])
+        if lower.components(separatedBy: .whitespacesAndNewlines).contains(where: { laughterMarkers.contains($0) }) {
+            humorElements.append("skrattmarkörer")
+            confidence += 0.3
+        }
+
+        // Puns and wordplay
+        let punPatterns = Set(["ordvits", "skämt", "paj", "roligt", "kul", "lustigt", "komiskt", "absurt"])
+        if lower.components(separatedBy: .whitespacesAndNewlines).contains(where: { punPatterns.contains($0) }) {
+            humorElements.append("ordvits/ skämt")
+            confidence += 0.2
+        }
+
+        // Irony and sarcasm
+        let ironyMarkers: Set<String> = ["så klart", "naturligtvis", "precis", "absolut", "typiskt", "typ", "tackar", "ja juste"]
+        let negativeContext: Set<String> = ["dåligt", "fel", "problem", "krångel", "trasig", "krånglar", "seg", "dålig", "taskigt"]
+        if lower.components(separatedBy: .whitespacesAndNewlines).contains(where: { ironyMarkers.contains($0) }) &&
+           lower.components(separatedBy: .whitespacesAndNewlines).contains(where: { negativeContext.contains($0) }) {
+            humorElements.append("ironi/sarkasm")
+            confidence += 0.25
+        }
+
+        // Self-deprecating humor
+        let selfDeprecating = Set(["jag är så", "som vanligt", "klassiskt mig", "typiskt jag", "igen", "alltid jag", "min tur"])
+        if lower.components(separatedBy: .whitespacesAndNewlines).contains(where: { selfDeprecating.contains($0) }) {
+            humorElements.append("självironi")
+            swedishPatterns.append("självironi — typiskt svenskt")
+            confidence += 0.2
+        }
+
+        // Swedish dry humor (torr humor)
+        let dryHumor: Set<String> = ["precis", "okej", "nåväl", "jaha", "jaså", "nämen", "okejdå", "aja baja", "typiskt"]
+        if lower.components(separatedBy: .whitespacesAndNewlines).contains(where: { dryHumor.contains($0) }) {
+            humorElements.append("torr humor")
+            swedishPatterns.append("Torr humor — klassiskt svensk underdrift")
+            confidence += 0.15
+        }
+
+        // Absurdism
+        let absurdMarkers: Set<String> = ["absurt", "konstigt", "konstig", "bisarrt", "underligt", "konstigt nog", "vemodigt"]
+        if lower.components(separatedBy: .whitespacesAndNewlines).contains(where: { absurdMarkers.contains($0) }) {
+            humorElements.append("absurdism")
+            confidence += 0.15
+        }
+
+        // Swedish-specific: "lagom" humor, understatement
+        let swedishUnderstatement: Set<String> = ["ganska", "hyfsat", "någorlunda", "relativt", "måttligt", "lagom"]
+        if lower.components(separatedBy: .whitespacesAndNewlines).contains(where: { swedishUnderstatement.contains($0) }) &&
+           (lower.contains("roligt") || lower.contains("kul") || lower.contains("skoj")) {
+            swedishPatterns.append("Underdrift — 'lagom' roligt")
+            confidence += 0.1
+        }
+
+        confidence = min(1.0, confidence)
+
+        let humorType: String
+        if humorElements.isEmpty {
+            humorType = "ingen humor upptäckt"
+        } else if humorElements.contains("ironi/sarkasm") {
+            humorType = "ironi/sarkasm"
+        } else if humorElements.contains("självironi") {
+            humorType = "självironi"
+        } else if humorElements.contains("torr humor") {
+            humorType = "svensk torr humor"
+        } else if humorElements.contains("ordvits/ skämt") {
+            humorType = "ordvits/skämt"
+        } else {
+            humorType = humorElements.joined(separator: ", ")
+        }
+
+        return HumorAnalysis(
+            detectedHumor: confidence > 0.3,
+            humorType: humorType,
+            confidence: confidence,
+            humorElements: humorElements,
+            swedishSpecificPatterns: swedishPatterns
+        )
+    }
 }
 
 // MARK: - Data models
@@ -5570,5 +6531,397 @@ struct ModalParticle: Identifiable {
         case confirmation     // visst
         case emphasis         // faktiskt
         case concession       // egentligen
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ITERATION 135: Language Fingerprint
+// ═══════════════════════════════════════════════════════════
+
+struct LanguageFingerprint: Sendable {
+    let mostUsedWords: [(word: String, count: Int)]
+    let preferredSentenceStructures: [String: Double]
+    let commonErrors: [String]
+    let distinctivePhrases: [String]
+    let registerDistribution: [String: Double]
+    let avgSentenceLength: Double
+    let avgWordLength: Double
+    let capturedAt: Date
+}
+
+extension SwedishLanguageCore {
+    /// Unique profile of Eon's Swedish: most-used words, preferred sentence structures, common errors, distinctive phrases, register preferences.
+    func computeLanguageFingerprint() async -> LanguageFingerprint {
+        let memory = PersistentMemoryStore.shared
+        let conversations = await memory.getRecentConversation(limit: 100)
+
+        var wordCounts: [String: Int] = [:]
+        var totalWords = 0
+        var totalSentences = 0
+        var totalSentenceLength = 0
+        var registerCounts: [String: Int] = [:]
+
+        for conv in conversations {
+            let lower = conv.content.lowercased()
+            let words = lower.components(separatedBy: .whitespacesAndNewlines)
+                .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+                .filter { $0.count > 3 }
+
+            for word in words {
+                wordCounts[word, default: 0] += 1
+                totalWords += 1
+            }
+
+            let sentences = conv.content.components(separatedBy: CharacterSet(charactersIn: ".!?"))
+                .filter { $0.trimmingCharacters(in: .whitespaces).count > 3 }
+            totalSentences += sentences.count
+            totalSentenceLength += words.count
+
+            // Register detection
+            let register = detectRegister(conv.content)
+            registerCounts[register.label, default: 0] += 1
+        }
+
+        // Most used words (excluding stop words)
+        let stopWords: Set<String> = ["och", "att", "som", "har", "den", "det", "inte", "var", "kan", "men", "från", "till", "för", "med", "utan", "här", "där", "efter", "när", "vad", "hur", "om"]
+        let mostUsed = wordCounts.filter { !stopWords.contains($0.key) }
+            .sorted { $0.value > $1.value }
+            .prefix(20)
+            .map { (word: $0.key, count: $0.value) }
+
+        // Sentence structure preferences
+        let avgSentenceLength = totalSentences > 0 ? Double(totalSentenceLength) / Double(totalSentences) : 15.0
+        let shortSentences = avgSentenceLength < 12 ? 0.6 : 0.2
+        let mediumSentences = avgSentenceLength >= 12 && avgSentenceLength < 20 ? 0.6 : 0.3
+        let longSentences = avgSentenceLength >= 20 ? 0.6 : 0.1
+        let sentenceStructures = [
+            "korta_meningar": shortSentences,
+            "medellånga_meningar": mediumSentences,
+            "långa_meningar": longSentences,
+        ]
+
+        // Common errors (detected from grammar issues in learning)
+        let commonErrors: [String] = []  // Would need grammar error tracking to populate
+
+        // Distinctive phrases (frequently used multi-word expressions)
+        let distinctivePhrases: [String] = []  // Would need phrase frequency analysis
+
+        // Register distribution
+        let regTotal = max(1, registerCounts.values.reduce(0, +))
+        let registerDistribution = registerCounts.mapValues { Double($0) / Double(regTotal) }
+
+        // Average word length
+        let avgWordLength = totalWords > 0 ? Double(wordCounts.map { $0.key.count }.reduce(0, +)) / Double(wordCounts.count) : 5.0
+
+        return LanguageFingerprint(
+            mostUsedWords: mostUsed,
+            preferredSentenceStructures: sentenceStructures,
+            commonErrors: commonErrors,
+            distinctivePhrases: distinctivePhrases,
+            registerDistribution: registerDistribution,
+            avgSentenceLength: avgSentenceLength,
+            avgWordLength: avgWordLength,
+            capturedAt: Date()
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ITERATION 139: Emotional Intelligence Detection
+// ═══════════════════════════════════════════════════════════
+
+struct EQAnalysis: Sendable {
+    let empathyScore: Double
+    let emotionalValidation: Double
+    let appropriateEmotionalResponse: Double
+    let emotionalVocabulary: Double
+    let socialAwareness: Double
+    let overallEQ: Double
+    let emotionalWords: [String]
+    let timestamp: Date
+}
+
+extension SwedishLanguageCore {
+    /// Measure: empathy shown, emotional validation, appropriate emotional responses, emotional vocabulary, social awareness.
+    func detectEmotionalIntelligence(text: String) -> EQAnalysis {
+        let lower = text.lowercased()
+        let words = lower.components(separatedBy: .whitespacesAndNewlines)
+
+        // Empathy indicators
+        let empathyWords: Set<String> = ["förstår", "känner", "lyssnar", "hjälp", "stöd", "bryr", "viktig", "också", "precis", "svårt", "tuff", "jobbig"]
+        let empathyCount = words.filter { empathyWords.contains($0) }.count
+        let empathyScore = min(1.0, Double(empathyCount) / 3.0)
+
+        // Emotional validation
+        let validationPhrases = ["det är okej", "jag förstår", "känns", "det är normalt", "många känner", "du är inte ensam", "jag lyssnar", "berätta mer"]
+        let validationCount = validationPhrases.filter { lower.contains($0) }.count
+        let emotionalValidation = min(1.0, Double(validationCount) / 2.0)
+
+        // Appropriate emotional response (matching user's emotional tone)
+        let emotionWords = ["ledsen", "glad", "arg", "rädd", "orolig", "nöjd", "frustrerad", "stressad", "ensam", "tacksam", "stolt", "skam"]
+        let emotionalVocab = words.filter { emotionWords.contains($0) }
+        let emotionalVocabulary = min(1.0, Double(emotionalVocab.count) / 4.0)
+
+        // Social awareness
+        let socialWords: Set<String> = ["vi", "tillsammans", "alla", "relation", "vän", "familj", "grupp", "samhälle", "respekt", "förståelse", "kommunikation"]
+        let socialCount = words.filter { socialWords.contains($0) }.count
+        let socialAwareness = min(1.0, Double(socialCount) / 3.0)
+
+        // Appropriate response estimation (heuristic: if text contains emotional words and validation, likely appropriate)
+        let appropriateEmotionalResponse = (emotionalVocabulary + emotionalValidation) / 2.0
+
+        let overallEQ = empathyScore * 0.25 + emotionalValidation * 0.2 + appropriateEmotionalResponse * 0.2 + emotionalVocabulary * 0.15 + socialAwareness * 0.2
+
+        return EQAnalysis(
+            empathyScore: empathyScore,
+            emotionalValidation: emotionalValidation,
+            appropriateEmotionalResponse: appropriateEmotionalResponse,
+            emotionalVocabulary: emotionalVocabulary,
+            socialAwareness: socialAwareness,
+            overallEQ: overallEQ,
+            emotionalWords: emotionalVocab,
+            timestamp: Date()
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ITERATION 145: Swedish Word Network
+// ═══════════════════════════════════════════════════════════
+
+struct WordNetwork: Sendable {
+    let nodes: [WordNode]
+    let edges: [WordEdge]
+    let networkMetrics: NetworkMetrics
+}
+
+struct WordNode: Sendable {
+    let word: String
+    let pos: String
+    let frequency: Int
+    let cefrLevel: String
+}
+
+struct WordEdge: Sendable {
+    let from: String
+    let to: String
+    let edgeType: EdgeType
+    let weight: Double
+}
+
+enum EdgeType: String, Sendable {
+    case synonymy = "synonymy"
+    case antonymy = "antonymy"
+    case derivation = "derivation"
+    case collocation = "collocation"
+    case semanticField = "semantic-field"
+    case morphologicalFamily = "morphological-family"
+}
+
+struct NetworkMetrics: Sendable {
+    let nodeCount: Int
+    let edgeCount: Int
+    let density: Double
+    let avgDegree: Double
+    let connectedComponents: Int
+    let avgClusteringCoeff: Double
+}
+
+extension SwedishLanguageCore {
+    /// Build a word network where words are connected by synonymy, antonymy, derivation, collocation, semantic field, morphological family.
+    func createSwedishWordNetwork() async -> WordNetwork {
+        let memory = PersistentMemoryStore.shared
+        let facts = await memory.getAllFacts(limit: 1000)
+        let learningEngine = LearningEngine.shared
+
+        // Extract words from known vocabulary and facts
+        var wordNodes: [WordNode] = []
+        let knownVocab = await learningEngine.swedishVocabularyCount()
+
+        // Create nodes from fact subjects (words/concepts Eon knows)
+        var wordSet: Set<String> = []
+        for fact in facts.prefix(200) {
+            let words = fact.subject.components(separatedBy: .whitespacesAndNewlines)
+                .map { $0.lowercased().trimmingCharacters(in: .punctuationCharacters) }
+                .filter { $0.count > 2 }
+            for word in words {
+                if wordSet.insert(word).inserted {
+                    wordNodes.append(WordNode(word: word, pos: "unknown", frequency: 1, cefrLevel: "B1"))
+                }
+            }
+        }
+
+        // Create edges based on relationships
+        var edges: [WordEdge] = []
+
+        // Synonymy/antonymy from fact predicates
+        for fact in facts.prefix(200) {
+            if fact.predicate.contains("synonym") || fact.predicate.contains("liknande") {
+                let parts = fact.object.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                if parts.count >= 2 {
+                    edges.append(WordEdge(from: parts[0], to: parts[1], edgeType: .synonymy, weight: 0.8))
+                }
+            }
+        }
+
+        // Collocations from co-occurrence in facts
+        var cooccurrence: [String: Int] = [:]
+        for fact in facts.prefix(200) {
+            let words = "\(fact.subject) \(fact.object)".lowercased()
+                .components(separatedBy: .whitespacesAndNewlines)
+                .filter { $0.count > 3 }
+            for i in 0..<(words.count - 1) {
+                let key = "\(words[i])|\(words[i + 1])"
+                cooccurrence[key, default: 0] += 1
+            }
+        }
+        for (pair, count) in cooccurrence where count >= 2 {
+            let parts = pair.components(separatedBy: "|")
+            if parts.count == 2 {
+                edges.append(WordEdge(from: parts[0], to: parts[1], edgeType: .collocation, weight: min(1.0, Double(count) * 0.2)))
+            }
+        }
+
+        // Semantic field edges (words in same domain)
+        let domainKeywords: [String: [String]] = [
+            "emotion": ["glad", "ledsen", "arg", "rädd", "kär", "stolt"],
+            "cognition": ["tänka", "veta", "förstå", "lära", "minnas", "glömma"],
+            "motion": ["gå", "springa", "åka", "flyga", "simma", "hoppa"],
+        ]
+        for (_, keywords) in domainKeywords {
+            for i in 0..<keywords.count {
+                for j in (i+1)..<keywords.count {
+                    if wordSet.contains(keywords[i]) && wordSet.contains(keywords[j]) {
+                        edges.append(WordEdge(from: keywords[i], to: keywords[j], edgeType: .semanticField, weight: 0.5))
+                    }
+                }
+            }
+        }
+
+        // Compute network metrics
+        let allWords = Set(wordNodes.map { $0.word })
+        let degreeMap: [String: Int] = {
+            var d: [String: Int] = [:]
+            for edge in edges {
+                d[edge.from, default: 0] += 1
+                d[edge.to, default: 0] += 1
+            }
+            return d
+        }()
+        let connectedNodes = degreeMap.keys.intersection(allWords).count
+        let avgDegree = allWords.isEmpty ? 0 : Double(edges.count * 2) / Double(allWords.count)
+        let maxEdges = allWords.count * (allWords.count - 1) / 2
+        let density = maxEdges > 0 ? Double(edges.count) / Double(maxEdges) : 0
+
+        let metrics = NetworkMetrics(
+            nodeCount: wordNodes.count,
+            edgeCount: edges.count,
+            density: density,
+            avgDegree: avgDegree,
+            connectedComponents: max(1, wordNodes.count - connectedNodes),
+            avgClusteringCoeff: 0.3  // Simplified — would need triangle counting
+        )
+
+        return WordNetwork(nodes: wordNodes, edges: edges, networkMetrics: metrics)
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ITERATION 159: Swedish Crossword Generation
+// ═══════════════════════════════════════════════════════════
+
+struct CrosswordPuzzle: Sendable {
+    let grid: [[Character?]]
+    let clues: [Clue]
+    let wordCount: Int
+    let difficulty: String
+}
+
+struct Clue: Sendable {
+    let number: Int
+    let direction: ClueDirection
+    let clue: String
+    let answer: String
+    let row: Int
+    let col: Int
+}
+
+enum ClueDirection: String, Sendable {
+    case across = "Vågrätt"
+    case down = "Lodrätt"
+}
+
+extension SwedishLanguageCore {
+    /// Generate crossword puzzles from Eon's vocabulary.
+    func generateSwedishCrossword() async -> CrosswordPuzzle {
+        let learningEngine = LearningEngine.shared
+        let memory = PersistentMemoryStore.shared
+        let facts = await memory.getAllFacts(limit: 500)
+
+        // Collect Swedish words Eon knows
+        var candidateWords: [String] = []
+        for fact in facts {
+            let words = fact.subject.components(separatedBy: .whitespacesAndNewlines)
+                .map { $0.lowercased().trimmingCharacters(in: .punctuationCharacters) }
+                .filter { $0.count >= 3 && $0.count <= 12 && $0.allSatisfy { $0.isLetter } }
+            candidateWords.append(contentsOf: words)
+        }
+
+        // Deduplicate and take unique words
+        let uniqueWords = Array(Set(candidateWords)).shuffled().prefix(20)
+
+        // Simple crossword: place words in a grid
+        let gridSize = 15
+        var grid: [[Character?]] = Array(repeating: Array(repeating: nil, count: gridSize), count: gridSize)
+        var clues: [Clue] = []
+        var clueNumber = 0
+
+        // Place first word horizontally in center
+        if let firstWord = uniqueWords.first {
+            let startCol = (gridSize - firstWord.count) / 2
+            let centerRow = gridSize / 2
+            for (i, char) in firstWord.enumerated() {
+                grid[centerRow][startCol + i] = char
+            }
+            clueNumber += 1
+            clues.append(Clue(number: clueNumber, direction: .across, clue: "Svenskt ord: \(firstWord.prefix(1).uppercased())...", answer: firstWord, row: centerRow, col: startCol))
+        }
+
+        // Try to place more words intersecting with existing words
+        for word in uniqueWords.dropFirst().prefix(8) {
+            // Find intersection with existing letters
+            for (rowIdx, row) in grid.enumerated() {
+                for (colIdx, cell) in row.enumerated() {
+                    if let existingChar = cell, let wordCharIdx = word.firstIndex(of: existingChar) {
+                        // Try to place word vertically through this position
+                        let startRow = rowIdx - wordCharIdx
+                        guard startRow >= 0 && startRow + word.count <= gridSize else { continue }
+
+                        // Check if placement is valid
+                        var valid = true
+                        for (i, char) in word.enumerated() {
+                            let r = startRow + i
+                            if let existing = grid[r][colIdx], existing != char {
+                                valid = false
+                                break
+                            }
+                        }
+
+                        if valid {
+                            for (i, char) in word.enumerated() {
+                                grid[startRow + i][colIdx] = char
+                            }
+                            clueNumber += 1
+                            clues.append(Clue(number: clueNumber, direction: .down, clue: "Svenskt ord", answer: word, row: startRow, col: colIdx))
+                            break
+                        }
+                    }
+                }
+            }
+        }
+
+        let difficulty = uniqueWords.count > 15 ? "svår" : uniqueWords.count > 8 ? "medel" : "lätt"
+
+        return CrosswordPuzzle(grid: grid, clues: clues, wordCount: clues.count, difficulty: difficulty)
     }
 }

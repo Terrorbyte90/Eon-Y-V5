@@ -11,10 +11,19 @@ actor NeuralEngineOrchestrator {
     private(set) var isLoaded: Bool = false
     private(set) var loadError: String?
 
-    // Inference cache: LRU med hash-nyckel
-    private var embeddingCache: [Int: [Float]] = [:]
-    private var cacheOrder: [Int] = []
-    private let maxCacheSize = 500
+    // Inference cache: LRU med hash-nyckel — foreground/background partitioning (GAP-6)
+    private var foregroundCache: [Int: [Float]] = [:]  // 200 slots for conversation
+    private var backgroundCache: [Int: [Float]] = [:]  // 300 slots for background
+    private var foregroundCacheOrder: [Int] = []
+    private var backgroundCacheOrder: [Int] = []
+    private let maxForegroundCacheSize = 200
+    private let maxBackgroundCacheSize = 300
+
+    // Embedding priority for cache partitioning
+    enum EmbeddingPriority: Sendable {
+        case foreground  // Conversation-critical embeddings
+        case background  // Background/maintenance embeddings
+    }
 
     private var modelVersion: Int = 1
 
@@ -87,7 +96,7 @@ actor NeuralEngineOrchestrator {
 
     // MARK: - Embedding
 
-    func embed(_ text: String) async -> [Float] {
+    func embed(_ text: String, priority: EmbeddingPriority = .foreground) async -> [Float] {
         // Thermal gate: skip GPU inference at critical thermal state
         let thermal = ProcessInfo.processInfo.thermalState
         if thermal == .critical {
@@ -95,7 +104,8 @@ actor NeuralEngineOrchestrator {
         }
 
         let cacheKey = (text + "\(modelVersion)").hashValue
-        if let cached = embeddingCache[cacheKey] { return cached }
+        let cache = priority == .foreground ? foregroundCache : backgroundCache
+        if let cached = cache[cacheKey] { return cached }
 
         await ensureLoaded()
         lastUse = Date()
@@ -105,7 +115,7 @@ actor NeuralEngineOrchestrator {
         }
 
         let embedding = await handler.embed(text)
-        cacheEmbedding(key: cacheKey, value: embedding)
+        cacheEmbedding(key: cacheKey, value: embedding, priority: priority)
         return embedding
     }
 
@@ -131,9 +141,50 @@ actor NeuralEngineOrchestrator {
         return results
     }
 
+    // v85: Efficiently computes similarity of multiple texts to a reference using
+    // batched GPU operations. Use for ranking memories, articles, and responses simultaneously.
+    func batchEmbedSimilarity(texts: [String], reference: String) async -> [(text: String, similarity: Double)] {
+        guard !texts.isEmpty else { return [] }
+
+        // Embed reference once
+        let refEmb = await embed(reference)
+        let refAvailable = !refEmb.allSatisfy { $0 == 0 }
+        guard refAvailable else {
+            // Fallback: return empty similarities
+            return texts.map { ($0, 0.0) }
+        }
+
+        // Batch embed all texts using TaskGroup for parallelism
+        var embeddings: [String: [Float]] = [:]
+        await withTaskGroup(of: (String, [Float]).self) { group in
+            for text in texts {
+                group.addTask { [self] in
+                    let emb = await self.embed(text, priority: .foreground)
+                    return (text, emb)
+                }
+            }
+            for await (text, emb) in group {
+                embeddings[text] = emb
+            }
+        }
+
+        // Compute similarities
+        var results: [(text: String, similarity: Double)] = []
+        for text in texts {
+            guard let emb = embeddings[text] else { continue }
+            let sim = Double(cosineSimilarity(refEmb, emb))
+            results.append((text: text, similarity: sim))
+        }
+
+        // Sort by similarity descending
+        return results.sorted { $0.similarity > $1.similarity }
+    }
+
     func invalidateCache() {
-        embeddingCache.removeAll()
-        cacheOrder.removeAll()
+        foregroundCache.removeAll()
+        backgroundCache.removeAll()
+        foregroundCacheOrder.removeAll()
+        backgroundCacheOrder.removeAll()
         modelVersion += 1
     }
 
@@ -238,8 +289,7 @@ actor NeuralEngineOrchestrator {
 
     func extractEntities(from text: String) async -> [ExtractedEntity] {
         var entities: [ExtractedEntity] = []
-        let tagger = NLTagger(tagSchemes: [.nameType])
-        tagger.string = text
+        let tagger = NLTaggerPool.shared.nameTypeTagger(for: text)
         tagger.enumerateTags(in: text.startIndex..<text.endIndex, unit: .word, scheme: .nameType) { tag, range in
             if let tag = tag {
                 let entityType: ExtractedEntity.EntityType
@@ -269,13 +319,23 @@ actor NeuralEngineOrchestrator {
 
     // MARK: - Cache management
 
-    private func cacheEmbedding(key: Int, value: [Float]) {
-        if cacheOrder.count >= maxCacheSize {
-            let evict = cacheOrder.removeFirst()
-            embeddingCache.removeValue(forKey: evict)
+    private func cacheEmbedding(key: Int, value: [Float], priority: EmbeddingPriority) {
+        switch priority {
+        case .foreground:
+            if foregroundCacheOrder.count >= maxForegroundCacheSize {
+                let evict = foregroundCacheOrder.removeFirst()
+                foregroundCache.removeValue(forKey: evict)
+            }
+            foregroundCache[key] = value
+            foregroundCacheOrder.append(key)
+        case .background:
+            if backgroundCacheOrder.count >= maxBackgroundCacheSize {
+                let evict = backgroundCacheOrder.removeFirst()
+                backgroundCache.removeValue(forKey: evict)
+            }
+            backgroundCache[key] = value
+            backgroundCacheOrder.append(key)
         }
-        embeddingCache[key] = value
-        cacheOrder.append(key)
     }
 
     // MARK: - Fallbacks

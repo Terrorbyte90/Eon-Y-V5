@@ -429,15 +429,42 @@ final class EonBrain: ObservableObject {
                             continuation.yield(token)
                         }
                     )
+                    // v71: Cross-validation — run response through BOTH GenerationValidator
+                    // AND OpenRouter's selfCorrectText, then pick the best version.
+                    // If they disagree, use the OpenRouter version (higher accuracy).
+                    let validatedResponse = response.response
+                    let openRouterCorrection = await OpenRouterLanguageEvaluator.shared.selfCorrectText(validatedResponse)
+                    let internalValidatorScore = response.validationScore
+                    let openRouterScore = openRouterCorrection.hadErrors
+                        ? max(0.5, 1.0 - Double(openRouterCorrection.corrections.count) * 0.1)
+                        : 0.95
+
+                    let finalResponse: String
+                    if openRouterCorrection.hadErrors && openRouterScore > internalValidatorScore {
+                        // OpenRouter found errors the internal validator missed — use corrected version
+                        finalResponse = openRouterCorrection.correctedText
+                        self.appendMonologue(MonologueLine(
+                            text: "Korsvalidering: OpenRouter korrigerade \(openRouterCorrection.corrections.count) fel (intern poäng: \(String(format: "%.2f", internalValidatorScore)) → OpenRouter: \(String(format: "%.2f", openRouterScore)))",
+                            type: .revision
+                        ))
+                    } else {
+                        finalResponse = validatedResponse
+                    }
+
                     // v12: Store cleaned response for UI replacement
                     await MainActor.run {
-                        self.lastCleanedResponse = response.response
+                        self.lastCleanedResponse = finalResponse
                         self.confidence = response.confidence
                     }
                     // v23: Move learning engine calls to background (saves ~0.2s from response latency)
                     let learnMsg = userMessage
-                    let learnResp = response.response
+                    let learnResp = finalResponse
                     let learnConf = response.confidence
+                    let learnSwedishAnalysis = response.swedishAnalysis
+                    // v71: Capture quality metrics for learning feedback
+                    let vScore = max(internalValidatorScore, openRouterScore)
+                    let vQaRel = response.qaRelevance
+                    let vNeededRegen = response.neededRegeneration
                     Task.detached(priority: .utility) {
                         await LearningEngine.shared.metaLearnFromConversation(
                             userMessage: learnMsg,
@@ -446,7 +473,15 @@ final class EonBrain: ObservableObject {
                         )
                         await LearningEngine.shared.learnFromConversation(
                             userMessage: learnMsg,
-                            eonResponse: learnResp
+                            eonResponse: learnResp,
+                            swedishAnalysis: learnSwedishAnalysis
+                        )
+                        // v71: Pass response quality metrics to learning engine
+                        await LearningEngine.shared.recordResponseQuality(
+                            validationScore: vScore,
+                            confidence: learnConf,
+                            qaRelevance: vQaRel,
+                            neededRegeneration: vNeededRegen
                         )
                     }
                     await MainActor.run {
