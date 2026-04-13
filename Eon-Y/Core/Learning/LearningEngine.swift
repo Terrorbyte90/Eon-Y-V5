@@ -3458,4 +3458,300 @@ struct MasteryLoopReport: Identifiable, Codable {
         Motivation: \(motivationalThought)
         """
     }
+
+    // MARK: - Iteration 70: Knowledge Graph Expansion from Text
+
+    struct KnowledgeGraph {
+        let entities: [KGEntity]
+        let relations: [KGRelation]
+        let properties: [KGProperty]
+        let newRelations: Int
+        let allBoost: Double
+    }
+
+    struct KGEntity: Identifiable, Codable {
+        let id = UUID()
+        let name: String
+        let entityType: EntityType
+        let confidence: Double
+
+        enum EntityType: String, Codable { case person, place, organization, concept, event, object, unknown }
+    }
+
+    struct KGRelation: Identifiable, Codable {
+        let id = UUID()
+        let source: String
+        let relationType: RelationType
+        let target: String
+        let confidence: Double
+
+        enum RelationType: String, Codable {
+            case isA = "är-en"
+            case hasA = "har-en"
+            case partOf = "del-av"
+            case causes = "orsakar"
+            case locatedIn = "placerad-i"
+            case createdBy = "skapad-av"
+            case relatedTo = "relaterad-till"
+            case influences = "påverkar"
+            case usedFor = "används-för"
+        }
+    }
+
+    struct KGProperty: Identifiable, Codable {
+        let id = UUID()
+        let entity: String
+        let property: String
+        let value: String
+        let confidence: Double
+    }
+
+    // Swedish patterns for entity and relation extraction
+    private static let personIndicators: Set<String> = ["han", "hon", "hen", "mannen", "kvinnan", "personen", "pojken", "flickan", "läraren", "doktorn", "chefen", "vännen", "brodern", " systern", "fadern", "modern"]
+    private static let organizationIndicators: Set<String> = ["AB", "aktiebolag", "organisation", "företag", "myndighet", "regeringen", "kommunen", "partiet", "föreningen", "universitet", "skola", "byrå", "institut", "bolag", "koncern"]
+    private static let placeIndicators: Set<String> = ["i Sverige", "i Stockholm", "i Göteborg", "i Malmö", "i Europa", "i världen", "staden", "landet", "platsen", "området", "regionen", "kommunen", "bygden", "orten"]
+
+    // Relation extraction patterns
+    private static let isAPatterns: [(String, String)] = [
+        ("(är|var|blev) (en|ett|den|det) ", "isA"),
+        ("kallas? (för|en|ett)", "isA"),
+        ("definieras? som", "isA"),
+        ("betecknas? som", "isA"),
+        ("klassificeras? som", "isA"),
+        ("typ av", "isA"),
+        ("sorts", "isA"),
+        ("slag av", "isA"),
+    ]
+
+    private static let partOfPatterns: [(String, String)] = [
+        ("(är|var|utgör) (en|ett|del) (av|i)", "partOf"),
+        ("ingår? i", "partOf"),
+        ("tillhör?", "partOf"),
+        ("består av", "partOf"),
+        ("ingår som del", "partOf"),
+        ("är en del", "partOf"),
+        ("utgör en del", "partOf"),
+    ]
+
+    private static let causePatterns: [(String, String)] = [
+        ("(orsakar?|leda till|resulterar?|medför|skapar?|genererar?|framkallar?|utlöser?)", "causes"),
+        ("(påverkar?|inverkar?|har effekt på)", "influences"),
+        ("(bidrar till|gör att)", "causes"),
+        ("(beror på|orsakas av|följd av)", "causes"),
+    ]
+
+    private static let locatedInPatterns: [(String, String)] = [
+        ("(ligger|finns|är belägen|är placerad|är lokaliserad) (i|på|vid|utanför)", "locatedIn"),
+        ("(i|på|vid) (Stockholm|Göteborg|Malmö|Sverige|Norge|Danmark|Europa|Asien|Amerika|London|Paris|Berlin|New York)", "locatedIn"),
+    ]
+
+    private static let createdByPatterns: [(String, String)] = [
+        ("(skapad|skapades|skapat|skapade) (av|utav|från)", "createdBy"),
+        ("(skapad|skapat|utvecklad|utvecklat|konstruerad|konstruerat|byggd|byggt|designad|designat) av", "createdBy"),
+        ("(av|från) (författaren|konstnären|skaparen|utvecklaren|designern|arkitekten)", "createdBy"),
+    ]
+
+    private static let usedForPatterns: [(String, String)] = [
+        ("(används?|brukar?|utnyttjas?) (för|till|som)", "usedFor"),
+        ("(syftar till|syftar på|avsedd för|menad för|tänkt för)", "usedFor"),
+        ("(tjänar som|fungerar som|fungerar för|används som)", "usedFor"),
+    ]
+
+    func extractKnowledgeGraph(text: String) -> KnowledgeGraph {
+        let lower = text.lowercased()
+        let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?;")).map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.count > 5 }
+        let tagger = NLTagger(tagSchemes: [.nameType, .lexicalClass])
+
+        var entities: [KGEntity] = []
+        var relations: [KGRelation] = []
+        var properties: [KGProperty] = []
+        var newRelations = 0
+
+        for sentence in sentences {
+            let sl = sentence.lowercased()
+            let words = sl.components(separatedBy: .whitespacesAndNewlines).map { $0.trimmingCharacters(in: .punctuationCharacters) }.filter { !$0.isEmpty }
+
+            // ── Entity extraction ──
+            tagger.string = sentence
+            tagger.setLanguage(.swedish, range: sentence.startIndex..<sentence.endIndex)
+
+            // Named entities via NLTagger
+            tagger.enumerateTags(in: sentence.startIndex..<sentence.endIndex, unit: .word, scheme: .nameType, options: [.omitWhitespace, .omitPunctuation, .joinNames]) { tag, range in
+                if tag != nil {
+                    let name = String(sentence[range])
+                    if name.count > 1 && !entities.contains(where: { $0.name == name }) {
+                        let type: KGEntity.EntityType
+                        if tag?.rawValue.contains("PersonName") == true { type = .person }
+                        else if tag?.rawValue.contains("PlaceName") == true { type = .place }
+                        else if tag?.rawValue.contains("OrganizationName") == true { type = .organization }
+                        else { type = .unknown }
+                        entities.append(KGEntity(name: name, entityType: type, confidence: 0.7))
+                    }
+                }
+                return true
+            }
+
+            // Detect capitalized words as potential entities
+            for word in words where word.first?.isUppercase == true && word.count > 2 {
+                if !entities.contains(where: { $0.name == word }) {
+                    // Heuristic: check if it looks like a person, org, or place
+                    let nextWordIdx = words.firstIndex(of: word).map { $0 + 1 }
+                    let nextWord = nextWordIdx != nil && nextWordIdx! < words.count ? words[nextWordIdx!] : ""
+
+                    if Self.organizationIndicators.contains(word) || nextWord.hasSuffix("AB") || nextWord.hasSuffix("ab") {
+                        entities.append(KGEntity(name: word, entityType: .organization, confidence: 0.5))
+                    } else if Self.placeIndicators.contains(where: { sl.contains($0) }) {
+                        entities.append(KGEntity(name: word, entityType: .place, confidence: 0.5))
+                    } else {
+                        entities.append(KGEntity(name: word, entityType: .concept, confidence: 0.4))
+                    }
+                }
+            }
+
+            // ── Relation extraction ──
+            // is-A relations
+            for (pattern, relType) in Self.isAPatterns {
+                if let range = sl.range(of: pattern, options: .regularExpression) {
+                    let beforeMatch = sl[..<range.lowerBound]
+                    let afterMatch = sl[range.upperBound...]
+                    let beforeWords = String(beforeMatch).components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 2 }
+                    let afterWords = String(afterMatch).components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 2 }
+                    if let source = beforeWords.last(where: { $0.first?.isUppercase == true || $0.count > 3 }),
+                       let target = afterWords.first(where: { $0.count > 2 }) {
+                        relations.append(KGRelation(source: source, relationType: .isA, target: target, confidence: 0.6))
+                    }
+                }
+            }
+
+            // Part-of relations
+            for (pattern, _) in Self.partOfPatterns {
+                if let range = sl.range(of: pattern, options: .regularExpression) {
+                    let beforeMatch = sl[..<range.lowerBound]
+                    let afterMatch = sl[range.upperBound...]
+                    let beforeWords = String(beforeMatch).components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 2 }
+                    let afterWords = String(afterMatch).components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 2 }
+                    if let source = beforeWords.last(where: { $0.count > 2 }), let target = afterWords.first(where: { $0.count > 2 }) {
+                        relations.append(KGRelation(source: source, relationType: .partOf, target: target, confidence: 0.6))
+                    }
+                }
+            }
+
+            // Cause relations
+            for (pattern, relType) in Self.causePatterns {
+                if sl.contains(pattern) {
+                    // Extract subject and object around the cause verb
+                    if let verbIdx = words.firstIndex(where: { $0.hasPrefix(pattern.prefix(4)) }),
+                       verbIdx > 0 && verbIdx + 1 < words.count {
+                        let subject = words[verbIdx - 1]
+                        let object = words[verbIdx + 1]
+                        let relT: KGRelation.RelationType = relType == "causes" ? .causes : .influences
+                        relations.append(KGRelation(source: subject, relationType: relT, target: object, confidence: 0.55))
+                    }
+                }
+            }
+
+            // Located-in relations
+            for (pattern, _) in Self.locatedInPatterns {
+                if let range = sl.range(of: pattern, options: .regularExpression) {
+                    let afterMatch = sl[range.upperBound...]
+                    let afterWords = String(afterMatch).components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 2 }
+                    let beforeMatch = sl[..<range.lowerBound]
+                    let beforeWords = String(beforeMatch).components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 2 }
+                    if let entity = beforeWords.last(where: { $0.count > 2 || $0.first?.isUppercase == true }),
+                       let location = afterWords.first(where: { $0.count > 2 }) {
+                        relations.append(KGRelation(source: entity, relationType: .locatedIn, target: location, confidence: 0.65))
+                    }
+                }
+            }
+
+            // Created-by relations
+            for (pattern, _) in Self.createdByPatterns {
+                if let range = sl.range(of: pattern, options: .regularExpression) {
+                    let afterMatch = sl[range.upperBound...]
+                    let afterWords = String(afterMatch).components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 2 }
+                    let beforeMatch = sl[..<range.lowerBound]
+                    let beforeWords = String(beforeMatch).components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 2 }
+                    if let created = beforeWords.last(where: { $0.count > 2 || $0.first?.isUppercase == true }),
+                       let creator = afterWords.first(where: { $0.count > 2 }) {
+                        relations.append(KGRelation(source: created, relationType: .createdBy, target: creator, confidence: 0.65))
+                    }
+                }
+            }
+
+            // Used-for relations
+            for (pattern, _) in Self.usedForPatterns {
+                if let range = sl.range(of: pattern, options: .regularExpression) {
+                    let beforeMatch = sl[..<range.lowerBound]
+                    let afterMatch = sl[range.upperBound...]
+                    let beforeWords = String(beforeMatch).components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 2 }
+                    let afterWords = String(afterMatch).components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 2 }
+                    if let entity = beforeWords.last(where: { $0.count > 2 }),
+                       let purpose = afterWords.first(where: { $0.count > 2 }) {
+                        relations.append(KGRelation(source: entity, relationType: .usedFor, target: purpose, confidence: 0.6))
+                    }
+                }
+            }
+
+            // Property extraction: "X är Y" → property
+            for (i, word) in words.enumerated() where word == "är" || word == "var" {
+                if i >= 1 && i + 1 < words.count {
+                    let entity = words[i - 1]
+                    let value = words[i + 1]
+                    if entity.count > 2 && value.count > 2 && value.first?.isLowercase == true {
+                        properties.append(KGProperty(entity: entity, property: word, value: value, confidence: 0.5))
+                    }
+                }
+            }
+        }
+
+        // Deduplicate relations
+        var seenRelations: Set<String> = []
+        var uniqueRelations: [KGRelation] = []
+        for rel in relations {
+            let key = "\(rel.source)-\(rel.relationType.rawValue)-\(rel.target)"
+            if !seenRelations.contains(key) {
+                seenRelations.insert(key)
+                uniqueRelations.append(rel)
+                newRelations += 1
+            }
+        }
+
+        // Boost all cognitive dimensions by 0.002 per new relation
+        let allBoost = min(0.02, Double(newRelations) * 0.002)
+
+        // Save to PersistentMemoryStore as structured knowledge
+        if newRelations > 0 {
+            Task.detached(priority: .utility) {
+                for rel in uniqueRelations {
+                    await PersistentMemoryStore.shared.saveFact(
+                        subject: rel.source,
+                        predicate: rel.relationType.rawValue,
+                        object: rel.target,
+                        confidence: rel.confidence,
+                        source: "knowledge_graph_extraction"
+                    )
+                }
+                for prop in properties.prefix(10) {
+                    await PersistentMemoryStore.shared.saveFact(
+                        subject: prop.entity,
+                        predicate: prop.property,
+                        object: prop.value,
+                        confidence: prop.confidence,
+                        source: "knowledge_graph_property"
+                    )
+                }
+                for entity in entities {
+                    await PersistentMemoryStore.shared.saveFact(
+                        subject: entity.name,
+                        predicate: "är_typ_av",
+                        object: entity.entityType.rawValue,
+                        confidence: entity.confidence,
+                        source: "knowledge_graph_entity"
+                    )
+                }
+            }
+        }
+
+        return KnowledgeGraph(entities: entities, relations: uniqueRelations, properties: properties, newRelations: newRelations, allBoost: allBoost)
+    }
 }

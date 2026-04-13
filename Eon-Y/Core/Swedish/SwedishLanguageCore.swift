@@ -1125,6 +1125,1964 @@ actor SwedishLanguageCore {
 
         return PolitenessAnalysis(strategy: .baldOnRecord, confidence: 0.5, markers: [], explanation: "Ingen tydlig artighetsstrategi detekterad")
     }
+
+    // ═══════════════════════════════════════════════════════════
+    // ITERATION 51-60: Deep Language Understanding
+    // ═══════════════════════════════════════════════════════════
+
+    // MARK: - Iteration 51: Phonological Awareness
+
+    struct PhonologicalAnalysis {
+        let text: String
+        let vowelHarmonyScore: Double           // 0-1, Swedish has limited vowel harmony
+        let consonantClusters: [ConsonantCluster]
+        let syllableStructure: [SyllableInfo]
+        let stressPattern: StressPattern
+        let phonologicalComplexity: Double       // 0-1 overall complexity
+        let syllableCount: Int
+        let complexPatterns: Int                 // Number of complex phonological patterns
+    }
+
+    struct ConsonantCluster: Identifiable {
+        let id = UUID()
+        let cluster: String
+        let position: Int
+        let type: ClusterType
+        let difficulty: Double
+
+        enum ClusterType: String {
+            case sj = "sj"       // /ɧ/ — unique Swedish phoneme
+            case stj = "stj"     // /ɧ/
+            case tj = "tj"       // /ɕ/
+            case sk = "sk"       // /ɧ/ or /sk/
+            case rs = "rs"       // /ʂ/
+            case general = "general"
+        }
+    }
+
+    struct SyllableInfo {
+        let syllable: String
+        let structure: String        // CV, CVC, CCV, CCVC, etc.
+        let isStressed: Bool
+        let stressLevel: StressLevel
+
+        enum StressLevel {
+            case primary, secondary, unstressed
+        }
+    }
+
+    struct StressPattern {
+        let primaryStressSyllable: Int
+        let secondaryStressSyllables: [Int]
+        let pattern: String          // e.g., "SUSU", "SUSUSU"
+        let pitchAccent: PitchAccentType?
+
+        enum PitchAccentType {
+            case accent1, accent2, unknown
+        }
+    }
+
+    // Swedish consonant clusters — many produce the unique /ɧ/ (sje-sound)
+    private static let sjClusterPatterns = ["sj", "stj", "tj", "skj", "sk"]
+    private static let rsClusterPattern = "rs"
+
+    // Common Swedish consonant clusters
+    private static let consonantClusterPatterns: [String] = [
+        "sj", "stj", "tj", "skj", "sk", "rs", "rt", "rn", "rl", "rd",
+        "str", "skr", "spr", "spl", "skv", "stv", "sv", "kv", "tw",
+        "bl", "kl", "fl", "gl", "pl", "sl", "tl",
+        "br", "kr", "fr", "gr", "pr", "tr", "dr",
+        "sp", "st", "sk", "sv", "sn", "sm", "sl"
+    ]
+
+    /// Swedish syllable nucleus vowels
+    private static let vowels: Set<Character> = ["a", "e", "i", "o", "u", "y", "å", "ä", "ö", "A", "E", "I", "O", "U", "Y", "Å", "Ä", "Ö"]
+
+    func analyzePhonology(text: String) -> PhonologicalAnalysis {
+        let words = text.components(separatedBy: .whitespacesAndNewlines)
+            .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+            .filter { !$0.isEmpty }
+
+        var allClusters: [ConsonantCluster] = []
+        var allSyllables: [SyllableInfo] = []
+        var totalComplexPatterns = 0
+
+        for (wordIdx, word) in words.enumerated() {
+            let lower = word.lowercased()
+
+            // Detect consonant clusters
+            for cluster in Self.consonantClusterPatterns {
+                var searchFrom = 0
+                while let range = lower.range(of: cluster, range: lower.index(lower.startIndex, offsetBy: searchFrom)..<lower.endIndex) {
+                    let position = lower.distance(from: lower.startIndex, to: range.lowerBound)
+                    let clusterType: ConsonantCluster.ClusterType
+                    switch cluster {
+                    case "sj": clusterType = .sj
+                    case "stj": clusterType = .stj
+                    case "tj": clusterType = .tj
+                    case "sk": clusterType = .sk
+                    case "rs": clusterType = .rs
+                    default: clusterType = .general
+                    }
+                    let difficulty = clusterType == .sj || clusterType == .stj || clusterType == .tj ? 0.9 :
+                                     clusterType == .sk ? 0.7 :
+                                     clusterType == .rs ? 0.8 : 0.4
+                    allClusters.append(ConsonantCluster(
+                        cluster: cluster, position: position, type: clusterType, difficulty: difficulty
+                    ))
+                    if clusterType != .general { totalComplexPatterns += 1 }
+                    searchFrom = lower.distance(from: lower.startIndex, to: range.upperBound)
+                    if searchFrom >= lower.count { break }
+                }
+            }
+
+            // Syllable decomposition (approximate)
+            let syllables = approximateSyllables(lower)
+            for (sylIdx, syl) in syllables.enumerated() {
+                let structure = computeSyllableStructure(syl)
+                let isStressed = sylIdx == 0
+                let stressLevel: SyllableInfo.StressLevel
+                if sylIdx == 0 {
+                    stressLevel = .primary
+                } else if sylIdx == 2 && syllables.count > 3 {
+                    stressLevel = .secondary
+                } else {
+                    stressLevel = .unstressed
+                }
+                allSyllables.append(SyllableInfo(syllable: syl, structure: structure, isStressed: isStressed, stressLevel: stressLevel))
+            }
+        }
+
+        // Vowel harmony — Swedish has some vowel harmony in compound words
+        let vowelHarmonyScore = computeVowelHarmony(words)
+
+        // Stress pattern
+        let stressPattern = computeStressPattern(allSyllables)
+
+        // Phonological complexity
+        let clusterComplexity = min(1.0, Double(totalComplexPatterns) * 0.15)
+        let syllableComplexity = min(1.0, Double(allSyllables.filter { $0.structure.count > 3 }.count) * 0.1)
+        let phonologicalComplexity = clusterComplexity * 0.6 + syllableComplexity * 0.4
+
+        return PhonologicalAnalysis(
+            text: text,
+            vowelHarmonyScore: vowelHarmonyScore,
+            consonantClusters: allClusters,
+            syllableStructure: allSyllables,
+            stressPattern: stressPattern,
+            phonologicalComplexity: phonologicalComplexity,
+            syllableCount: allSyllables.count,
+            complexPatterns: totalComplexPatterns
+        )
+    }
+
+    /// Approximate syllable splitting for Swedish
+    private func approximateSyllables(_ word: String) -> [String] {
+        guard !word.isEmpty else { return [] }
+        var syllables: [String] = []
+        var current = ""
+        var vowelCount = 0
+
+        for char in word {
+            current.append(char)
+            if Self.vowels.contains(char) {
+                vowelCount += 1
+                // After vowel + optional consonants, try to split
+                if vowelCount > 1 && current.count > 2 {
+                    syllables.append(current)
+                    current = ""
+                    vowelCount = 0
+                }
+            }
+        }
+        if !current.isEmpty {
+            if syllables.isEmpty {
+                syllables.append(current)
+            } else {
+                syllables[syllables.count - 1] += current
+            }
+        }
+        return syllables.isEmpty ? [word] : syllables
+    }
+
+    /// Compute syllable structure (CV, CVC, CCV, etc.)
+    private func computeSyllableStructure(_ syllable: String) -> String {
+        var structure = ""
+        var prevWasConsonant = false
+        for char in syllable.lowercased() {
+            if Self.vowels.contains(char) {
+                structure.append("V")
+                prevWasConsonant = false
+            } else {
+                structure.append("C")
+                prevWasConsonant = true
+            }
+        }
+        return structure.isEmpty ? "V" : structure
+    }
+
+    /// Compute vowel harmony score — Swedish has some harmony in compounds
+    private func computeVowelHarmony(_ words: [String]) -> Double {
+        var harmonyScore: Double = 0
+        for word in words where word.count > 4 {
+            let vowelsInWord = word.lowercased().filter { Self.vowels.contains($0) }
+            if vowelsInWord.count >= 3 {
+                // Check for front/back vowel mixing (Swedish vowel harmony constraint)
+                let frontVowels = vowelsInWord.filter { ["e", "i", "y", "ä", "ö"].contains($0) }
+                let backVowels = vowelsInWord.filter { ["a", "o", "u", "å"].contains($0) }
+                if !frontVowels.isEmpty && !backVowels.isEmpty {
+                    harmonyScore += 0.1 // Some mixing = slight disharmony
+                }
+            }
+        }
+        return min(1.0, harmonyScore)
+    }
+
+    /// Compute stress pattern for analyzed text
+    private func computeStressPattern(_ syllables: [SyllableInfo]) -> StressPattern {
+        let primaryIdx = syllables.firstIndex { $0.stressLevel == .primary } ?? 0
+        let secondaryIndices = syllables.enumerated().compactMap { $0.element.stressLevel == .secondary ? $0.offset : nil }
+        let pattern = syllables.map { s in
+            switch s.stressLevel {
+            case .primary: return "S"
+            case .secondary: return "U"
+            case .unstressed: return "u"
+            }
+        }.joined()
+        return StressPattern(
+            primaryStressSyllable: primaryIdx,
+            secondaryStressSyllables: secondaryIndices,
+            pattern: pattern,
+            pitchAccent: nil
+        )
+    }
+
+    // MARK: - Iteration 52: Swedish Pitch Accent Detection
+
+    /// Pitch accent 1 (akut accent) vs accent 2 (grav accent)
+    /// Critical for Swedish — distinguishes many minimal pairs
+    /// Accent 1: single peak (e.g., "anden" = the duck)
+    /// Accent 2: double peak (e.g., "anden" = the spirit)
+
+    func detectPitchAccent(word: String) -> Int {
+        let lower = word.lowercased().trimmingCharacters(in: .punctuationCharacters)
+        if let accent = Self.pitchAccentDatabase[lower] {
+            return accent
+        }
+        // Heuristic: multi-syllable compound words tend to have accent 2
+        let syllables = approximateSyllables(lower)
+        if syllables.count >= 3 {
+            return 2 // Compounds and longer words typically accent 2
+        }
+        return 1 // Default: accent 1 for short/simple words
+    }
+
+    /// 500+ Swedish words with known pitch accent
+    /// 1 = accent 1 (akut), 2 = accent 2 (grav)
+    private static let pitchAccentDatabase: [String: Int] = [
+        // Accent 1 words (akut accent) — typically monosyllabic roots + simple words
+        "and": 1, "bil": 1, "bok": 1, "dag": 1, "eld": 1, "fot": 1, "god": 1, "hus": 1,
+        "jul": 1, "kog": 1, "lag": 1, "man": 1, "not": 1, "orm": 1, "pung": 1, "rost": 1,
+        "sol": 1, "tåg": 1, "uggla": 1, "vit": 1, "vän": 1, "år": 1, "älg": 1, "öring": 1,
+        "and": 1, "ball": 1, "dans": 1, "fast": 1, "glass": 1, "hand": 1, "katt": 1, "land": 1,
+        "mjölk": 1, "natt": 1, "ost": 1, "präst": 1, "qvist": 1, "rätt": 1, "säng": 1, "tall": 1,
+        "varg": 1, "yx": 1, "zoo": 1, "åsna": 1, "ängel": 1, "öra": 1,
+        "banan": 1, "klocka": 1, "flicka": 1, "pojke": 1, "kvinna": 1, "man": 1, "barn": 1,
+        "fader": 1, "moder": 1, "broder": 1, "syster": 1, "fader": 1,
+        "springa": 1, "gå": 1, "komma": 1, "ta": 1, "ge": 1, "se": 1, "höra": 1, "säga": 1,
+        "bra": 1, "dålig": 1, "stor": 1, "liten": 1, "ny": 1, "gammal": 1, "ung": 1,
+        "vacker": 1, "ful": 1, "snabb": 1, "långsam": 1, "tung": 1, "lätt": 1,
+        "hus": 1, "rum": 1, "kök": 1, "badrum": 1, "sovrum": 1, "dörr": 1, "fönster": 1,
+        "bord": 1, "stol": 1, "lamp": 1, "bädd": 1, "soffa": 1, "bok": 1, "tidning": 1,
+        "äpple": 1, "päron": 1, "banan": 1, "apelsin": 1, "bröd": 1, "smör": 1, "ost": 1,
+        "mjölk": 1, "vatten": 1, "kaffe": 1, "te": 1, "kött": 1, "fisk": 1, "kyckling": 1,
+        "bil": 1, "buss": 1, "tåg": 1, "flygplan": 1, "cykel": 1, "båt": 1, "biljett": 1,
+        "skola": 1, "lärare": 1, "elev": 1, "bok": 1, "penna": 1, "papper": 1, "dator": 1,
+        "arbete": 1, "jobb": 1, "kontor": 1, "chef": 1, "kollega": 1, "lön": 1, "semester": 1,
+        "sjuk": 1, "frisk": 1, "läkare": 1, "sjukhus": 1, "medicin": 1, "huvudvärk": 1,
+        "regn": 1, "sol": 1, "snö": 1, "vind": 1, "moln": 1, "väder": 1, "temperatur": 1,
+        "glad": 1, "ledsen": 1, "arg": 1, "rädd": 1, "trött": 1, "nyfiken": 1, "kär": 1,
+        "pengar": 1, "pris": 1, "butik": 1, "marknad": 1, "bank": 1, "kredit": 1, "ränta": 1,
+        "färg": 1, "röd": 1, "blå": 1, "grön": 1, "gul": 1, "svart": 1, "vit": 1, "grå": 1,
+        "en": 1, "två": 1, "tre": 1, "fyra": 1, "fem": 1, "sex": 1, "sju": 1, "åtta": 1, "nio": 1, "tio": 1,
+        "hund": 1, "katt": 1, "häst": 1, "ko": 1, "gris": 1, "får": 1, "get": 1, "höna": 1, "anka": 1,
+        "skog": 1, "sjö": 1, "berg": 1, "hav": 1, "flod": 1, "ö": 1, "stad": 1, "by": 1, "land": 1,
+        "vän": 1, "fiende": 1, "familj": 1, "barn": 1, "förälder": 1, "morfar": 1, "farmor": 1,
+        "måndag": 1, "tisdag": 1, "onsdag": 1, "torsdag": 1, "fredag": 1, "lördag": 1, "söndag": 1,
+        "januari": 1, "februari": 1, "mars": 1, "april": 1, "maj": 1, "juni": 1, "juli": 1,
+        "år": 1, "månad": 1, "vecka": 1, "dag": 1, "timme": 1, "minut": 1, "sekund": 1,
+        "nord": 1, "syd": 1, "öst": 1, "väst": 1, "vänster": 1, "höger": 1, "fram": 1, "bak": 1,
+        "jag": 1, "du": 1, "han": 1, "hon": 1, "den": 1, "det": 1, "vi": 1, "ni": 1, "de": 1,
+        "är": 1, "var": 1, "bli": 1, "ha": 1, "få": 1, "kunna": 1, "måste": 1, "ska": 1,
+        "och": 1, "eller": 1, "men": 1, "för": 1, "om": 1, "att": 1, "som": 1, "när": 1,
+        "här": 1, "där": 1, "upp": 1, "ner": 1, "in": 1, "ut": 1, "på": 1, "av": 1, "till": 1,
+        "mycket": 1, "lite": 1, "alla": 1, "många": 1, "någon": 1, "ingen": 1, "varje": 1,
+        "idag": 1, "igår": 1, "imorgon": 1, "nu": 1, "sedan": 1, "först": 1, "sen": 1,
+        // Accent 2 words (grav accent) — typically polysyllabic, compounds, -ande/-ende
+        "äpple": 2, "bagare": 2, "dörrar": 2, "flickor": 2, "gator": 2, "hundar": 2,
+        "kilometer": 2, "lärare": 2, "momenter": 2, "någorlunda": 2, "ordinarie": 2,
+        "påfund": 2, "kvastar": 2, "reformer": 2, "studenter": 2, "undantag": 2,
+        "vandrare": 2, "ynglingar": 2, "ämbete": 2, "övergång": 2, "återkomst": 2,
+        "andelar": 2, "arbetare": 2, "berättelse": 2, "datorspel": 2, "egenartad": 2,
+        "författare": 2, "genomsnitt": 2, "hemlighet": 2, "information": 2, "järnväg": 2,
+        "kaffebryggare": 2, "läkemedel": 2, "matematik": 2, "nordpolen": 2, "organisation": 2,
+        "persontåg": 2, "quantitet": 2, "regering": 2, "sjukhus": 2, "tillsammans": 2,
+        "universitet": 2, "vetenskap": 2, "ytterligare": 2, "äventyr": 2,
+        "sjungen": 2, "bunden": 2, "funnen": 2, "kommen": 2, "runnen": 2, "sprungen": 2,
+        "stungen": 2, "svunnen": 2, "tvungen": 2, "unnen": 2, "vunnen": 2,
+        "andning": 2, "betydelse": 2, "diskussion": 2, "effektiv": 2, "förändring": 2,
+        "gemenskap": 2, "händelse": 2, "illustration": 2, "juridik": 2, "kommunikation": 2,
+        "lagstiftning": 2, "medvetande": 2, "nationell": 2, "operation": 2, "produktion": 2,
+        "reflektion": 2, "situation": 2, "teknologi": 2, "upplevelse": 2, "växling": 2,
+        "yllen": 2, "zink": 2, "ämne": 2, "övning": 2,
+        // Pitch accent minimal pairs — same spelling, different accent, different meaning
+        "anden": 1,    // Accent 1 = the duck (anden); Accent 2 = the spirit (anden)
+        "grisen": 1,   // Accent 1 = the pig; context distinguishes
+        "tomten": 1,   // Accent 1 = the plot; Accent 2 = Santa/elf
+        "buren": 1,    // Accent 1 = carried; Accent 2 = the cage
+        "fången": 1,   // Accent 1 = captured; Accent 2 = the lap
+        "stegen": 1,   // Accent 1 = the step; Accent 2 = the ladder
+        "släkten": 1,  // Accent 1 = the relative; Accent 2 = the family/clan
+        "tanken": 1,   // Accent 1 = the thought; Accent 2 = the tank
+        "vännen": 1,   // Accent 1 = the friend; Accent 2 = (context)
+        "måttet": 1,   // Accent 1 = the measure; Accent 2 = (context)
+        "ordet": 1,    // Accent 1 = the word; Accent 2 = (context)
+        "boken": 1,    // Accent 1 = the book; Accent 2 = (context)
+        "fisken": 1,   // Accent 1 = the fish; Accent 2 = (context)
+        "foten": 1,    // Accent 1 = the foot; Accent 2 = (context)
+        " handen": 1,  // Accent 1 = the hand; Accent 2 = (context)
+        "kaminen": 1,  // Accent 1 = the stove; Accent 2 = (context)
+        "stenen": 1,   // Accent 1 = the stone; Accent 2 = (context)
+        "tåget": 1,    // Accent 1 = the train; Accent 2 = (context)
+        "vägen": 1,    // Accent 1 = the road; Accent 2 = (context)
+        "gatan": 1,    // Accent 1 = the street; Accent 2 = (context)
+        "floden": 1,   // Accent 1 = the river; Accent 2 = (context)
+        "skogen": 1,   // Accent 1 = the forest; Accent 2 = (context)
+        "vinden": 1,   // Accent 1 = the wind; Accent 2 = (context)
+        "målet": 1,    // Accent 1 = the goal; Accent 2 = the meal
+        "fallet": 1,   // Accent 1 = the case; Accent 2 = the fall
+        "laget": 1,    // Accent 1 = the team; Accent 2 = the law
+        "bordet": 1,   // Accent 1 = the table
+        "huset": 1,    // Accent 1 = the house
+        "landet": 1,   // Accent 1 = the country
+        "vattnet": 1,  // Accent 1 = the water
+        "sol en": 1,   // Accent 1 = the sun
+        "månen": 1,    // Accent 1 = the moon
+        "stjärnan": 1, // Accent 1 = the star
+        "blomman": 1,  // Accent 1 = the flower
+        "trädet": 1,   // Accent 1 = the tree
+        "fågeln": 1,   // Accent 1 = the bird
+        " älgen": 1,   // Accent 1 = the moose
+        "björnen": 1,  // Accent 1 = the bear
+        "räven": 1,    // Accent 1 = the fox
+        "örnen": 1,    // Accent 1 = the eagle
+        // More accent 2 words (compounds, derivations)
+        "sjukhuset": 2, "flygplatsen": 2, "järnvägsstation": 2, "handelsområde": 2,
+        "utbildningsnivå": 2, "forskningresultat": 2, "arbetslöshet": 2, "bostadsområde": 2,
+        "miljöfråga": 2, "säkerhetspolitik": 2, "integrationsprocess": 2,
+        "klimatförändring": 2, "samhällsutveckling": 2, "sjukvårdsreform": 2,
+        "skolundervisning": 2, "näringslivspolitik": 2, "försvarsbeslut": 2,
+        "kulturverksamhet": 2, "idrottsförening": 2, "musikinstrument": 2,
+        "konstutställning": 2, "litteraturpris": 2, "teaterföreställning": 2,
+        "naturvetenskap": 2, "samhällsvetenskap": 2, "rättsvetenskap": 2,
+        "ekonomi": 2, "filosofi": 2, "historia": 2, "psykologi": 2, "sociologi": 2,
+        "antropologi": 2, "arkeologi": 2, "biologi": 2, "kemi": 2, "fysik": 2,
+        "matematik": 2, "statistik": 2, "geografi": 2, "geologi": 2, "astronomi": 2,
+        // Common Swedish words accent 2
+        "vackrare": 2, "vackrast": 2, "vackraste": 2, "snabbare": 2, "snabbast": 2,
+        "längre": 2, "längst": 2, "bättre": 2, "bäst": 2, "sämre": 2, "sämst": 2,
+        "mindre": 2, "minst": 2, "mer": 2, "mest": 2, "fler": 2, "flest": 2,
+        "större": 2, "störst": 2, "högre": 2, "högst": 2, "lägre": 2, "lägst": 2,
+        "tidigare": 2, "tidigast": 2, "senare": 2, "senast": 2, "nyare": 2, "nyast": 2,
+        "äldre": 2, "äldst": 2, "yngre": 2, "yngst": 2, "större": 2,
+        "springande": 2, "gående": 2, "kommande": 2, "boende": 2, "levande": 2,
+        "döende": 2, "troende": 2, "seende": 2, "hörande": 2, "talande": 2,
+        "skrivande": 2, "läsande": 2, "arbetande": 2, "tänkande": 2, "kännande": 2,
+        "förstående": 2, "lärande": 2, "undervisande": 2, "forskande": 2,
+        "utvecklande": 2, "skapande": 2, "byggande": 2, "förbättrande": 2,
+        // Additional common words — accent 1
+        "bror": 1, "syster": 1, "mor": 1, "far": 1, "son": 1, "dotter": 1,
+        "vän": 1, "kompis": 1, "granne": 1, "kollega": 1, "chef": 1, "elev": 1,
+        "vinter": 1, "sommar": 1, "vår": 1, "höst": 1, "morgon": 1, "kväll": 1,
+        "natt": 1, "eftermiddag": 1, "middag": 1, "frukost": 1, "lunch": 1,
+        "köttbullar": 2, "gravlax": 2, "prinsesstårta": 2, "kanelbulle": 2,
+        "folköl": 2, "läskedryck": 2, "smörgåstårta": 2, "rärakor": 2,
+        // More minimal pairs
+        "tomten": 2,   // Accent 2 = Santa/elf; Accent 1 = the plot/lot
+        "buren": 2,    // Accent 2 = the cage; Accent 1 = carried
+        "fången": 2,   // Accent 2 = the prisoner/lap; Accent 1 = captured
+        "stegen": 2,   // Accent 2 = the ladder; Accent 1 = the steps
+        "anden": 2,    // Accent 2 = the spirit; Accent 1 = the duck
+        "släkten": 2,  // Accent 2 = the clan; Accent 1 = the relative
+    ]
+
+    /// Pitch-accent homograph pairs for WSD disambiguation
+    private static let pitchAccentHomographPairs: [(word: String, accent1Meaning: String, accent2Meaning: String)] = [
+        ("anden", "anden (the duck)", "anden (the spirit/ghost)"),
+        ("tomten", "tomten (the plot/lot)", "tomten (Santa Claus/the elf)"),
+        ("buren", "buren (carried)", "buren (the cage)"),
+        ("fången", "fången (captured)", "fången (the prisoner/the lap)"),
+        ("stegen", "stegen (the steps)", "stegen (the ladder)"),
+        ("släkten", "släkten (the relative)", "släkten (the clan/family)"),
+        ("tanken", "tanken (the thought)", "tanken (the tank)"),
+        ("måttet", "måttet (the measure)", "måttet (context-dependent)"),
+        ("målet", "målet (the goal/target)", "målet (the meal/food)"),
+        ("fallet", "fallet (the case/matter)", "fallet (the fall/cascade)"),
+        ("laget", "laget (the team)", "laget (the law)"),
+    ]
+
+    /// Disambiguate pitch-accent homographs using context
+    func disambiguatePitchAccentHomograph(word: String, context: String) -> (accent: Int, meaning: String)? {
+        let lower = word.lowercased().trimmingCharacters(in: .punctuationCharacters)
+        let contextLower = context.lowercased()
+
+        for pair in Self.pitchAccentHomographPairs where pair.word == lower {
+            // Use context words to disambiguate
+            let accent1Words = pair.accent1Meaning.lowercased().components(separatedBy: .whitespaces)
+            let accent2Words = pair.accent2Meaning.lowercased().components(separatedBy: .whitespaces)
+
+            let contextWords = Set(contextLower.components(separatedBy: .whitespacesAndNewlines))
+            let a1Overlap = contextWords.intersection(accent1Words).count
+            let a2Overlap = contextWords.intersection(accent2Words).count
+
+            if a1Overlap > a2Overlap {
+                return (1, pair.accent1Meaning)
+            } else if a2Overlap > a1Overlap {
+                return (2, pair.accent2Meaning)
+            }
+            // If ambiguous, use the database default
+            if let defaultAccent = Self.pitchAccentDatabase[lower] {
+                return (defaultAccent, defaultAccent == 1 ? pair.accent1Meaning : pair.accent2Meaning)
+            }
+        }
+        return nil
+    }
+
+    // MARK: - Iteration 53: Orthographic Normalization
+
+    struct OrthographicNormalization {
+        let normalized: String
+        let changes: [OrthographicChange]
+        let compoundErrors: [CompoundError]
+        let normalizationScore: Double  // 0-1, how many changes were needed
+    }
+
+    struct OrthographicChange: Identifiable {
+        let id = UUID()
+        let original: String
+        let corrected: String
+        let type: OrthographicChangeType
+        let position: Int
+
+        enum OrthographicChangeType {
+            case dialectNormalization   // å→a, ä→e
+            case capitalizationFix
+            case commonMisspelling
+            case informalSpelling
+            case punctuationFix
+            case spacing
+        }
+    }
+
+    struct CompoundError: Identifiable {
+        let id = UUID()
+        let original: String
+        let corrected: String
+        let confidence: Double
+        let explanation: String
+    }
+
+    /// Common Swedish misspellings and their corrections
+    private static let commonMisspellings: [String: String] = [
+        "int": "inte", "ite": "inte", "itne": "inte",
+        "inget": "inget", "inggen": "ingen", "ingna": "inga",
+        "deff": "de", "demm": "dem", "dom": "de/dem",
+        "sen": "sedan", "åt": "att", "att": "att",
+        "får": "får", "får": "för", "for": "för",
+        "varfor": "varför", "därför": "därför",
+        "mycket": "mycket", "mycke": "mycket", "mykett": "mycket",
+        "bra": "bra", "bror": "bra",
+        "stor": "stor", "stoor": "stor",
+        "liten": "liten", "liiten": "liten",
+        "gammal": "gammal", "gammall": "gammal",
+        "idag": "idag", "i dag": "i dag",
+        "igår": "igår", "i går": "i går",
+        "imorgon": "imorgon", "i morgon": "i morgon",
+        "kanske": "kanske", "kanske": "kanske",
+        "tack": "tack", "takk": "tack",
+        "hej": "hej", "hejsan": "hejsan",
+        "snälla": "snälla", "snäla": "snälla",
+        "förlåt": "förlåt", "förlat": "förlåt",
+        "ursäkta": "ursäkta", "ursäka": "ursäkta",
+        "jag": "jag", "ja": "jag",
+        "det": "det", "de": "de",
+        "är": "är", "ar": "är",
+        "har": "har", "ahr": "har",
+        "med": "med", "medh": "med",
+        "men": "men", "mne": "men",
+        "och": "och", "ocj": "och", "ock": "och",
+        "att": "att", "at": "att",
+        "som": "som", "som": "som",
+        "till": "till", "til": "till",
+        "från": "från", "frn": "från",
+        "över": "över", "över": "över",
+        "under": "under", "under": "under",
+        "mellan": "mellan", "melllan": "mellan",
+        "genom": "genom", "genmo": "genom",
+        "efter": "efter", "efetr": "efter",
+        "före": "före", "före": "före",
+        "mot": "mot", "mott": "mot",
+        "hos": "hos", "hoss": "hos",
+        "bland": "bland", "balnd": "bland",
+        "utan": "utan", "utna": "utan",
+        "inom": "inom", "ino": "inom",
+    ]
+
+    /// Swedish dialect spelling patterns
+    private static let dialectSpellings: [String: String] = [
+        // Skånska: ä→e
+        "bäst": "bäst", "best": "bäst", "här": "här", "her": "här",
+        "värld": "värld", "verld": "värld", "fäst": "fäst", "fest": "fäst",
+        // Göteborgska specific
+        "a": "å", "o": "å",
+        // Norrländska
+        "in": "ing", "en": "ing",
+        // Finlandssvenska
+        "stycke": "sak", "gård": "gård",
+    ]
+
+    /// Detects särskrivning (compound words written separately — very common Swedish error)
+    private func detectSärskrivning(_ text: String) -> [CompoundError] {
+        var errors: [CompoundError] = []
+        let words = text.components(separatedBy: .whitespacesAndNewlines)
+            .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+            .filter { $0.count > 1 }
+
+        for i in 0..<(words.count - 1) {
+            let w1 = words[i].lowercased()
+            let w2 = words[i + 1].lowercased()
+
+            // Check if combining creates a known compound
+            let combined = w1 + w2
+            if Self.commonCompounds.contains(combined) || looksLikeValidCompound(combined) {
+                errors.append(CompoundError(
+                    original: "\(w1) \(w2)",
+                    corrected: combined,
+                    confidence: 0.7,
+                    explanation: "Särskrivning: '\(w1) \(w2)' bör skrivas ihop som '\(combined)'"
+                ))
+            }
+        }
+        return errors
+    }
+
+    /// Common Swedish compound words (for särskrivning detection)
+    private static let commonCompounds: Set<String> = [
+        "sjukhus", "flygplats", "järnväg", "handbok", "lärobok", "ordbok",
+        "dagstidning", "morgonrock", "kvällstidning", "nattklub",
+        "bostadshus", "affärsområde", "skolbarn", "barnbok",
+        "frukostbord", "middagsbjudning", "eftermiddagskaffe",
+        "högskola", "grundskola", "gymnasieskola", "folkshögskola",
+        "sjukvård", "hälsovård", "äldreomsorg", "barnomsorg",
+        "naturskydd", "miljöskydd", "datorkunskap", "språkkunskap",
+        "arbetstillfälle", "bostadsområde", "handelsområde",
+        "fritidshus", "sommarstuga", "vintersport", "fotbollslag",
+        " ishockey", "skidåkning", "simhall", "gymnastik",
+        "cykelväg", "bilväg", "gångväg", "järnvägsstation",
+        "busshållplats", "tågstation", "flygplats", "hamnområde",
+        "köksbord", "sovrum", "vardagsrum", "badrum", "arbetsrum",
+        "skrivbord", "läslampa", "soffbord", "matbord",
+        "kaffekopp", "tekopp", "vattenglas", "mjölkkanna",
+        "äppelträd", "björkträd", "granträd", "tallskog",
+        "äppeljuice", "apelsinjuice", "tranbärsjuice",
+        "fiskbullar", "köttbullar", "pannkaka", "chokladkaka",
+        "smörgåstårta", "prinsesstårta", "kladdkaka", "morotskaka",
+        "sommarlov", "sportlov", "påsklov", "jullov",
+        "hösttermin", "vårtermin", "terminsstart", "studiehandledning",
+        "dataspel", "brädspel", "kortspel", "pusselspel",
+        "mobiltelefon", "surfplatta", "bärbar_dator", "skrivare",
+    ]
+
+    private func looksLikeValidCompound(_ word: String) -> Bool {
+        // Heuristic: Swedish compounds are typically 6+ chars and contain two recognizable stems
+        guard word.count >= 6 else { return false }
+
+        // Try splitting at various points
+        for splitPoint in stride(from: 3, through: word.count - 3, by: 1) {
+            let part1 = String(word.prefix(splitPoint))
+            let part2 = String(word.suffix(word.count - splitPoint))
+
+            // Check if both parts look like Swedish word stems
+            let part1LooksSwedish = Self.commonSwedishStems.contains(where: { part1.hasPrefix($0) || $0.hasPrefix(part1) })
+            let part2LooksSwedish = Self.commonSwedishStems.contains(where: { part2.hasPrefix($0) || $0.hasPrefix(part2) })
+
+            if part1LooksSwedish && part2LooksSwedish && part1.count >= 2 && part2.count >= 2 {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Common Swedish word stems for compound detection
+    private static let commonSwedishStems: Set<String> = [
+        "bil", "hus", "stad", "land", "väg", "bok", "tid", "dag", "år", "månad",
+        "vecka", "skola", "arbete", "jobb", "kök", "rum", "dörr", "fönster",
+        "bord", "stol", "säng", "lamp", "vatten", "mjölk", "bröd", "smör",
+        "fisk", "kött", "frukt", "grönt", "kaffe", "te", "äpple", "päron",
+        "träd", "skog", "sjö", "hav", "berg", "dal", "äng", "mark",
+        "sol", "måne", "stjärn", "regn", "snö", "vind", "moln",
+        "barn", "man", "kvinna", "flick", "pojk", "vän", "familj",
+        "hand", "fot", "huvud", "öga", "öra", "mun", "näsa",
+        "dag", "natt", "morgon", "kväll", "eftermiddag",
+        "sommar", "vinter", "vår", "höst",
+        "stor", "liten", "bra", "dålig", "ny", "gammal", "ung", "röd",
+        "blå", "grön", "gul", "svart", "vit", "grå",
+        "spring", "gå", "kom", "ta", "ge", "se", "hör", "säg",
+        "skriv", "läs", "tänk", "känn", "arbete", "bo", "lev",
+        "sjuk", "frisk", "trött", "glad", "ledsen", "arg", "rädd",
+        "hund", "katt", "häst", "ko", "gris", "får", "fågel", "anka",
+        "färg", "form", "storlek", "vikt", "längd", "bredd", "höjd",
+        "data", "dator", "telefon", "nät", "app", "program", "system",
+    ]
+
+    func normalizeOrthography(text: String) -> OrthographicNormalization {
+        var current = text
+        var changes: [OrthographicChange] = []
+        var compoundErrors: [CompoundError] = []
+
+        // 1. Detect särskrivning (compound spelling errors)
+        compoundErrors = detectSärskrivning(text)
+
+        // Apply särskrivning corrections
+        for error in compoundErrors {
+            current = current.replacingOccurrences(of: error.original, with: error.corrected)
+        }
+
+        // 2. Common misspelling correction
+        let words = current.components(separatedBy: .whitespacesAndNewlines)
+        var correctedWords: [String] = []
+        for (idx, word) in words.enumerated() {
+            let lower = word.lowercased()
+            if let correction = Self.commonMisspellings[lower] {
+                changes.append(OrthographicChange(
+                    original: word, corrected: correction,
+                    type: .commonMisspelling, position: idx
+                ))
+                // Preserve capitalization pattern
+                if word.first?.isUppercase == true {
+                    correctedWords.append(correction.prefix(1).uppercased() + correction.dropFirst())
+                } else {
+                    correctedWords.append(correction)
+                }
+            } else {
+                correctedWords.append(word)
+            }
+        }
+        current = correctedWords.joined(separator: " ")
+
+        // 3. Capitalization fixes — sentence start
+        let sentences = current.components(separatedBy: CharacterSet(charactersIn: ".!?"))
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        var fixedSentences: [String] = []
+        for sentence in sentences {
+            if let first = sentence.first, first.isLowercase {
+                let fixed = sentence.prefix(1).uppercased() + sentence.dropFirst()
+                if fixed != sentence {
+                    changes.append(OrthographicChange(
+                        original: sentence, corrected: fixed,
+                        type: .capitalizationFix, position: 0
+                    ))
+                }
+                fixedSentences.append(fixed)
+            } else {
+                fixedSentences.append(sentence)
+            }
+        }
+        current = fixedSentences.joined(separator: ". ")
+
+        // Normalization score
+        let normalizationScore = min(1.0, Double(changes.count + compoundErrors.count) * 0.05)
+
+        return OrthographicNormalization(
+            normalized: current,
+            changes: changes,
+            compoundErrors: compoundErrors,
+            normalizationScore: normalizationScore
+        )
+    }
+
+    // MARK: - Iteration 54: Swedish Dialect Detection
+
+    struct DialectEstimate {
+        let text: String
+        let primaryDialect: SwedishDialect?
+        let dialectScores: [SwedishDialect: Double]
+        let markers: [DialectMarker]
+        let confidence: Double
+    }
+
+    enum SwedishDialect: String, CaseIterable {
+        case skanska = "Skånska"
+        case goteborgska = "Göteborgska"
+        case norrlandska = "Norrländska"
+        case finlandssvenska = "Finlandssvenska"
+        case stockholmska = "Stockholmska"
+        case rikssvenska = "Rikssvenska"  // Standard Swedish
+    }
+
+    struct DialectMarker: Identifiable {
+        let id = UUID()
+        let marker: String
+        let dialect: SwedishDialect
+        let type: DialectMarkerType
+        let position: Int
+
+        enum DialectMarkerType {
+            case vocabulary
+            case phonology
+            case morphology
+            case spelling
+            case slang
+        }
+    }
+
+    /// Skånska markers
+    private static let skanskaMarkers: [String: DialectMarker.DialectMarkerType] = [
+        "e": .spelling,        // ä→e: bäst→best
+        "ä": .spelling,        // Reduced ä usage
+        "va": .vocabulary,     // was→va
+        "här": .vocabulary,    // her
+        "nån": .spelling,      // någon
+        "ing": .spelling,      // -ing → -in
+        "på": .vocabulary,
+        "sö": .spelling,       // söder→sö
+    ]
+
+    /// Göteborgska markers
+    private static let goteborgskaMarkers: [String: DialectMarker.DialectMarkerType] = [
+        "ba": .slang,          // bara
+        "isch": .slang,        // exclamation
+        "w": .phonology,       // v→w: varit→warit
+        "a": .spelling,        // å→a: på→pa
+        "ska": .vocabulary,    // distinctive usage
+        "korv": .vocabulary,   // korvmoj
+        "moj": .vocabulary,
+        "dä": .spelling,       // det→dä
+        "bär": .vocabulary,
+    ]
+
+    /// Norrländska markers
+    private static let norrlandskaMarkers: [String: DialectMarker.DialectMarkerType] = [
+        "in": .morphology,     // -ing→-in: spring→sprin
+        "å": .vocabulary,      // och→å
+        "hitåt": .vocabulary,
+        "ditåt": .vocabulary,
+        "backe": .vocabulary,
+        "bygd": .vocabulary,
+        "fäbod": .vocabulary,
+        "palt": .vocabulary,
+        "rörk": .vocabulary,
+        "kams": .vocabulary,
+        "ren": .vocabulary,    // reindeer context
+        "fjäll": .vocabulary,
+        "skoter": .vocabulary,
+    ]
+
+    /// Finlandssvenska markers
+    private static let finlandssvenskaMarkers: [String: DialectMarker.DialectMarkerType] = [
+        "stycke": .vocabulary,   // thing (standard: sak)
+        "gård": .vocabulary,     // yard
+        "hugga": .vocabulary,    // cut (standard: hugga/kapa)
+        "långhals": .vocabulary,
+        "stadin": .vocabulary,
+        "åboland": .vocabulary,
+        "nyland": .vocabulary,
+        "pik": .vocabulary,      // stick (standard: pinne)
+        "knappis": .vocabulary,  // button
+        "färja": .vocabulary,
+        "skärgård": .vocabulary,
+        "kaffi": .spelling,      // kaffe→kaffi
+        "mycke": .spelling,      // mycket→mycke
+        "ku": .spelling,         // hur→ku
+    ]
+
+    /// Stockholmska (urban slang) markers
+    private static let stockholmskaMarkers: [String: DialectMarker.DialectMarkerType] = [
+        "tja": .slang,           // greeting
+        "tjabba": .slang,
+        "tjena": .slang,
+        "tjene": .slang,
+        "guzz": .slang,
+        "blä": .slang,
+        "shyy": .slang,
+        "wallah": .slang,
+        "habibi": .slang,
+        "lan": .slang,           // slang for "man"
+        "bror": .slang,
+        "ey": .slang,
+        "förort": .slang,
+        "snurr": .slang,
+        "pang": .slang,
+        "sug": .slang,
+        "dryg": .slang,
+        "crispig": .slang,
+    ]
+
+    func detectDialect(text: String) -> DialectEstimate {
+        let lower = text.lowercased()
+        let words = lower.components(separatedBy: .whitespacesAndNewlines)
+            .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+            .filter { !$0.isEmpty }
+        var markers: [DialectMarker] = []
+        var scores: [SwedishDialect: Double] = Dictionary(uniqueKeysWithValues: SwedishDialect.allCases.map { ($0, 0.0) })
+
+        // Check each word against dialect markers
+        for (idx, word) in words.enumerated() {
+            // Skånska
+            for (marker, type) in Self.skanskaMarkers {
+                if word == marker || (marker.count >= 3 && word.hasPrefix(marker)) {
+                    scores[.skanska, default: 0] += 1.0
+                    markers.append(DialectMarker(marker: word, dialect: .skanska, type: type, position: idx))
+                }
+            }
+            // Göteborgska
+            for (marker, type) in Self.goteborgskaMarkers {
+                if word == marker || (marker.count >= 3 && word.hasPrefix(marker)) {
+                    scores[.goteborgska, default: 0] += 1.0
+                    markers.append(DialectMarker(marker: word, dialect: .goteborgska, type: type, position: idx))
+                }
+            }
+            // Norrländska
+            for (marker, type) in Self.norrlandskaMarkers {
+                if word == marker || (marker.count >= 3 && word.hasPrefix(marker)) {
+                    scores[.norrlandska, default: 0] += 1.0
+                    markers.append(DialectMarker(marker: word, dialect: .norrlandska, type: type, position: idx))
+                }
+            }
+            // Finlandssvenska
+            for (marker, type) in Self.finlandssvenskaMarkers {
+                if word == marker || (marker.count >= 3 && word.hasPrefix(marker)) {
+                    scores[.finlandssvenska, default: 0] += 1.0
+                    markers.append(DialectMarker(marker: word, dialect: .finlandssvenska, type: type, position: idx))
+                }
+            }
+            // Stockholmska
+            for (marker, type) in Self.stockholmskaMarkers {
+                if word == marker || (marker.count >= 3 && word.hasPrefix(marker)) {
+                    scores[.stockholmska, default: 0] += 1.0
+                    markers.append(DialectMarker(marker: word, dialect: .stockholmska, type: type, position: idx))
+                }
+            }
+        }
+
+        // Normalize scores
+        let maxScore = scores.values.max() ?? 0
+        if maxScore > 0 {
+            for key in scores.keys {
+                scores[key] = scores[key]! / max(maxScore, 1.0)
+            }
+        }
+
+        // Determine primary dialect
+        let sorted = scores.sorted { $0.value > $1.value }
+        let primaryDialect: SwedishDialect?
+        if let first = sorted.first, first.value > 0.2 {
+            primaryDialect = first.key
+        } else {
+            primaryDialect = .rikssvenska
+        }
+
+        let confidence = sorted.first?.value ?? 0
+
+        return DialectEstimate(
+            text: text,
+            primaryDialect: primaryDialect,
+            dialectScores: scores,
+            markers: markers,
+            confidence: confidence
+        )
+    }
+
+    // MARK: - Iteration 55: Prosody and Rhythm Analysis
+
+    struct ProsodyAnalysis {
+        let text: String
+        let sentenceLengthVariation: Double    // Coefficient of variation
+        let averageSentenceLength: Double
+        let punctuationPattern: PunctuationAnalysis
+        let emphasisMarkers: [EmphasisMarker]
+        let readingEaseScore: Double           // Adapted for Swedish (Läsbarhetsindex)
+        let rhythmQuality: RhythmQuality
+        let prosodyScore: Double               // Overall 0-1
+    }
+
+    struct PunctuationAnalysis {
+        let commaCount: Int
+        let periodCount: Int
+        let exclamationCount: Int
+        let questionCount: Int
+        let semicolonCount: Int
+        let dashCount: Int
+        let pauseDensity: Double               // Punctuation per word
+    }
+
+    struct EmphasisMarker: Identifiable {
+        let id = UUID()
+        let type: EmphasisType
+        let text: String
+        let position: Int
+
+        enum EmphasisType {
+            case capitalization
+            case exclamation
+            case repetition
+            case elongation     // "supeeeer"
+            case intensifier    // "väldigt", "jätte"
+        }
+    }
+
+    enum RhythmQuality: String {
+        case monotonous = "Monoton"
+        case moderate = "Måttlig variation"
+        case good = "God variation"
+        case excellent = "Utmärkt prosodi"
+    }
+
+    /// Swedish intensifiers
+    private static let swedishIntensifiers: Set<String> = [
+        "väldigt", "mycket", "jätte", "extremt", "oerhört", "fruktansvärt",
+        "otroligt", "fantastiskt", "super", "extra", "särskilt", "helt",
+        "fullständigt", "totalt", "absolut", "verkligen", "riktigt",
+    ]
+
+    func analyzeProsody(text: String) -> ProsodyAnalysis {
+        let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?"))
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+
+        // Sentence length variation
+        let sentenceLengths = sentences.map { s in
+            s.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.count
+        }
+        let avgLength = sentenceLengths.isEmpty ? 0.0 : Double(sentenceLengths.reduce(0, +)) / Double(sentenceLengths.count)
+        let variance = sentenceLengths.isEmpty ? 0.0 :
+            sentenceLengths.map { pow(Double($0) - avgLength, 2) }.reduce(0, +) / Double(sentenceLengths.count)
+        let stdDev = sqrt(variance)
+        let cv = avgLength > 0 ? stdDev / avgLength : 0.0  // Coefficient of variation
+
+        // Punctuation analysis
+        let commaCount = text.components(separatedBy: ",").count - 1
+        let periodCount = text.components(separatedBy: ".").count - 1
+        let exclamationCount = text.components(separatedBy: "!").count - 1
+        let questionCount = text.components(separatedBy: "?").count - 1
+        let semicolonCount = text.components(separatedBy: ";").count - 1
+        let dashCount = text.components(separatedBy: "—").count + text.components(separatedBy: "-").count - 1
+
+        let totalWords = text.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.count
+        let totalPunctuation = commaCount + periodCount + exclamationCount + questionCount + semicolonCount + max(0, dashCount)
+        let pauseDensity = totalWords > 0 ? Double(totalPunctuation) / Double(totalWords) : 0.0
+
+        let punctuationAnalysis = PunctuationAnalysis(
+            commaCount: commaCount, periodCount: periodCount,
+            exclamationCount: exclamationCount, questionCount: questionCount,
+            semicolonCount: semicolonCount, dashCount: max(0, dashCount),
+            pauseDensity: pauseDensity
+        )
+
+        // Emphasis markers
+        var emphasisMarkers: [EmphasisMarker] = []
+        let words = text.components(separatedBy: .whitespacesAndNewlines)
+
+        for (idx, word) in words.enumerated() {
+            // All caps (not single letters)
+            if word.count > 1 && word.allSatisfy({ $0.isUppercase }) && word.rangeOfCharacter(from: .letters) != nil {
+                emphasisMarkers.append(EmphasisMarker(type: .capitalization, text: word, position: idx))
+            }
+            // Exclamation
+            if word.hasSuffix("!") {
+                emphasisMarkers.append(EmphasisMarker(type: .exclamation, text: word, position: idx))
+            }
+            // Repetition detection
+            if idx > 0 && word.lowercased().trimmingCharacters(in: .punctuationCharacters) ==
+               words[idx - 1].lowercased().trimmingCharacters(in: .punctuationCharacters) {
+                emphasisMarkers.append(EmphasisMarker(type: .repetition, text: word, position: idx))
+            }
+            // Elongation (repeated characters: "supeeer")
+            let cleaned = word.lowercased().trimmingCharacters(in: .punctuationCharacters)
+            if cleaned.count >= 4 {
+                var hasElongation = false
+                for i in 0..<(cleaned.count - 2) {
+                    let c1 = cleaned[cleaned.index(cleaned.startIndex, offsetBy: i)]
+                    let c2 = cleaned[cleaned.index(cleaned.startIndex, offsetBy: i + 1)]
+                    let c3 = cleaned[cleaned.index(cleaned.startIndex, offsetBy: i + 2)]
+                    if c1 == c2 && c2 == c3 {
+                        hasElongation = true
+                        break
+                    }
+                }
+                if hasElongation {
+                    emphasisMarkers.append(EmphasisMarker(type: .elongation, text: word, position: idx))
+                }
+            }
+            // Intensifiers
+            if Self.swedishIntensifiers.contains(cleaned) {
+                emphasisMarkers.append(EmphasisMarker(type: .intensifier, text: word, position: idx))
+            }
+        }
+
+        // Swedish reading ease score (adapted LIX)
+        // LIX = (words/sentences) + (long_words * 100 / words)
+        // Long words = 7+ characters
+        let longWords = words.filter { w in w.trimmingCharacters(in: .punctuationCharacters).count >= 7 }.count
+        let wordCount = max(1, words.count)
+        let sentenceCount = max(1, sentences.count)
+        let readingEase = Double(wordCount) / Double(sentenceCount) + (Double(longWords) * 100.0 / Double(wordCount))
+        // Normalize to 0-1 (LIX typically ranges 20-60)
+        let normalizedReadingEase = max(0.0, min(1.0, 1.0 - (readingEase - 20) / 40))
+
+        // Rhythm quality
+        let rhythmQuality: RhythmQuality
+        if cv < 0.15 {
+            rhythmQuality = .monotonous
+        } else if cv < 0.35 {
+            rhythmQuality = .moderate
+        } else if cv < 0.6 {
+            rhythmQuality = .good
+        } else {
+            rhythmQuality = .excellent
+        }
+
+        // Overall prosody score
+        let rhythmScore = min(1.0, cv * 1.5)
+        let punctuationScore = min(1.0, pauseDensity * 5.0)
+        let prosodyScore = rhythmScore * 0.4 + punctuationScore * 0.3 + normalizedReadingEase * 0.3
+
+        return ProsodyAnalysis(
+            text: text,
+            sentenceLengthVariation: cv,
+            averageSentenceLength: avgLength,
+            punctuationPattern: punctuationAnalysis,
+            emphasisMarkers: emphasisMarkers,
+            readingEaseScore: normalizedReadingEase,
+            rhythmQuality: rhythmQuality,
+            prosodyScore: prosodyScore
+        )
+    }
+
+    // MARK: - Iteration 56: Numerical and Mathematical Language
+
+    struct NumericalAnalysis {
+        let text: String
+        let numbers: [NumberInfo]
+        let dates: [DateInfo]
+        let measurements: [MeasurementInfo]
+        let percentages: [PercentageInfo]
+        let fractions: [FractionInfo]
+        let numericalComplexity: Double
+        let mathematicalExpressions: [String]
+    }
+
+    struct NumberInfo: Identifiable {
+        let id = UUID()
+        let original: String
+        let value: Double
+        let type: NumberType
+
+        enum NumberType {
+            case cardinal     // ett, två, tre
+            case ordinal      // första, andra, tredje
+        }
+    }
+
+    struct DateInfo: Identifiable {
+        let id = UUID()
+        let original: String
+        let resolvedDate: Date?
+        let format: DateFormat
+    }
+
+    enum DateFormat: String {
+        case iso = "ISO"              // 2024-01-15
+        case written = "Written"      // den 15 januari 2024
+        case relative = "Relative"    // i morgon, förra veckan
+    }
+
+    struct MeasurementInfo: Identifiable {
+        let id = UUID()
+        let value: Double
+        let unit: String
+        let original: String
+    }
+
+    struct PercentageInfo: Identifiable {
+        let id = UUID()
+        let value: Double
+        let original: String
+    }
+
+    struct FractionInfo: Identifiable {
+        let id = UUID()
+        let numerator: Int
+        let denominator: Int
+        let original: String
+    }
+
+    /// Swedish cardinal number words
+    private static let cardinalNumbers: [String: Double] = [
+        "noll": 0, "ett": 1, "en": 1, "två": 2, "tre": 3, "fyra": 4, "fem": 5,
+        "sex": 6, "sju": 7, "åtta": 8, "nio": 9, "tio": 10,
+        "elva": 11, "tolv": 12, "tretton": 13, "fjorton": 14, "femton": 15,
+        "sexton": 16, "sjutton": 17, "arton": 18, "nitton": 19, "tjugo": 20,
+        "tjugoen": 21, "tjugoett": 21, "tjugotvå": 22, "tjugotre": 23, "tjugofyra": 24,
+        "tjugofem": 25, "tjugosex": 26, "tjugosju": 27, "tjugoåtta": 28, "tjugonio": 29,
+        "trettio": 30, "fyrtio": 40, "femtio": 50, "sextio": 60, "sjuttio": 70,
+        "åttio": 80, "nittio": 90, "hundra": 100, "tusen": 1000,
+        "miljon": 1_000_000, "miljard": 1_000_000_000,
+    ]
+
+    /// Swedish ordinal number words
+    private static let ordinalNumbers: [String: Int] = [
+        "första": 1, "andre": 2, "andra": 2, "tredje": 3, "fjärde": 4, "femte": 5,
+        "sjätte": 6, "sjunde": 7, "åttonde": 8, "nionde": 9, "tionde": 10,
+        "elfte": 11, "tolfte": 12, "trettonde": 13, "fjortonde": 14, "femtonde": 15,
+        "tjugonde": 20, "tjugoförsta": 21, "trettionde": 30,
+        "hundrade": 100, "tusende": 1000,
+    ]
+
+    /// Swedish month names
+    private static let swedishMonths: [String: Int] = [
+        "januari": 1, "februari": 2, "mars": 3, "april": 4, "maj": 5, "juni": 6,
+        "juli": 7, "augusti": 8, "september": 9, "oktober": 10, "november": 11, "december": 12,
+    ]
+
+    /// Swedish measurement units
+    private static let measurementUnits: Set<String> = [
+        "meter", "m", "kilometer", "km", "centimeter", "cm", "millimeter", "mm",
+        "kilogram", "kg", "gram", "g", "ton",
+        "liter", "l", "deciliter", "dl", "centiliter", "cl", "milliliter", "ml",
+        "kvadratmeter", "m²", "kvadratkilometer",
+        "sekund", "s", "minut", "min", "timme", "timmar", "h",
+        "celsius", "°C", "fahrenheit", "°F", "kelvin", "K",
+        "procent", "%", "kr", "kronor", "öre", "euro",
+        "meter per sekund", "km/h", "km/tim",
+    ]
+
+    /// Swedish fraction words
+    private static let fractionWords: [String: (Int, Int)] = [
+        "halv": (1, 2), "halva": (1, 2), "hälften": (1, 2),
+        "tredjedel": (1, 3), "tredjedelar": (1, 3),
+        "fjärdedel": (1, 4), "fjärdedelar": (1, 4), "kvart": (1, 4),
+        "femtedel": (1, 5), "sjättedel": (1, 6),
+        "tiondel": (1, 10), "hundradel": (1, 100), "tusendel": (1, 1000),
+        "tredjedel": (1, 3), "två tredjedelar": (2, 3),
+        "en fjärdedel": (1, 4), "tre fjärdedelar": (3, 4),
+        "en och en halv": (3, 2), "två och en halv": (5, 2),
+    ]
+
+    func analyzeNumericalLanguage(text: String) -> NumericalAnalysis {
+        let lower = text.lowercased()
+        let words = lower.components(separatedBy: .whitespacesAndNewlines)
+            .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+            .filter { !$0.isEmpty }
+
+        var numbers: [NumberInfo] = []
+        var dates: [DateInfo] = []
+        var measurements: [MeasurementInfo] = []
+        var percentages: [PercentageInfo] = []
+        var fractions: [FractionInfo] = []
+        var mathExpressions: [String] = []
+
+        // Detect digit numbers
+        let digitPattern = try? NSRegularExpression(pattern: "[\\d]+[,.]?[\\d]*")
+        if let matches = digitPattern?.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+            for match in matches {
+                let numStr = String(text[Range(match.range, in: text)!])
+                let normalized = numStr.replacingOccurrences(of: ",", with: ".")
+                if let value = Double(normalized) {
+                    numbers.append(NumberInfo(original: numStr, value: value, type: .cardinal))
+                }
+            }
+        }
+
+        // Detect cardinal number words
+        for word in words {
+            if let value = Self.cardinalNumbers[word] {
+                numbers.append(NumberInfo(original: word, value: value, type: .cardinal))
+            }
+            if let value = Self.ordinalNumbers[word] {
+                numbers.append(NumberInfo(original: word, value: Double(value), type: .ordinal))
+            }
+        }
+
+        // Detect dates in ISO format: 2024-01-15
+        let isoDatePattern = try? NSRegularExpression(pattern: "\\d{4}-\\d{2}-\\d{2}")
+        if let matches = isoDatePattern?.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+            for match in matches {
+                let dateStr = String(text[Range(match.range, in: text)!])
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd"
+                formatter.locale = Locale(identifier: "sv_SE")
+                let parsedDate = formatter.date(from: dateStr)
+                dates.append(DateInfo(original: dateStr, resolvedDate: parsedDate, format: .iso))
+            }
+        }
+
+        // Detect written dates: den 15 januari 2024
+        let writtenDatePattern = try? NSRegularExpression(pattern: "den\\s+\\d{1,2}\\s+(januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december)(?:\\s+\\d{4})?", options: .caseInsensitive)
+        if let matches = writtenDatePattern?.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+            for match in matches {
+                let dateStr = String(text[Range(match.range, in: text)!])
+                dates.append(DateInfo(original: dateStr, resolvedDate: nil, format: .written))
+            }
+        }
+
+        // Detect percentages
+        let pctPattern = try? NSRegularExpression(pattern: "[\\d]+[,.]?[\\d]*\\s*%")
+        if let matches = pctPattern?.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+            for match in matches {
+                let pctStr = String(text[Range(match.range, in: text)!])
+                let numPart = pctStr.replacingOccurrences(of: "%", with: "").replacingOccurrences(of: ",", with: ".").trimmingCharacters(in: .whitespaces)
+                if let value = Double(numPart) {
+                    percentages.append(PercentageInfo(value: value, original: pctStr))
+                }
+            }
+        }
+
+        // Detect fractions
+        for word in words {
+            if let (num, den) = Self.fractionWords[word] {
+                fractions.append(FractionInfo(numerator: num, denominator: den, original: word))
+            }
+        }
+
+        // Detect measurements
+        for (i, word) in words.enumerated() {
+            if Self.measurementUnits.contains(word) {
+                // Look for preceding number
+                if i > 0 {
+                    let prevWord = words[i - 1]
+                    let normalized = prevWord.replacingOccurrences(of: ",", with: ".")
+                    if let value = Double(normalized) {
+                        measurements.append(MeasurementInfo(value: value, unit: word, original: "\(prevWord) \(word)"))
+                    }
+                }
+            }
+        }
+
+        // Detect mathematical expressions (contains operators)
+        if text.contains("+") || text.contains("-") || text.contains("*") || text.contains("/") || text.contains("=") || text.contains("^") {
+            let exprs = text.components(separatedBy: .whitespacesAndNewlines)
+                .filter { $0.contains("+") || $0.contains("-") || $0.contains("*") || $0.contains("/") || $0.contains("=") }
+            mathExpressions = exprs
+        }
+
+        // Numerical complexity
+        let totalNumerical = numbers.count + dates.count + measurements.count + percentages.count + fractions.count + mathExpressions.count
+        let numericalComplexity = min(1.0, Double(totalNumerical) * 0.2)
+
+        return NumericalAnalysis(
+            text: text,
+            numbers: numbers,
+            dates: dates,
+            measurements: measurements,
+            percentages: percentages,
+            fractions: fractions,
+            numericalComplexity: numericalComplexity,
+            mathematicalExpressions: mathExpressions
+        )
+    }
+
+    // MARK: - Iteration 57: Temporal Expression Resolution
+
+    struct TemporalResolution: Identifiable {
+        let id = UUID()
+        let original: String
+        let type: TemporalType
+        let resolvedDate: Date?
+        let resolvedInterval: (start: Date?, end: Date?)?
+        let confidence: Double
+
+        enum TemporalType {
+            case relativeTime      // i morgon, i går
+            case absoluteTime      // 2024-01-15, den 15 januari
+            case duration          // i tre timmar, under en månad
+            case frequency         // varje dag, tre gånger i veckan
+        }
+    }
+
+    /// Swedish relative temporal expressions
+    private static let relativeTimeExpressions: [String: (component: Calendar.Component, value: Int)] = [
+        "i morgon": (.day, 1),
+        "imorgon": (.day, 1),
+        "i går": (.day, -1),
+        "igår": (.day, -1),
+        "i förrgår": (.day, -2),
+        "iförrgår": (.day, -2),
+        "i övermorgon": (.day, 2),
+        "iövermorgon": (.day, 2),
+        "nästa vecka": (.weekOfYear, 1),
+        "förra veckan": (.weekOfYear, -1),
+        "denna vecka": (.weekOfYear, 0),
+        "nästa månad": (.month, 1),
+        "förra månaden": (.month, -1),
+        "denna månad": (.month, 0),
+        "nästa år": (.year, 1),
+        "förra året": (.year, -1),
+        "i år": (.year, 0),
+        "i dag": (.day, 0),
+        "idag": (.day, 0),
+        "i natt": (.day, 0),
+        "inatt": (.day, 0),
+        "i kväll": (.day, 0),
+        "ikväll": (.day, 0),
+        "i morse": (.day, 0),
+        "imorse": (.day, 0),
+        "häromdagen": (.day, -3),
+        "för en vecka sedan": (.weekOfYear, -1),
+        "för två veckor sedan": (.weekOfYear, -2),
+        "för en månad sedan": (.month, -1),
+        "för ett år sedan": (.year, -1),
+        "för två år sedan": (.year, -2),
+        "om en vecka": (.weekOfYear, 1),
+        "om två veckor": (.weekOfYear, 2),
+        "om en månad": (.month, 1),
+        "om ett år": (.year, 1),
+    ]
+
+    /// Swedish duration expressions
+    private static let durationExpressions: [String: (component: Calendar.Component, value: Int)] = [
+        "en sekund": (.second, 1),
+        "två sekunder": (.second, 2),
+        "tre sekunder": (.second, 3),
+        "en minut": (.minute, 1),
+        "två minuter": (.minute, 2),
+        "tre minuter": (.minute, 3),
+        "fem minuter": (.minute, 5),
+        "tio minuter": (.minute, 10),
+        "tjugo minuter": (.minute, 20),
+        "trettio minuter": (.minute, 30),
+        "en timme": (.hour, 1),
+        "två timmar": (.hour, 2),
+        "tre timmar": (.hour, 3),
+        "fyra timmar": (.hour, 4),
+        "fem timmar": (.hour, 5),
+        "sex timmar": (.hour, 6),
+        "en dag": (.day, 1),
+        "två dagar": (.day, 2),
+        "tre dagar": (.day, 3),
+        "fyra dagar": (.day, 4),
+        "fem dagar": (.day, 5),
+        "en vecka": (.weekOfYear, 1),
+        "två veckor": (.weekOfYear, 2),
+        "tre veckor": (.weekOfYear, 3),
+        "en månad": (.month, 1),
+        "två månader": (.month, 2),
+        "tre månader": (.month, 3),
+        "sex månader": (.month, 6),
+        "ett år": (.year, 1),
+        "två år": (.year, 2),
+        "tre år": (.year, 3),
+        "fem år": (.year, 5),
+        "tio år": (.year, 10),
+    ]
+
+    /// Swedish frequency expressions
+    private static let frequencyExpressions: [String: (count: Int, period: String)] = [
+        "varje dag": (1, "day"),
+        "varannan dag": (1, "2days"),
+        "var tredje dag": (1, "3days"),
+        "varje vecka": (1, "week"),
+        "varannan vecka": (1, "2weeks"),
+        "varje månad": (1, "month"),
+        "varje år": (1, "year"),
+        "varje timme": (1, "hour"),
+        "en gång om dagen": (1, "day"),
+        "två gånger om dagen": (2, "day"),
+        "tre gånger om dagen": (3, "day"),
+        "en gång i veckan": (1, "week"),
+        "två gånger i veckan": (2, "week"),
+        "tre gånger i veckan": (3, "week"),
+        "en gång i månaden": (1, "month"),
+        "två gånger i månaden": (2, "month"),
+        "en gång om året": (1, "year"),
+        "dagligen": (1, "day"),
+        "veckovis": (1, "week"),
+        "månadsvis": (1, "month"),
+        "årligen": (1, "year"),
+        "många gånger": (-1, "unknown"),
+        "flera gånger": (-1, "unknown"),
+        "sällan": (-1, "rarely"),
+        "aldrig": (0, "never"),
+        "alltid": (-1, "always"),
+        "ofta": (-1, "often"),
+    ]
+
+    func resolveTemporalExpressions(text: String) -> [TemporalResolution] {
+        var results: [TemporalResolution] = []
+        let lower = text.lowercased()
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date()
+
+        // Relative time expressions
+        for (expression, offset) in Self.relativeTimeExpressions {
+            if lower.contains(expression) {
+                let resolvedDate = calendar.date(byAdding: offset.component, value: offset.value, to: now)
+                results.append(TemporalResolution(
+                    original: expression,
+                    type: .relativeTime,
+                    resolvedDate: resolvedDate,
+                    resolvedInterval: nil,
+                    confidence: 0.9
+                ))
+            }
+        }
+
+        // Absolute dates (ISO format)
+        let isoDatePattern = try? NSRegularExpression(pattern: "\\d{4}-\\d{2}-\\d{2}")
+        if let matches = isoDatePattern?.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+            for match in matches {
+                let dateStr = String(text[Range(match.range, in: text)!])
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd"
+                formatter.locale = Locale(identifier: "sv_SE")
+                let resolvedDate = formatter.date(from: dateStr)
+                results.append(TemporalResolution(
+                    original: dateStr,
+                    type: .absoluteTime,
+                    resolvedDate: resolvedDate,
+                    resolvedInterval: nil,
+                    confidence: 0.95
+                ))
+            }
+        }
+
+        // Written dates
+        let writtenDatePattern = try? NSRegularExpression(pattern: "den\\s+\\d{1,2}\\s+(januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december)(?:\\s+\\d{4})?", options: .caseInsensitive)
+        if let matches = writtenDatePattern?.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+            for match in matches {
+                let dateStr = String(text[Range(match.range, in: text)!])
+                // Try to parse
+                let formatter = DateFormatter()
+                formatter.dateFormat = "'den' dd MMMM yyyy"
+                formatter.locale = Locale(identifier: "sv_SE")
+                var resolvedDate = formatter.date(from: dateStr)
+                if resolvedDate == nil {
+                    formatter.dateFormat = "'den' dd MMMM"
+                    resolvedDate = formatter.date(from: dateStr)
+                }
+                results.append(TemporalResolution(
+                    original: dateStr,
+                    type: .absoluteTime,
+                    resolvedDate: resolvedDate,
+                    resolvedInterval: nil,
+                    confidence: 0.85
+                ))
+            }
+        }
+
+        // Duration expressions
+        for (expression, duration) in Self.durationExpressions {
+            if lower.contains(expression) {
+                let startDate = now
+                let endDate = calendar.date(byAdding: duration.component, value: duration.value, to: now)
+                results.append(TemporalResolution(
+                    original: expression,
+                    type: .duration,
+                    resolvedDate: nil,
+                    resolvedInterval: (start: startDate, end: endDate),
+                    confidence: 0.8
+                ))
+            }
+        }
+
+        // Frequency expressions
+        for (expression, freq) in Self.frequencyExpressions {
+            if lower.contains(expression) {
+                results.append(TemporalResolution(
+                    original: expression,
+                    type: .frequency,
+                    resolvedDate: nil,
+                    resolvedInterval: nil,
+                    confidence: 0.7
+                ))
+            }
+        }
+
+        return results
+    }
+
+    // MARK: - Iteration 58: Negation Scope Detection
+
+    struct NegationScope: Identifiable {
+        let id = UUID()
+        let negationMarker: String
+        let markerType: NegationType
+        let position: Int                // Word index of negation
+        let scopeStart: Int              // Start of what is negated
+        let scopeEnd: Int                // End of what is negated
+        let negatedText: String
+        let confidence: Double
+
+        enum NegationType: String {
+            case preVerbal       // inte before verb
+            case postVerbal      // inte after verb
+            case doubleNegation  // dialectal double negation
+            case compoundNegation // negation in compound
+            case subordinateClause // negation in subordinate clause
+        }
+    }
+
+    /// Swedish negation markers
+    private static let negationMarkers: Set<String> = [
+        "inte", "ej", "icke", "ingen", "inget", "inga",
+        "aldrig", "varken", "knappast", "föga", "knappast",
+        "ingalunda", "absolut inte", "alls inte", "inte heller",
+        "inte ens", "inte längre", "inte heller",
+        "varke", "varken",
+        "ingenting", "ingendera", "ingenstans", "ingens",
+    ]
+
+    /// Swedish verbs (for scope determination)
+    private static let commonVerbs: Set<String> = [
+        "är", "var", "blir", "blir", "har", "hade", "ska", "skulle",
+        "kan", "kunde", "måste", "bör", "borde", "får", "fick",
+        "vill", "ville", "går", "gick", "kommer", "kom",
+        "gör", "gjorde", "säger", "sa", "sa", "tycker", "tyckte",
+        "tror", "trodde", "vet", "visste", "ser", "såg",
+        "har", "hade", "tagit", "gett", "fått",
+        "springer", "sprang", "springit",
+        "äta", "äter", "åt", "ätit",
+        "sova", "sover", "sov", "sovit",
+        "läsa", "läser", "läste", "läst",
+        "skriva", "skriver", "skrev", "skrivit",
+        "tänka", "tänker", "tänkte", "tänkt",
+        "känna", "känner", "kände", "känt",
+        "arbeta", "arbetar", "arbetade", "arbetat",
+        "bo", "bor", "bodde", "bott",
+        "ha", "hade", "haft",
+        "göra", "gör", "gjorde", "gjort",
+        "säga", "säger", "sa", "sagt",
+        "komma", "kommer", "kom", "kommit",
+        "gå", "går", "gick", "gått",
+        "få", "får", "fick", "fått",
+        "veta", "vet", "visste", "vetat",
+        "se", "ser", "såg", "sett",
+        "höra", "hör", "hörde", "hört",
+        "tala", "talar", "talade", "talat",
+        "prata", "pratar", "pratade", "prat",
+    ]
+
+    /// Swedish subordinators (for subordinate clause scope)
+    private static let temporalSubordinators: Set<String> = [
+        "att", "som", "om", "när", "medan", "eftersom", "trots", "fast", "innan",
+        "efter", "tills", "såvida", "huruvida", "ifall",
+    ]
+
+    func analyzeNegationScope(text: String) -> [NegationScope] {
+        let words = text.components(separatedBy: .whitespacesAndNewlines)
+            .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+            .filter { !$0.isEmpty }
+        var scopes: [NegationScope] = []
+
+        for (idx, word) in words.enumerated() {
+            guard Self.negationMarkers.contains(word.lowercased()) else { continue }
+
+            let lowerWord = word.lowercased()
+            let negationType: NegationScope.NegationType
+
+            // Determine negation type
+            if idx > 0 && Self.commonVerbs.contains(words[idx - 1].lowercased()) {
+                // Post-verbal negation (most common in Swedish main clauses)
+                negationType = .postVerbal
+            } else if idx + 1 < words.count && Self.commonVerbs.contains(words[idx + 1].lowercased()) {
+                // Pre-verbal negation (less common)
+                negationType = .preVerbal
+            } else {
+                // Determine if in subordinate clause
+                let precedingWords = words.prefix(idx).map { $0.lowercased() }
+                let inSubordinate = precedingWords.contains { Self.temporalSubordinators.contains($0) }
+                if inSubordinate {
+                    negationType = .subordinateClause
+                } else {
+                    negationType = .postVerbal // Default for Swedish
+                }
+            }
+
+            // Determine scope: from negation to end of clause/sentence
+            var scopeEnd = words.count - 1
+            // Find end of current clause (next comma, period, or subordinator)
+            for i in (idx + 1)..<words.count {
+                let w = words[i]
+                if w == "," || w == "." || w == "!" || w == "?" || w == ";" ||
+                   Self.temporalSubordinators.contains(w.lowercased()) {
+                    scopeEnd = i - 1
+                    break
+                }
+            }
+
+            let scopeStart = max(0, idx - 1)  // Include preceding verb if present
+            let negatedText = words[scopeStart...scopeEnd].joined(separator: " ")
+
+            let confidence = negationType == .postVerbal ? 0.9 :
+                             negationType == .preVerbal ? 0.85 :
+                             negationType == .subordinateClause ? 0.8 : 0.7
+
+            scopes.append(NegationScope(
+                negationMarker: word,
+                markerType: negationType,
+                position: idx,
+                scopeStart: scopeStart,
+                scopeEnd: scopeEnd,
+                negatedText: negatedText,
+                confidence: confidence
+            ))
+        }
+
+        return scopes
+    }
+
+    // MARK: - Iteration 59: Quantifier Reasoning
+
+    struct QuantifierAnalysis {
+        let text: String
+        let universalQuantifiers: [QuantifierInfo]
+        let existentialQuantifiers: [QuantifierInfo]
+        let proportionalQuantifiers: [QuantifierInfo]
+        let vagueQuantifiers: [QuantifierInfo]
+        let logicalImplications: [String]
+        let quantifierDensity: Double
+    }
+
+    struct QuantifierInfo: Identifiable {
+        let id = UUID()
+        let word: String
+        let type: QuantifierType
+        let position: Int
+        let logicalStrength: Double    // 0-1, how strong the logical implication is
+
+        enum QuantifierType {
+            case universal     // alla, varje, varenda, samtliga
+            case existential   // någon, några, ett, en, vissa
+            case proportional  // de flesta, majoriteten, hälften, en tredjedel
+            case vague         // många, få, flera, ett antal
+        }
+    }
+
+    /// Universal quantifiers — ALL
+    private static let universalQuantifiers: Set<String> = [
+        "alla", "allt", "all", "varje", "varenda", "var och en",
+        "samtliga", "envar", "vardera", "båda", "båda två",
+        "hel", "hela", "helt", "helt och hållet",
+    ]
+
+    /// Existential quantifiers — EXISTS
+    private static let existentialQuantifiers: Set<String> = [
+        "någon", "något", "några", "någonstans", "någonting",
+        "vissa", "visst", "viss",
+        "en", "ett", "minst en", "åtminstone en",
+        "någonsin", "överhuvudtaget",
+    ]
+
+    /// Proportional quantifiers — FRACTION/PROPORTION
+    private static let proportionalQuantifiers: Set<String> = [
+        "de flesta", "flesta", "majoriteten", "hälften", "halva",
+        "en tredjedel", "två tredjedelar", "en fjärdedel",
+        "en femtedel", "en sjättedel", "en tiondel",
+        "en halv", "tre fjärdedelar", "femtionde",
+        "mer än hälften", "mindre än hälften",
+        "nästan alla", "nästan inga", "knappast någon",
+        "en del", "delvis", "partiellt",
+    ]
+
+    /// Vague quantifiers — APPROXIMATE
+    private static let vagueQuantifiers: Set<String> = [
+        "många", "få", "flera", "ett antal", "några",
+        "åtskilliga", "talrika", "otäliga", "oräkneliga",
+        "en hel del", "ganska många", "relativt få",
+        "ett flertal", "en mängd", "massor", "hundratals",
+        "tusentals", "miljontals", "ett par", "några få",
+        "lagom", "tillräckligt", "tillräckligt många",
+        "ett tiotal", "ett hundratal", "ett tusental",
+    ]
+
+    func analyzeQuantifiers(text: String) -> QuantifierAnalysis {
+        let lower = text.lowercased()
+        let words = lower.components(separatedBy: .whitespacesAndNewlines)
+            .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+            .filter { !$0.isEmpty }
+
+        var universal: [QuantifierInfo] = []
+        var existential: [QuantifierInfo] = []
+        var proportional: [QuantifierInfo] = []
+        var vague: [QuantifierInfo] = []
+        var implications: [String] = []
+
+        // Check for multi-word quantifiers first
+        let bigrams: [String] = words.enumerated().compactMap { idx, word in
+            if idx + 1 < words.count {
+                return "\(word) \(words[idx + 1])"
+            }
+            return nil
+        }
+
+        // Multi-word proportional quantifiers
+        for bigram in bigrams {
+            if Self.proportionalQuantifiers.contains(bigram) {
+                let idx = words.firstIndex(of: bigram.components(separatedBy: " ").first!) ?? 0
+                proportional.append(QuantifierInfo(word: bigram, type: .proportional, position: idx, logicalStrength: 0.8))
+            }
+        }
+
+        // Single-word quantifiers
+        for (idx, word) in words.enumerated() {
+            if Self.universalQuantifiers.contains(word) {
+                universal.append(QuantifierInfo(word: word, type: .universal, position: idx, logicalStrength: 1.0))
+            }
+            if Self.existentialQuantifiers.contains(word) {
+                existential.append(QuantifierInfo(word: word, type: .existential, position: idx, logicalStrength: 0.5))
+            }
+            if Self.vagueQuantifiers.contains(word) {
+                vague.append(QuantifierInfo(word: word, type: .vague, position: idx, logicalStrength: 0.3))
+            }
+        }
+
+        // Remove proportional quantifiers that were already caught as bigrams
+        proportional = proportional.filter { $0.word.components(separatedBy: " ").count > 1 ||
+            !bigrams.contains($0.word) }
+        // Re-add single-word proportional
+        for (idx, word) in words.enumerated() {
+            if Self.proportionalQuantifiers.contains(word) && !proportional.contains(where: { $0.word == word }) {
+                proportional.append(QuantifierInfo(word: word, type: .proportional, position: idx, logicalStrength: 0.7))
+            }
+        }
+
+        // Generate logical implications
+        if !universal.isEmpty {
+            implications.append("Universell kvantifiering: påståendet gäller ALLA element")
+        }
+        if !existential.isEmpty {
+            implications.append("Existentiell kvantifiering: det finns MINST ETT element")
+        }
+        if !proportional.isEmpty {
+            implications.append("Proportionell kvantifiering: en DELMÄNGD av element")
+        }
+        if !vague.isEmpty {
+            implications.append("Vag kvantifiering: ospecifik mängd")
+        }
+
+        // Check for logical contradictions (universal + negation)
+        let hasNegation = words.contains { Self.negationMarkers.contains($0) }
+        if hasNegation && !universal.isEmpty {
+            implications.append("⚠ Universell kvantifiering med negation — kontrollera giltighet")
+        }
+
+        let totalQuantifiers = universal.count + existential.count + proportional.count + vague.count
+        let quantifierDensity = min(1.0, Double(totalQuantifiers) * 0.25)
+
+        return QuantifierAnalysis(
+            text: text,
+            universalQuantifiers: universal,
+            existentialQuantifiers: existential,
+            proportionalQuantifiers: proportional,
+            vagueQuantifiers: vague,
+            logicalImplications: implications,
+            quantifierDensity: quantifierDensity
+        )
+    }
+
+    // MARK: - Iteration 60: Epistemic Modality Tracking
+
+    struct EpistemicAnalysis {
+        let text: String
+        let modalVerbs: [EpistemicMarker]
+        let epistemicAdverbs: [EpistemicMarker]
+        let evidentialMarkers: [EpistemicMarker]
+        let reportativeMarkers: [EpistemicMarker]
+        let overallEpistemicStrength: Double  // 0-1, 1 = absolute certainty
+        let certaintyLevel: CertaintyLevel
+        let connectionToConfidence: Double    // How this maps to Eon's confidence system
+    }
+
+    struct EpistemicMarker: Identifiable {
+        let id = UUID()
+        let word: String
+        let type: EpistemicType
+        let position: Int
+        let strength: Double  // 0-1
+
+        enum EpistemicType {
+            case modalVerb          // måste, borde, kan, skulle, torde
+            case epistemicAdverb    // kanske, möjligen, sannolikt, troligen
+            case evidential         // tydligen, uppenbarligen, visst, antagligen
+            case reportative        // tycks, sägs, påstås
+        }
+    }
+
+    enum CertaintyLevel: String {
+        case absolute = "Absolut säker"     // 0.9-1.0
+        case high = "Hög säkerhet"          // 0.7-0.9
+        case moderate = "Måttlig säkerhet"  // 0.4-0.7
+        case low = "Låg säkerhet"           // 0.2-0.4
+        case uncertain = "Osäker"           // 0.0-0.2
+    }
+
+    /// Modal verbs with epistemic strength
+    private static let modalVerbsStrength: [String: Double] = [
+        "måste": 0.95,    // Must — very strong
+        "borde": 0.7,     // Should — strong but not absolute
+        "bör": 0.7,       // Ought to
+        "kan": 0.4,       // Can/may — possibility
+        "kunde": 0.35,    // Could — weaker possibility
+        "skulle": 0.5,    // Would — conditional
+        "torde": 0.8,     // Presumably — strong presumption
+        " lär": 0.75,     // Is said to — hearsay with confidence
+        "vill": 0.3,      // Wants to — volitional, weak epistemic
+    ]
+
+    /// Epistemic adverbs with strength
+    private static let epistemicAdverbsStrength: [String: Double] = [
+        "kanske": 0.3,
+        "möjligen": 0.35,
+        "eventuellt": 0.3,
+        "sannolikt": 0.8,
+        "troligen": 0.75,
+        "antagligen": 0.7,
+        "förmodligen": 0.75,
+        "säkert": 0.85,
+        "definitivt": 0.95,
+        "absolut": 0.95,
+        "utan tvekan": 0.95,
+        "tveklöst": 0.9,
+        "otvivelaktigt": 0.95,
+        "onekligen": 0.85,
+        "verkligen": 0.8,
+        "faktiskt": 0.75,
+        "visst": 0.6,
+        "naturligtvis": 0.8,
+        "givetvis": 0.8,
+        "säkerligen": 0.85,
+    ]
+
+    /// Evidential markers — indicate source of knowledge
+    private static let evidentialMarkers: [String: Double] = [
+        "tydligen": 0.7,
+        "uppenbarligen": 0.8,
+        "uppenbart": 0.8,
+        "synbarligen": 0.7,
+        "märkbart": 0.6,
+        "klart": 0.7,
+        "tydligt": 0.75,
+        "uppenbart": 0.8,
+        "synligen": 0.7,
+        "märkligt": 0.5,
+        "antagligen": 0.7,
+        "troligtvis": 0.75,
+    ]
+
+    /// Reportative markers — indicate reported/hearsay knowledge
+    private static let reportativeMarkers: [String: Double] = [
+        "tycks": 0.5,
+        "verkar": 0.5,
+        "sägs": 0.4,
+        "påstås": 0.35,
+        "berättas": 0.4,
+        "rapporteras": 0.45,
+        "ryktas": 0.3,
+        "hävda": 0.4,
+        "hävdas": 0.4,
+        "anges": 0.5,
+        "uppges": 0.45,
+        "menas": 0.4,
+        "anser": 0.5,
+        "anses": 0.5,
+        "betraktas": 0.5,
+        "beskrivs": 0.5,
+        "sägas": 0.4,
+    ]
+
+    func analyzeEpistemicModality(text: String) -> EpistemicAnalysis {
+        let lower = text.lowercased()
+        let words = lower.components(separatedBy: .whitespacesAndNewlines)
+            .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+            .filter { !$0.isEmpty }
+
+        var modalVerbs: [EpistemicMarker] = []
+        var epistemicAdverbs: [EpistemicMarker] = []
+        var evidential: [EpistemicMarker] = []
+        var reportative: [EpistemicMarker] = []
+
+        // Check single words
+        for (idx, word) in words.enumerated() {
+            if let strength = Self.modalVerbsStrength[word] {
+                modalVerbs.append(EpistemicMarker(word: word, type: .modalVerb, position: idx, strength: strength))
+            }
+            if let strength = Self.epistemicAdverbsStrength[word] {
+                epistemicAdverbs.append(EpistemicMarker(word: word, type: .epistemicAdverb, position: idx, strength: strength))
+            }
+            if let strength = Self.evidentialMarkers[word] {
+                evidential.append(EpistemicMarker(word: word, type: .evidential, position: idx, strength: strength))
+            }
+            if let strength = Self.reportativeMarkers[word] {
+                reportative.append(EpistemicMarker(word: word, type: .reportative, position: idx, strength: strength))
+            }
+        }
+
+        // Check multi-word expressions
+        let bigrams = words.enumerated().compactMap { idx, word -> (Int, String)? in
+            if idx + 1 < words.count {
+                return (idx, "\(word) \(words[idx + 1])")
+            }
+            return nil
+        }
+        for (idx, bigram) in bigrams {
+            if let strength = Self.epistemicAdverbsStrength[bigram] {
+                epistemicAdverbs.append(EpistemicMarker(word: bigram, type: .epistemicAdverb, position: idx, strength: strength))
+            }
+        }
+
+        // Compute overall epistemic strength
+        let allMarkers = modalVerbs + epistemicAdverbs + evidential + reportative
+        let overallEpistemicStrength: Double
+        if allMarkers.isEmpty {
+            overallEpistemicStrength = 1.0  // No hedging = full certainty
+        } else {
+            // Use the minimum strength (weakest link principle)
+            let minStrength = allMarkers.map { $0.strength }.min() ?? 1.0
+            // Also compute average for overall assessment
+            let avgStrength = allMarkers.map { $0.strength }.reduce(0, +) / Double(allMarkers.count)
+            // Weight minimum more heavily (one weak claim weakens the whole)
+            overallEpistemicStrength = minStrength * 0.6 + avgStrength * 0.4
+        }
+
+        // Determine certainty level
+        let certaintyLevel: CertaintyLevel
+        if overallEpistemicStrength >= 0.9 {
+            certaintyLevel = .absolute
+        } else if overallEpistemicStrength >= 0.7 {
+            certaintyLevel = .high
+        } else if overallEpistemicStrength >= 0.4 {
+            certaintyLevel = .moderate
+        } else if overallEpistemicStrength >= 0.2 {
+            certaintyLevel = .low
+        } else {
+            certaintyLevel = .uncertain
+        }
+
+        // Map to Eon's confidence system
+        let connectionToConfidence = overallEpistemicStrength
+
+        return EpistemicAnalysis(
+            text: text,
+            modalVerbs: modalVerbs,
+            epistemicAdverbs: epistemicAdverbs,
+            evidentialMarkers: evidential,
+            reportativeMarkers: reportative,
+            overallEpistemicStrength: overallEpistemicStrength,
+            certaintyLevel: certaintyLevel,
+            connectionToConfidence: connectionToConfidence
+        )
+    }
 }
 
 // MARK: - SwedishMorphologyEngine (Pelare A)
@@ -1534,6 +3492,832 @@ actor SwedishMorphologyEngine {
         }
 
         return derivatives
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ITERATION 61-69: Advanced Semantics, Discourse, Narrative, Rhetoric
+    // ═══════════════════════════════════════════════════════════
+
+    // MARK: - Iteration 61: Argumentation Structure Analysis
+
+    struct ArgumentationAnalysis {
+        let claims: [ArgumentClaim]
+        let evidence: [ArgumentEvidence]
+        let warrants: [ArgumentWarrant]
+        let rebuttals: [ArgumentRebuttal]
+        let concessions: [ArgumentConcession]
+        let argumentGraph: [ArgumentNode]
+        let strengthScore: Double
+        let fallacies: [LogicalFallacy]
+        let analysis: String
+    }
+    struct ArgumentClaim: Identifiable {
+        let id = UUID(); let text: String; let type: ClaimType; let confidence: Double
+        enum ClaimType: String { case main, sub, counter }
+    }
+    struct ArgumentEvidence: Identifiable {
+        let id = UUID(); let text: String; let supportsClaim: String?; let evidenceType: EvidenceType; let strength: Double
+        enum EvidenceType: String { case factual, statistical, anecdotal, authoritative, logical }
+    }
+    struct ArgumentWarrant: Identifiable {
+        let id = UUID(); let text: String; let connectsEvidence: String; let connectsClaim: String; let explicitness: Explicitness
+        enum Explicitness { case explicit, implicit }
+    }
+    struct ArgumentRebuttal: Identifiable {
+        let id = UUID(); let text: String; let targetsClaim: String; let rebuttalType: RebuttalType; let effectiveness: Double
+        enum RebuttalType: String { case directRefutation, underminingWarrant, attackingEvidence, offeringCounter }
+    }
+    struct ArgumentConcession: Identifiable {
+        let id = UUID(); let text: String; let concededPoint: String; let followedByCounter: Bool
+    }
+    struct ArgumentNode: Identifiable {
+        let id = UUID(); let text: String; let nodeType: ArgumentNodeType; var children: [UUID]; let strength: Double
+        enum ArgumentNodeType: String { case claim, evidence, warrant, rebuttal, concession }
+    }
+    struct LogicalFallacy: Identifiable {
+        let id = UUID(); let type: FallacyType; let text: String; let explanation: String; let severity: Double
+        enum FallacyType: String, CaseIterable {
+            case adHominem = "ad hominem"; case strawMan = "straw man"; case falseDichotomy = "false dichotomy"
+            case slipperySlope = "slippery slope"; case circularReasoning = "cirkelresonemang"
+        }
+    }
+
+    private static let claimMarkers: Set<String> = ["jag anser", "jag tycker", "jag menar", "jag hävdar", "det är tydligt att", "utan tvekan", "uppenbarligen", "det står klart", "min uppfattning är", "vi bör", "vi måste", "det är nödvändigt", "det är viktigt att"]
+    private static let evidenceMarkers: Set<String> = ["till exempel", "exempelvis", "enligt", "studier visar", "forskning", "bevis", "statistik", "undersökningar", "rapporter", "data visar", "som exempel", "ett bevis", "fakta är", "det finns belägg"]
+    private static let warrantMarkers: Set<String> = ["detta innebär", "vilket betyder", "detta visar", "alltså", "därför att", "eftersom", "då", "med andra ord", "detta leder till", "följden blir"]
+    private static let rebuttalMarkers: Set<String> = ["men", "dock", "emellertid", "å andra sidan", "däremot", "ändå", "trots detta", "fastän", "även om", "mot detta kan invändas", "kritiker menar", "vissa hävdar", "en invändning"]
+    private static let concessionMarkers: Set<String> = ["visserligen", "certe", "jag medger", "det är sant att", "naturligtvis", "givetvis", "visst", "det ska medges", "även om", "trots att"]
+
+    func analyzeArgumentation(text: String) -> ArgumentationAnalysis {
+        let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?;")).map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.count > 3 }
+        var claims: [ArgumentClaim] = []; var evidence: [ArgumentEvidence] = []; var warrants: [ArgumentWarrant] = []
+        var rebuttals: [ArgumentRebuttal] = []; var concessions: [ArgumentConcession] = []; var nodes: [ArgumentNode] = []
+        var fallacies: [LogicalFallacy] = []
+
+        for sentence in sentences {
+            let sl = sentence.lowercased()
+            for marker in Self.claimMarkers where sl.contains(marker) {
+                let c = ArgumentClaim(text: sentence, type: .main, confidence: 0.8); claims.append(c)
+                nodes.append(ArgumentNode(text: sentence, nodeType: .claim, children: [], strength: 0.7))
+            }
+            for marker in Self.evidenceMarkers where sl.contains(marker) {
+                let evType: ArgumentEvidence.EvidenceType
+                if sl.contains("studie") || sl.contains("forskning") { evType = .authoritative }
+                else if sl.contains("statistik") || sl.contains("data") { evType = .statistical }
+                else if sl.contains("exempel") { evType = .anecdotal }
+                else { evType = .factual }
+                let ev = ArgumentEvidence(text: sentence, supportsClaim: claims.last?.text, evidenceType: evType, strength: evType == .statistical ? 0.8 : evType == .authoritative ? 0.75 : 0.6)
+                evidence.append(ev); nodes.append(ArgumentNode(text: sentence, nodeType: .evidence, children: [], strength: ev.strength))
+            }
+            for marker in Self.warrantMarkers where sl.contains(marker) {
+                warrants.append(ArgumentWarrant(text: sentence, connectsEvidence: evidence.last?.text ?? "", connectsClaim: claims.last?.text ?? "", explicitness: .explicit))
+                nodes.append(ArgumentNode(text: sentence, nodeType: .warrant, children: [], strength: 0.6))
+            }
+            for marker in Self.rebuttalMarkers where sl.contains(marker) {
+                let rbType: ArgumentRebuttal.RebuttalType
+                if sl.contains("invänd") || sl.contains("kritik") { rbType = .directRefutation }
+                else if sl.contains("bevis") || sl.contains("fakta") { rbType = .attackingEvidence }
+                else if sl.contains("menar") || sl.contains("hävdar") { rbType = .offeringCounter }
+                else { rbType = .underminingWarrant }
+                rebuttals.append(ArgumentRebuttal(text: sentence, targetsClaim: claims.last?.text ?? "", rebuttalType: rbType, effectiveness: 0.6))
+                nodes.append(ArgumentNode(text: sentence, nodeType: .rebuttal, children: [], strength: 0.5))
+            }
+            for marker in Self.concessionMarkers where sl.contains(marker) {
+                let followedByCounter = Self.rebuttalMarkers.contains { m in let idx = sl.range(of: marker)?.upperBound ?? sl.startIndex; return sl[idx...].contains(m) }
+                concessions.append(ArgumentConcession(text: sentence, concededPoint: sentence, followedByCounter: followedByCounter))
+                nodes.append(ArgumentNode(text: sentence, nodeType: .concession, children: [], strength: 0.4))
+            }
+        }
+
+        for (i, node) in nodes.enumerated() where node.nodeType == .evidence {
+            if let ci = nodes.firstIndex(where: { $0.nodeType == .claim }) { nodes[i].children.append(nodes[ci].id) }
+        }
+
+        // Fallacy detection
+        let fallacyPatterns: [(pattern: String, type: LogicalFallacy.FallacyType, explanation: String)] = [
+            ("(du|han|hon|de).*(är|verkar).*(naiv|dum|okunnig|enfaldig)", .adHominem, "Personangrepp: attackerar personen istället för argumentet"),
+            ("(din|hans|hennes).*(brist|okunnighet|naivitet)", .adHominem, "Personangrepp: fokuserar på personens brister"),
+            ("(du|ni|de).*(tycker|menar|hävdar) alltså att.*(alla|alltid|aldrig|inget)", .strawMan, "Straw man: överdriver motståndarens position"),
+            ("så.*(du|ni|de) vill.*(inget|aldrig|bara|enbart)", .strawMan, "Straw man: förenklar motståndarens argument"),
+            ("(antingen|endast).*(eller|annars).*(inte|aldrig)", .falseDichotomy, "Falsk dikotomi: presenterar bara två alternativ"),
+            ("(är|vill) du.*(för|mot|med|emot)", .falseDichotomy, "Falsk dikotomi: tvingar fram ett binärt val"),
+            ("om.*(då|sedan|sen|efter|leda|resultera|betyda|innebär).*och.*(sedan|sen|därefter)", .slipperySlope, "Sluttande plan: kedja av osannolika konsekvenser"),
+            ("först.*(sen|sedan|därefter|efter det|nästa steg|till slut)", .slipperySlope, "Sluttande plan: antar oundviklig kedja"),
+        ]
+        for sentence in sentences {
+            let sl = sentence.lowercased()
+            for (pattern, type, explanation) in fallacyPatterns {
+                let regex = try? NSRegularExpression(pattern: pattern, options: [])
+                if let regex, regex.firstMatch(in: sl, range: NSRange(sl.startIndex..., in: sl)) != nil {
+                    fallacies.append(LogicalFallacy(type: type, text: sentence, explanation: explanation, severity: 0.7))
+                }
+            }
+        }
+
+        let claimEvidenceRatio = claims.isEmpty ? 0.0 : min(1.0, Double(evidence.count) / Double(claims.count))
+        let rebuttalBonus = claims.isEmpty ? 0.0 : min(0.2, Double(rebuttals.count) * 0.1)
+        let concessionBonus = concessions.filter { $0.followedByCounter }.isEmpty ? 0.0 : 0.1
+        let fallacyPenalty = Double(fallacies.count) * 0.1
+        let strengthScore = max(0.0, min(1.0, claimEvidenceRatio * 0.5 + rebuttalBonus + concessionBonus - fallacyPenalty + 0.2))
+        let analysis = claims.isEmpty ? "Inga tydliga påståenden identifierade" : "Argumentationsanalys: \(claims.count) påståenden, \(evidence.count) bevis, \(rebuttals.count) motbevis, \(fallacies.count) logiska felslut"
+        return ArgumentationAnalysis(claims: claims, evidence: evidence, warrants: warrants, rebuttals: rebuttals, concessions: concessions, argumentGraph: nodes, strengthScore: strengthScore, fallacies: fallacies, analysis: analysis)
+    }
+
+    // MARK: - Iteration 62: Narrative Structure Detection
+
+    struct NarrativeStructure {
+        let narrativeArc: NarrativeArc; let temporalMarkers: [TemporalMarker]
+        let characterPerspectives: [CharacterPerspective]; let plotCoherence: Double
+        let narrativeType: NarrativeType; let creativityBoost: Double; let comprehensionBoost: Double; let analysis: String
+    }
+    struct NarrativeArc: Codable {
+        let exposition: [String]; let risingAction: [String]; let climax: [String]; let fallingAction: [String]; let resolution: [String]
+        var arcComplete: Bool { !exposition.isEmpty && !risingAction.isEmpty && !climax.isEmpty && !resolution.isEmpty }
+    }
+    struct TemporalMarker: Identifiable {
+        let id = UUID(); let text: String; let type: TemporalType; let position: Int
+        enum TemporalType: String { case flashback, flashForward, simultaneous, linear, ambiguous }
+    }
+    struct CharacterPerspective: Identifiable {
+        let id = UUID(); let character: String; let sentences: [String]; let perspectiveType: PerspectiveType
+        enum PerspectiveType: String { case firstPerson, thirdPersonLimited, thirdPersonOmniscient, unreliable }
+    }
+    enum NarrativeType: String, CaseIterable { case linear = "linjär"; case nonLinear = "icke-linjär"; case frameNarrative = "ramberättelse"; case streamOfConsciousness = "medvetandeström"; case unknown = "okänd" }
+
+    private static let expositionMarkers: Set<String> = ["det var en gång", "för länge sedan", "i början", "allt började", "det började med", "från början", "till en början"]
+    private static let risingActionMarkers: Set<String> = ["plötsligt", "men sedan", "dock", "samtidigt", "mer och mer", "allt oftare", "successivt", "gradvis", "efterhand", "snart", "då hände något"]
+    private static let climaxMarkers: Set<String> = ["högsta punkten", "kulmen", "toppen", "avgörande ögonblick", "vändpunkten", "allt eller inget", "i det avgörande ögonblicket", "plötsligt insåg", "då förstod"]
+    private static let fallingActionMarkers: Set<String> = ["efter det", "därefter", "som följd", "i spåren av", "efter händelsen", "när allt var över", "efter stormen"]
+    private static let resolutionMarkers: Set<String> = ["slutligen", "till slut", "sammanfattningsvis", "så småningom", "i slutändan", "resultatet blev", "och så", "det slutade med"]
+    private static let flashbackMarkers: Set<String> = ["tidigare", "förut", "innan", "bakåt i tiden", "i minnet", "minns", "kom ihåg", "tänkte tillbaka", "år tillbaka", "förra året", "en gång i tiden"]
+    private static let flashForwardMarkers: Set<String> = ["senare", "i framtiden", "framåt", "kommande", "om ett år", "snart", "om några år", "i morgon", "någon gång senare", "år framöver"]
+    private static let firstPersonMarkers: Set<String> = ["jag", "mig", "min", "mitt", "mina", "vi", "oss", "vår"]
+    private static let thirdPersonMarkers: Set<String> = ["han", "hon", "hen", "den", "det", "de", "dem", "deras"]
+
+    func detectNarrativeStructure(text: String) -> NarrativeStructure {
+        let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?;")).map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.count > 3 }
+        let lowerText = text.lowercased()
+        var exposition: [String] = []; var risingAction: [String] = []; var climax: [String] = []
+        var fallingAction: [String] = []; var resolution: [String] = []
+        for s in sentences {
+            let sl = s.lowercased()
+            if Self.expositionMarkers.contains(where: { sl.contains($0) }) { exposition.append(s) }
+            else if Self.climaxMarkers.contains(where: { sl.contains($0) }) { climax.append(s) }
+            else if Self.fallingActionMarkers.contains(where: { sl.contains($0) }) { fallingAction.append(s) }
+            else if Self.resolutionMarkers.contains(where: { sl.contains($0) }) { resolution.append(s) }
+            else if Self.risingActionMarkers.contains(where: { sl.contains($0) }) { risingAction.append(s) }
+        }
+        if exposition.isEmpty && risingAction.isEmpty && climax.isEmpty && fallingAction.isEmpty && resolution.isEmpty && sentences.count > 1 {
+            let chunkSize = max(1, sentences.count / 5)
+            exposition = Array(sentences.prefix(chunkSize))
+            risingAction = Array(sentences[chunkSize..<min(chunkSize * 2, sentences.count)])
+            if sentences.count > chunkSize * 2 { climax = Array(sentences[chunkSize * 2..<min(chunkSize * 3, sentences.count)]) }
+            if sentences.count > chunkSize * 3 { fallingAction = Array(sentences[chunkSize * 3..<min(chunkSize * 4, sentences.count)]) }
+            if sentences.count > chunkSize * 4 { resolution = Array(sentences[chunkSize * 4...]) }
+        }
+        let arc = NarrativeArc(expedition: exposition, risingAction: risingAction, climax: climax, fallingAction: fallingAction, resolution: resolution)
+
+        var temporalMarkers: [TemporalMarker] = []
+        for (idx, s) in sentences.enumerated() {
+            let sl = s.lowercased()
+            if Self.flashbackMarkers.contains(where: { sl.contains($0) }) { temporalMarkers.append(TemporalMarker(text: s, type: .flashback, position: idx)) }
+            else if Self.flashForwardMarkers.contains(where: { sl.contains($0) }) { temporalMarkers.append(TemporalMarker(text: s, type: .flashForward, position: idx)) }
+        }
+
+        var perspectives: [CharacterPerspective] = []
+        var currentCharacters: [String: [String]] = [:]
+        for s in sentences {
+            let sl = s.lowercased()
+            let isFirst = Self.firstPersonMarkers.contains { sl.contains(" \($0) ") || sl.hasPrefix("\($0) ") }
+            let isThird = Self.thirdPersonMarkers.contains { sl.contains(" \($0) ") || sl.hasPrefix("\($0) ") }
+            if isFirst { currentCharacters["jag", default: []].append(s) }
+            else if isThird { currentCharacters["third_person", default: []].append(s) }
+        }
+        for (char, charSentences) in currentCharacters {
+            let pType: CharacterPerspective.PerspectiveType = char == "jag" ? .firstPerson : charSentences.count == 1 ? .thirdPersonLimited : .thirdPersonOmniscient
+            perspectives.append(CharacterPerspective(character: char, sentences: charSentences, perspectiveType: pType))
+        }
+
+        let hasTemporalShifts = temporalMarkers.filter { $0.type == .flashback || $0.type == .flashForward }.count > 1
+        let isSoC = sentences.filter { $0.count > 40 }.count > sentences.count / 2
+        let hasFrame = (Self.expositionMarkers.contains { lowerText.contains($0) }) && (Self.resolutionMarkers.contains { lowerText.contains($0) })
+        let narrativeType: NarrativeType
+        if isSoC { narrativeType = .streamOfConsciousness }
+        else if hasFrame && hasTemporalShifts { narrativeType = .frameNarrative }
+        else if hasTemporalShifts { narrativeType = .nonLinear }
+        else if !temporalMarkers.isEmpty { narrativeType = .linear }
+        else { narrativeType = .unknown }
+
+        let arcElements = [exposition, risingAction, climax, fallingAction, resolution].filter { !$0 }.count
+        let plotCoherence = min(1.0, Double(arcElements) / 5.0 * 0.6 + (temporalMarkers.isEmpty ? 0.2 : 0.4))
+        let creativityBoost = min(0.04, Double(arcElements) * 0.004 + (hasTemporalShifts ? 0.01 : 0.0))
+        let comprehensionBoost = min(0.03, Double(perspectives.count) * 0.003 + (arc.arcComplete ? 0.01 : 0.0))
+        let analysis = arc.arcComplete ? "Narrativ struktur: \(narrativeType.rawValue) med komplett berättelsebåge, \(temporalMarkers.count) tidsmarkörer, \(perspectives.count) perspektiv" : "Narrativ struktur: \(narrativeType.rawValue) — ofullständig båge (\(arcElements)/5 delar)"
+        return NarrativeStructure(narrativeArc: arc, temporalMarkers: temporalMarkers, characterPerspectives: perspectives, plotCoherence: plotCoherence, narrativeType: narrativeType, creativityBoost: creativityBoost, comprehensionBoost: comprehensionBoost, analysis: analysis)
+    }
+
+    // MARK: - Iteration 63: Rhetorical Device Detection
+
+    struct RhetoricalDevice: Identifiable, Codable {
+        let id = UUID(); let type: RhetoricalDeviceType; let text: String; let explanation: String; let positions: [Int]; let strength: Double
+        enum RhetoricalDeviceType: String, CaseIterable {
+            case anaphora = "anafor"; case epistrophe = "epifor"; case chiasmus = "chiasm"; case parallelism = "parallelism"
+            case tricolon = "trikolon"; case rhetoricalQuestion = "retorisk fråga"; case litotes = "litotes"
+            case hyperbole = "hyperbol"; case alliteration = "allitteration"; case assonance = "assonans"
+            case folkvisestil = "folkvisestil"; case talesätt = "talesätt"
+        }
+    }
+
+    private static let folkvisestilPatterns: [(String, String)] = [("lilla", "Folkvisestil: diminutivt uttryck"), ("fagra", "Folkvisestil: poetiskt adjektiv"), ("mången", "Folkvisestil: arkaiskt pronomen"), ("den gången", "Folkvisestil: balladformel"), ("i ungdomens", "Folkvisestil: balladtema"), ("rida", "Folkvisestil: balladverb"), ("jungfru", "Folkvisestil: balladmotiv"), ("riddar", "Folkvisestil: balladmotiv")]
+    private static let talesattPatterns: Set<String> = ["bättre fly än illa fäkta", "tiden läkar alla sår", "skam den som ger sig", "bra karl reder sig själv", "morgonstund har guld i mund", "man ska inte köpa katten i säcken", "den som väntar på något gott", "man ska inte ropa hop innan man har skjutit björnen", "den som gräver en grop", "söka efter nålen i höstacken", "vad man sådd får man skörda", "man ska inte kasta pärlor åt svin", "den som tiger samtycker"]
+
+    func detectRhetoricalDevices(text: String) -> [RhetoricalDevice] {
+        var devices: [RhetoricalDevice] = []
+        let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?;")).map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.count > 3 }
+        let lowerText = text.lowercased()
+        let words = lowerText.components(separatedBy: .whitespacesAndNewlines).map { $0.trimmingCharacters(in: .punctuationCharacters) }.filter { !$0.isEmpty }
+
+        // Anaphora
+        if sentences.count >= 2 {
+            var anaphoricSequences: [[String]] = []; var currentSeq: [String] = [sentences[0]]
+            var currentStart = sentences[0].lowercased().prefix(4)
+            for i in 1..<sentences.count {
+                let sentStart = sentences[i].lowercased().prefix(4)
+                if sentStart == currentStart && currentStart.count >= 3 { currentSeq.append(sentences[i]) }
+                else { if currentSeq.count >= 2 { anaphoricSequences.append(currentSeq) }; currentSeq = [sentences[i]]; currentStart = sentences[i].lowercased().prefix(4) }
+            }
+            if currentSeq.count >= 2 { anaphoricSequences.append(currentSeq) }
+            for seq in anaphoricSequences { devices.append(RhetoricalDevice(type: .anaphora, text: seq.joined(separator: "; "), explanation: "Anafor: upprepning av '\(currentStart)' i början av \(seq.count) satser", positions: [], strength: min(0.95, 0.5 + Double(seq.count) * 0.15))) }
+        }
+
+        // Epistrophe
+        if sentences.count >= 2 {
+            var epiSequences: [[String]] = []; var currentSeq: [String] = [sentences[0]]
+            var currentEnd = String(sentences[0].lowercased().suffix(4))
+            for i in 1..<sentences.count {
+                let sentEnd = String(sentences[i].lowercased().suffix(4))
+                if sentEnd == currentEnd && currentEnd.count >= 3 { currentSeq.append(sentences[i]) }
+                else { if currentSeq.count >= 2 { epiSequences.append(currentSeq) }; currentSeq = [sentences[i]]; currentEnd = String(sentences[i].lowercased().suffix(4)) }
+            }
+            if currentSeq.count >= 2 { epiSequences.append(currentSeq) }
+            for seq in epiSequences { devices.append(RhetoricalDevice(type: .epistrophe, text: seq.joined(separator: "; "), explanation: "Epifor: upprepning i slutet av \(seq.count) satser", positions: [], strength: min(0.95, 0.5 + Double(seq.count) * 0.15))) }
+        }
+
+        // Chiasmus
+        for i in 0..<(sentences.count - 1) {
+            let w1 = sentences[i].lowercased().components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 3 }
+            let w2 = sentences[i + 1].lowercased().components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 3 }
+            if w1.count >= 2 && w2.count >= 2 && w1.first == w2.last && w1.last == w2.first {
+                devices.append(RhetoricalDevice(type: .chiasmus, text: "\(sentences[i]); \(sentences[i + 1])", explanation: "Chiasm: ABBA-struktur", positions: [], strength: 0.8))
+            }
+        }
+
+        // Parallelism
+        for i in 0..<(sentences.count - 1) {
+            let w1P = sentences[i].lowercased().components(separatedBy: .whitespacesAndNewlines).prefix(2).joined(separator: " ")
+            let w2P = sentences[i + 1].lowercased().components(separatedBy: .whitespacesAndNewlines).prefix(2).joined(separator: " ")
+            if w1P.count > 3 && w2P.count > 3 && w1P.count == w2P.count {
+                let sim = Double(zip(w1P, w2P).filter { $0 == $1 }.count) / Double(w1P.count)
+                if sim >= 0.5 { devices.append(RhetoricalDevice(type: .parallelism, text: "\(sentences[i]); \(sentences[i + 1])", explanation: "Parallelism: '\(w1P)' / '\(w2P)'", positions: [], strength: sim * 0.8)) }
+            }
+        }
+
+        // Tricolon
+        for s in sentences {
+            let parts = s.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.count > 2 }
+            if parts.count == 3 {
+                let lengths = parts.map { Double($0.components(separatedBy: .whitespacesAndNewlines).count) }
+                let avg = lengths.reduce(0, +) / 3.0; let variance = lengths.map { pow($0 - avg, 2) }.reduce(0, +) / 3.0
+                if variance < 2.0 { devices.append(RhetoricalDevice(type: .tricolon, text: s, explanation: "Trikolon: tredelad uppräkning", positions: [], strength: min(0.9, 0.6 + (1.0 - variance / 2.0) * 0.3))) }
+            }
+        }
+
+        // Rhetorical questions
+        for s in sentences where s.contains("?") {
+            let sl = s.lowercased(); let qws = ["vem", "vad", "varför", "hur", "när", "var", "vilken"]
+            if qws.contains(where: { sl.contains($0) }) { devices.append(RhetoricalDevice(type: .rhetoricalQuestion, text: s, explanation: "Retorisk fråga", positions: [], strength: 0.7)) }
+        }
+
+        // Litotes
+        for pattern in ["inte dålig", "inte illa", "inte osannolikt", "inte obetydlig", "inte helt fel", "inte ovanligt", "inte utan", "icke desto mindre", "inte okunnig", "inte ointressant", "inte oviktigt", "inte omöjligt", "inte helt ovanligt", "inte så dumt"] where lowerText.contains(pattern) {
+            devices.append(RhetoricalDevice(type: .litotes, text: pattern, explanation: "Litotes: underdrift genom dubbel negation", positions: [], strength: 0.75))
+        }
+
+        // Hyperbole
+        let hyperWords = Set(["aldrig", "alltid", "värsta", "bästa", "sämsta", "ofattbart", "absolut", "totalt", "extremt", "enormt", "världens", "oändligt", "evigt", "fantastiskt", "fullständigt", "komplett"])
+        let hyperMatches = words.filter { hyperWords.contains($0) }
+        if hyperMatches.count >= 2 { devices.append(RhetoricalDevice(type: .hyperbole, text: String(hyperMatches.joined(separator: ", ")), explanation: "Hyperbol: överdrivna uttryck (\(hyperMatches.count) ord)", positions: [], strength: min(0.9, 0.4 + Double(hyperMatches.count) * 0.1))) }
+
+        // Alliteration
+        for s in sentences {
+            let sw = s.lowercased().components(separatedBy: .whitespacesAndNewlines).map { $0.trimmingCharacters(in: .punctuationCharacters) }.filter { $0.count > 2 }
+            var i = 0
+            while i < sw.count - 1 {
+                let fl = sw[i].first; var count = 1
+                while i + count < sw.count && sw[i + count].first == fl { count += 1 }
+                if count >= 3 { devices.append(RhetoricalDevice(type: .alliteration, text: sw[i..<i + count].joined(separator: " "), explanation: "Allitteration: \(count) ord på '\(String(fl ?? "x"))'", positions: [], strength: min(0.9, 0.4 + Double(count) * 0.15))); i += count } else { i += 1 }
+            }
+        }
+
+        // Assonance
+        for (vowel, label) in [("a", "a/å"), ("e", "e/ä"), ("o", "o/ö"), ("i", "i"), ("u", "u")] {
+            let vw = words.filter { $0.contains(vowel) }
+            if vw.count >= 3 { devices.append(RhetoricalDevice(type: .assonance, text: vw.prefix(4).joined(separator: ", "), explanation: "Assonans: vokal '\(label)' i \(vw.count) ord", positions: [], strength: min(0.8, 0.3 + Double(vw.count) * 0.1))) }
+        }
+
+        // Folkvisestil
+        for (pattern, explanation) in Self.folkvisestilPatterns where lowerText.contains(pattern) {
+            devices.append(RhetoricalDevice(type: .folkvisestil, text: pattern, explanation: explanation, positions: [], strength: 0.7))
+        }
+        // Talesätt
+        for ta in Self.talesattPatterns where lowerText.contains(ta) {
+            devices.append(RhetoricalDevice(type: .talesätt, text: ta, explanation: "Talesätt: '\(ta)'", positions: [], strength: 0.85))
+        }
+        return devices
+    }
+
+    // MARK: - Iteration 64: Frame Semantics
+
+    struct FrameAnalysis {
+        let frames: [SemanticFrame]; let frameRelations: [FrameRelation]; let frameCompleteness: Double
+        let whoDidWhat: [String]; let comprehensionBoost: Double
+    }
+    struct SemanticFrame: Identifiable {
+        let id = UUID(); let frameName: String; let triggerWord: String; let frameElements: [FrameElement]; let completeness: Double
+    }
+    struct FrameElement: Codable { let role: String; let filler: String; let confidence: Double }
+    struct FrameRelation: Identifiable {
+        let id = UUID(); let fromFrame: String; let toFrame: String; let relationType: FrameRelationType
+        enum FrameRelationType: String { case causes, enables, precedes, contrastsWith, partOf }
+    }
+
+    private static let frameDatabase: [String: (frameName: String, roles: [String])] = [
+        "köpa": ("COMMERCE_BUY", ["köpare", "säljare", "vara", "pengar"]), "köp": ("COMMERCE_BUY", ["köpare", "säljare", "vara"]),
+        "handla": ("COMMERCE_BUY", ["köpare", "säljare", "vara"]),
+        "sälja": ("COMMERCE_SELL", ["säljare", "köpare", "vara", "pris"]), "försäljning": ("COMMERCE_SELL", ["säljare", "köpare", "vara"]),
+        "ge": ("GIVING", ["givare", "mottagare", "objekt"]), "gav": ("GIVING", ["givare", "mottagare", "objekt"]), "giva": ("GIVING", ["givare", "mottagare", "objekt"]),
+        "få": ("RECEIVING", ["mottagare", "givare", "objekt"]), "motta": ("RECEIVING", ["mottagare", "avsändare", "objekt"]),
+        "ta": ("RECEIVING", ["tagare", "källa", "objekt"]),
+        "skicka": ("TRANSFER", ["avsändare", "mottagare", "objekt", "medium"]), "sända": ("TRANSFER", ["avsändare", "mottagare", "objekt"]),
+        "säga": ("COMMUNICATION", ["talare", "lyssnare", "meddelande"]), "berätta": ("COMMUNICATION", ["berättare", "åhörare", "innehåll"]),
+        "skriva": ("COMMUNICATION", ["författare", "läsare", "text"]), "tala": ("COMMUNICATION", ["talare", "publik", "ämne"]),
+        "prata": ("COMMUNICATION", ["talare", "lyssnare", "ämne"]), "fråga": ("COMMUNICATION", ["frågare", "svarare", "fråga"]),
+        "svara": ("COMMUNICATION", ["svarare", "frågare", "svar"]), "meddela": ("COMMUNICATION", ["avsändare", "mottagare", "meddelande"]),
+        "se": ("PERCEPTION", ["observatör", "fenomen"]), "höra": ("PERCEPTION", ["lyssnare", "ljud"]),
+        "känna": ("PERCEPTION", ["kännare", "stimulus"]), "observera": ("PERCEPTION", ["observatör", "fenomen"]),
+        "tänka": ("COGNITION", ["tänkare", "tankeinnehåll"]), "tro": ("COGNITION", ["troende", "proposition"]),
+        "veta": ("COGNITION", ["vetare", "faktum"]), "förstå": ("COGNITION", ["förstående", "fenomen"]),
+        "begripa": ("COGNITION", ["begripare", "fenomen"]), "minnas": ("COGNITION", ["minnande", "erinran"]),
+        "glömma": ("COGNITION", ["glömsk", "glömt"]), "lära": ("COGNITION", ["lärande", "innehåll", "källa"]),
+        "fundera": ("COGNITION", ["funderande", "ämne"]), "misstänka": ("COGNITION", ["misstänkande", "proposition"]),
+        "älska": ("EMOTION", ["kännare", "objekt"]), "hata": ("EMOTION", ["kännare", "objekt"]),
+        "frukta": ("EMOTION", ["kännare", "hot"]), "oroa": ("EMOTION", ["kännare", "orsak"]),
+        "glädja": ("EMOTION", ["kännare", "orsak"]), "sörja": ("EMOTION", ["sörjande", "orsak"]),
+        "gå": ("MOTION", ["rörelseaktör", "källa", "mål"]), "springa": ("MOTION", ["rörelseaktör", "mål"]),
+        "åka": ("MOTION", ["rörelseaktör", "källa", "mål"]), "resa": ("MOTION", ["resenär", "källa", "mål"]),
+        "flyga": ("MOTION", ["rörelseaktör", "källa", "mål"]), "cykla": ("MOTION", ["cyklist", "källa", "mål"]),
+        "köra": ("MOTION", ["förare", "fordon", "källa", "mål"]), "vandra": ("MOTION", ["vandrare", "källa", "mål"]),
+        "bli": ("CHANGE", ["entitet", "sluttillstånd", "orsak"]), "ändra": ("CHANGE", ["aktör", "objekt", "nytt_tillstånd"]),
+        "förändra": ("CHANGE", ["aktör", "objekt", "nytt_tillstånd"]), "utveckla": ("CHANGE", ["aktör", "objekt", "resultat"]),
+        "öka": ("CHANGE", ["entitet", "mängd"]), "minska": ("CHANGE", ["entitet", "mängd"]),
+        "skapa": ("CREATION", ["skapare", "resultat"]), "bygga": ("CREATION", ["byggare", "resultat"]),
+        "tillverka": ("CREATION", ["tillverkare", "resultat"]), "göra": ("CREATION", ["aktör", "resultat"]),
+        "producera": ("CREATION", ["producent", "resultat"]), "konstruera": ("CREATION", ["konstruktör", "resultat"]),
+        "förstöra": ("DESTRUCTION", ["aktör", "objekt"]), "krossa": ("DESTRUCTION", ["aktör", "objekt"]),
+        "ha": ("POSSESSION", ["ägare", "objekt"]), "äga": ("POSSESSION", ["ägare", "objekt"]),
+        "tillhöra": ("POSSESSION", ["ägare", "objekt"]), "förlora": ("POSSESSION", ["förlorare", "objekt"]),
+        "hjälpa": ("SOCIAL", ["hjälpare", "hjälptagare", "uppgift"]), "stjäla": ("SOCIAL", ["tjuv", "offer", "objekt"]),
+        "lova": ("SOCIAL", ["lovare", "mottagare", "löfte"]), "tacka": ("SOCIAL", ["tackare", "mottagare"]),
+        "förlåta": ("SOCIAL", ["förlåtare", "syndare"]), "straffa": ("SOCIAL", ["straffare", "bestraffad", "brott"]),
+        "döma": ("JUDGING", ["domare", "bedömd", "kriterium"]), "bedöma": ("JUDGING", ["bedömare", "bedömd", "kriterium"]),
+        "kritisera": ("JUDGING", ["kritiker", "kritiserad"]), "berömma": ("JUDGING", ["berömmare", "berömd"]),
+        "försöka": ("ATTEMPT", ["försökare", "mål"]), "pröva": ("ATTEMPT", ["prövare", "mål"]),
+        "orsaka": ("CAUSE", ["orsak", "verkan", "aktör"]), "leda": ("CAUSE", ["orsak", "verkan"]),
+        "resultera": ("CAUSE", ["orsak", "verkan"]), "medföra": ("CAUSE", ["orsak", "verkan"]),
+        "påverka": ("CAUSE", ["påverkare", "påverkad"]), "utlösa": ("CAUSE", ["utlösare", "händelse"]),
+        "bidra": ("CAUSE", ["bidragare", "resultat"]),
+        "födas": ("BEING_BORN", ["person", "tid", "plats"]), "dö": ("DYING", ["person", "tid", "orsak"]),
+        "upptäcka": ("BECOMING_AWARE", ["upptäckare", "fenomen"]), "inse": ("BECOMING_AWARE", ["inseende", "faktum"]),
+        "studera": ("EDUCATION", ["student", "ämne", "plats"]), "läsa": ("EDUCATION", ["läsare", "ämne"]),
+        "undervisa": ("EDUCATION", ["lärare", "elev", "ämne"]), "forska": ("EDUCATION", ["forskare", "ämne"]),
+        "analysera": ("EDUCATION", ["analytiker", "objekt"]),
+        "leverera": ("TRANSFER", ["leverantör", "mottagare", "objekt"]), "upplysa": ("COMMUNICATION", ["upplysare", "mottagare", "information"]),
+        "lukta": ("PERCEPTION", ["observatör", "doft"]), "smaka": ("PERCEPTION", ["smakare", "mat"]),
+        "glömma": ("COGNITION", ["glömsk", "glömt"]), "ana": ("COGNITION", ["anande", "proposition"]),
+        "beundra": ("EMOTION", ["beundrare", "objekt"]), "förundra": ("EMOTION", ["förundrande", "fenomen"]),
+        "simma": ("MOTION", ["simnare", "källa", "mål"]), "röra": ("MOTION", ["aktör", "objekt", "riktning"]),
+        "förbättra": ("CHANGE", ["aktör", "objekt"]), "försämra": ("CHANGE", ["aktör", "objekt"]),
+        "forma": ("CREATION", ["aktör", "resultat"]), "designa": ("CREATION", ["designer", "resultat"]),
+        "rasera": ("DESTRUCTION", ["aktör", "objekt"]), "bryta": ("DESTRUCTION", ["aktör", "objekt"]),
+        "behålla": ("POSSESSION", ["behållare", "objekt"]), "hålla": ("POSSESSION", ["hållare", "objekt"]),
+        "lura": ("SOCIAL", ["bedragare", "offer"]), "bedra": ("SOCIAL", ["bedragare", "offer"]),
+        "svika": ("SOCIAL", ["svikare", "offer"]), "hota": ("SOCIAL", ["hotare", "hotad", "hot"]),
+        "bjuda": ("SOCIAL", ["värd", "gäst", "erbjudande"]), "ursäkta": ("SOCIAL", ["ursäktare", "mottagare"]),
+        "belöna": ("SOCIAL", ["belönare", "belönad", "förtjänst"]),
+        "ogilla": ("JUDGING", ["ogillare", "ogillad"]), "gilla": ("JUDGING", ["gillare", "gillad"]),
+        "förakta": ("JUDGING", ["föraktare", "föraktad"]),
+        "sträva": ("ATTEMPT", ["strävare", "mål"]),
+        "framkalla": ("CAUSE", ["orsak", "effekt"]), "bidra": ("CAUSE", ["bidragare", "resultat"]),
+        "avlida": ("DYING", ["person", "tid"]), "mörda": ("DYING", ["mördare", "offer"]),
+        "märka": ("BECOMING_AWARE", ["märkare", "fenomen"]), "notera": ("BECOMING_AWARE", ["noterande", "fenomen"]),
+        "erkänna": ("BECOMING_AWARE", ["erkännande", "faktum"]),
+        "svära": ("MAKING_PROMISES", ["svärande", "löfte"]), "garantera": ("MAKING_PROMISES", ["garant", "löfte"]),
+        "utbilda": ("EDUCATION", ["utbildare", "elev", "ämne"]), "examinera": ("EDUCATION", ["examinator", "student"]),
+    ]
+
+    func analyzeFrameSemantics(text: String) -> FrameAnalysis {
+        let lower = text.lowercased()
+        let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?;")).map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.count > 3 }
+        var frames: [SemanticFrame] = []; var frameRelations: [FrameRelation] = []; var whoDidWhat: [String] = []
+
+        for sentence in sentences {
+            let sl = sentence.lowercased()
+            let sw = sl.components(separatedBy: .whitespacesAndNewlines).map { $0.trimmingCharacters(in: .punctuationCharacters) }.filter { !$0.isEmpty }
+            for word in sw {
+                if let (frameName, roles) = Self.frameDatabase[word] {
+                    var elements: [FrameElement] = []
+                    let otherWords = sw.filter { $0 != word }
+                    for (roleIdx, role) in roles.enumerated() where roleIdx < otherWords.count {
+                        elements.append(FrameElement(role: role, filler: otherWords[roleIdx], confidence: 0.6))
+                    }
+                    // Preposition-based role filling
+                    if let idx = sw.firstIndex(of: "av"), idx + 1 < sw.count { elements.append(FrameElement(role: "källa/agent", filler: sw[idx + 1], confidence: 0.7)) }
+                    if let idx = sw.firstIndex(of: "till"), idx + 1 < sw.count { elements.append(FrameElement(role: "mål/mottagare", filler: sw[idx + 1], confidence: 0.7)) }
+                    if let idx = sw.firstIndex(of: "med"), idx + 1 < sw.count { elements.append(FrameElement(role: "instrument", filler: sw[idx + 1], confidence: 0.7)) }
+                    if let idx = sw.firstIndex(of: "från"), idx + 1 < sw.count { elements.append(FrameElement(role: "ursprung", filler: sw[idx + 1], confidence: 0.7)) }
+
+                    let completeness = roles.isEmpty ? 0.0 : Double(elements.count) / Double(max(1, roles.count))
+                    frames.append(SemanticFrame(frameName: frameName, triggerWord: word, frameElements: elements, completeness: min(1.0, completeness)))
+
+                    let agent = elements.first(where: { $0.role.contains("givare") || $0.role.contains("aktör") || $0.role.contains("köpare") || $0.role.contains("talare") })
+                    let patient = elements.first(where: { $0.role.contains("objekt") || $0.role.contains("vara") || $0.role.contains("meddelande") })
+                    let goal = elements.first(where: { $0.role.contains("mottagare") || $0.role.contains("mål") })
+                    if let a = agent, let p = patient { whoDidWhat.append(goal != nil ? "\(a.filler) \(word) \(p.filler) till \(goal!.filler)" : "\(a.filler) \(word) \(p.filler)") }
+                    else if let p = patient { whoDidWhat.append("\(word) \(p.filler)") }
+                }
+            }
+        }
+
+        for i in 0..<(frames.count - 1) {
+            let f1 = frames[i], f2 = frames[i + 1]
+            if (f1.frameName == "ATTEMPT" || f1.frameName == "CAUSE") && (f2.frameName == "CHANGE" || f2.frameName == "CREATION") { frameRelations.append(FrameRelation(fromFrame: f1.frameName, toFrame: f2.frameName, relationType: .causes)) }
+            if f1.frameName == "MOTION" && f2.frameName == "PERCEPTION" { frameRelations.append(FrameRelation(fromFrame: f1.frameName, toFrame: f2.frameName, relationType: .precedes)) }
+            if (f1.frameName == "POSSESSION" && f2.frameName == "DESTRUCTION") || (f1.frameName == "DESTRUCTION" && f2.frameName == "POSSESSION") { frameRelations.append(FrameRelation(fromFrame: f1.frameName, toFrame: f2.frameName, relationType: .contrastsWith)) }
+        }
+
+        let frameCompleteness = frames.isEmpty ? 0.0 : frames.reduce(0.0) { $0 + $1.completeness } / Double(frames.count)
+        return FrameAnalysis(frames: frames, frameRelations: frameRelations, frameCompleteness: frameCompleteness, whoDidWhat: whoDidWhat, comprehensionBoost: min(0.1, Double(frames.count) * 0.005))
+    }
+
+    // MARK: - Iteration 65: Presupposition Detection
+
+    struct Presupposition: Identifiable {
+        let id = UUID(); let type: PresuppositionType; let text: String; let presupposedContent: String; let trigger: String; let confidence: Double; let negationTest: Bool
+        enum PresuppositionType: String { case factive = "faktiv"; case implicative = "implikativ"; case lexical = "lexikalisk"; case structural = "strukturell"; case nonRestrictiveRelative = "icke-restriktiv relativsats" }
+    }
+
+    private static let factiveVerbs: Set<String> = ["vet", "veta", "visste", "inse", "inser", "insåg", "upptäcka", "upptäcker", "upptäckte", "ångra", "ångrade", "begråta", "begråter", "förvånad", "glad över", "ledsen över", "stolt över", "realisera", "realiserar", "förstå", "förstår", "förstod", "medge", "medger", "medgav", "erkänna", "erkänner", "erkände", "är medveten", "var medveten"]
+    private static let implicativeVerbs: Set<String> = ["lyckades", "lyckas", "glömde", "glömmer", "glömma", "undvek", "undviker", "undvika", "tvingades", "tvingas", "tvinga", "vågade", "vågar", "våga", "kunde", "kan", "kunna", "hinner", "hinna", "hann", "orkade", "orkar", "orka", "förmådde", "förmår", "förmå"]
+    private static let lexicalPresuppositionTriggers: [String: String] = ["sluta": "att personen tidigare gjorde handlingen", "slutar": "att personen tidigare gjorde handlingen", "slutade": "att personen tidigare gjorde handlingen", "fortsätta": "att personen redan påbörjat handlingen", "fortsätter": "att personen redan påbörjat handlingen", "fortsatte": "att personen redan påbörjat handlingen", "börja": "att handlingen inte pågick tidigare", "börjar": "att handlingen inte pågick tidigare", "började": "att handlingen inte pågick tidigare", "återvända": "att personen varit där tidigare", "återvänder": "att personen varit där tidigare", "återvände": "att personen varit där tidigare", "än en gång": "att det hänt minst en gång tidigare", "återigen": "att det hänt minst en gång tidigare", "igen": "att det hänt minst en gång tidigare", "också": "att något annat liknande gäller", "dessutom": "att något annat redan etablerats"]
+    private static let structuralPresupPositions: Set<String> = ["om", "ifall", "såvida", "förutsatt att", "under förutsättning att"]
+    private static let nonRestrictiveMarkers = [", som ", ", vilket ", ", vilken ", ", vilka "]
+
+    func detectPresuppositions(text: String) -> [Presupposition] {
+        let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?;")).map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.count > 3 }
+        var presuppositions: [Presupposition] = []
+        for sentence in sentences {
+            let sl = sentence.lowercased()
+            let words = sl.components(separatedBy: .whitespacesAndNewlines).map { $0.trimmingCharacters(in: .punctuationCharacters) }.filter { !$0.isEmpty }
+            for (i, word) in words.enumerated() where Self.factiveVerbs.contains(word) {
+                let complement = words[(i + 1)...].joined(separator: " ")
+                presuppositions.append(Presupposition(type: .factive, text: sentence, presupposedContent: complement, trigger: word, confidence: 0.85, negationTest: true))
+            }
+            for (i, word) in words.enumerated() where Self.implicativeVerbs.contains(word) && i + 1 < words.count {
+                let complement = words[(i + 1)...].joined(separator: " ")
+                presuppositions.append(Presupposition(type: .implicative, text: sentence, presupposedContent: "försökte: \(complement)", trigger: word, confidence: 0.75, negationTest: false))
+            }
+            for (trigger, meaning) in Self.lexicalPresuppositionTriggers where sl.contains(trigger) {
+                presuppositions.append(Presupposition(type: .lexical, text: sentence, presupposedContent: meaning, trigger: trigger, confidence: 0.7, negationTest: true))
+            }
+            if let condIdx = words.firstIndex(where: { Self.structuralPresupPositions.contains($0) }) {
+                let condition = words[(condIdx + 1)...].joined(separator: " ")
+                presuppositions.append(Presupposition(type: .structural, text: sentence, presupposedContent: "möjligt att: \(condition)", trigger: words[condIdx], confidence: 0.65, negationTest: false))
+            }
+            for marker in Self.nonRestrictiveMarkers where sl.contains(marker) {
+                if let idx = sl.range(of: marker) {
+                    let relativeContent = String(sl[idx.upperBound...]).components(separatedBy: ".").first ?? ""
+                    presuppositions.append(Presupposition(type: .nonRestrictiveRelative, text: sentence, presupposedContent: "det som beskrivs existerar: \(relativeContent)", trigger: marker.trimmingCharacters(in: .whitespaces), confidence: 0.7, negationTest: true))
+                }
+            }
+        }
+        return presuppositions
+    }
+
+    // MARK: - Iteration 66: Conversational Implicature Detection
+
+    struct Implicature: Identifiable {
+        let id = UUID(); let violatedMaxim: GriceanMaxim; let utterance: String; let literalMeaning: String; let inferredMeaning: String; let confidence: Double; let explanation: String
+    }
+    enum GriceanMaxim: String, CaseIterable { case quantity = "Kvantitet"; case quality = "Kvalitet"; case relation = "Relation"; case manner = "Sätt" }
+
+    func detectImplicatures(conversation: [String]) -> [Implicature] {
+        guard conversation.count >= 2 else { return [] }
+        var implicatures: [Implicature] = []
+        for (idx, utterance) in conversation.enumerated() {
+            let lower = utterance.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            let words = lower.components(separatedBy: .whitespacesAndNewlines).map { $0.trimmingCharacters(in: .punctuationCharacters) }.filter { !$0.isEmpty }
+
+            // Quantity violations
+            if idx > 0 {
+                let prevLen = conversation[idx - 1].count
+                if prevLen > 50 && utterance.count < 10 && words.count <= 2 {
+                    if words == ["ok"] || words == ["okej"] || words == ["ja"] || words == ["n"] || words == ["nä"] {
+                        implicatures.append(Implicature(violatedMaxim: .quantity, utterance: utterance, literalMeaning: utterance, inferredMeaning: "Talaren ger medvetet minimal information — kanske ogillande eller ointresse", confidence: 0.6, explanation: "Kvantitetsbrott: oväntat kort svar"))
+                    }
+                }
+            }
+            if words.count > 50 {
+                let hedgeCount = words.filter { ["kanske", "möjligen", "typ", "liksom", "asså", "egentligen"].contains($0) }.count
+                if hedgeCount >= 3 {
+                    implicatures.append(Implicature(violatedMaxim: .quantity, utterance: utterance, literalMeaning: String(utterance.prefix(100)), inferredMeaning: "Onödigt mycket detaljinformation — kanske för att dölja något", confidence: 0.5, explanation: "Kvantitetsbrott: överdrivet detaljerat"))
+                }
+            }
+
+            // Quality violations
+            if lower.contains("alla ") && (lower.contains("vet") || lower.contains("tycker")) {
+                implicatures.append(Implicature(violatedMaxim: .quality, utterance: utterance, literalMeaning: utterance, inferredMeaning: "Generalisering utan belägg — subjektiv uppfattning som fakta", confidence: 0.55, explanation: "Kvalitetsbrott: obelagd generalisering"))
+            }
+            if (lower.contains("jag vet") || lower.contains("alla vet")) && words.contains(where: { $0.contains("alltid") || $0.contains("aldrig") }) {
+                implicatures.append(Implicature(violatedMaxim: .quality, utterance: utterance, literalMeaning: utterance, inferredMeaning: "Kunskapspåstående som inte kan verifieras — ironi eller överdrift", confidence: 0.6, explanation: "Kvalitetsbrott: kunskapspåstående med absolut formulering"))
+            }
+
+            // Relation violations
+            if idx > 0 && words.count >= 3 {
+                let prevWords = Set(conversation[idx - 1].lowercased().components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 3 })
+                let currWords = Set(words.filter { $0.count > 3 })
+                if prevWords.intersection(currWords).isEmpty && !lower.contains("?") && !conversation[idx - 1].contains("?") {
+                    let hasTopicShift = ["förresten", "just det", "apropå", "men", "annars", "på ett annat plan"].contains { lower.contains($0) }
+                    if !hasTopicShift {
+                        implicatures.append(Implicature(violatedMaxim: .relation, utterance: utterance, literalMeaning: utterance, inferredMeaning: "Svaret verkar inte relevant — talaren kanske undviker ämnet", confidence: 0.45, explanation: "Relationsbrott: ingen tydlig topikanknytning"))
+                    }
+                }
+            }
+
+            // Manner violations
+            let vagueWords = Set(["något", "någon", "någonting", "saker", "ting", "grejer", "grej", "grejen", "typ", "liksom", "asså", "va", "nån", "nånstans"])
+            let vagueCount = words.filter { vagueWords.contains($0) }.count
+            if vagueCount >= 4 && words.count > 5 {
+                implicatures.append(Implicature(violatedMaxim: .manner, utterance: utterance, literalMeaning: utterance, inferredMeaning: "Talaren är medvetet otydlig — kanske för att undvika ansvar", confidence: 0.55, explanation: "Sättbrott: \(vagueCount) vaga uttryck"))
+            }
+
+            // Irony via maxim violation
+            let posInBad = lower.contains("bra") || lower.contains("fint") || lower.contains("trevligt") || lower.contains("underbart")
+            let badWords = ["problem", "fel", "dåligt", "trasig", "krångel", "misslyckad", "död", "katastrof"]
+            if posInBad && words.contains(where: { badWords.contains($0) }) {
+                implicatures.append(Implicature(violatedMaxim: .quality, utterance: utterance, literalMeaning: utterance, inferredMeaning: "Ironi: positivt ord i negativ kontext — talaren menar motsatsen", confidence: 0.7, explanation: "Kvalitetsbrott: inkongruens mellan känsla och kontext"))
+            }
+        }
+        return implicatures
+    }
+
+    // MARK: - Iteration 67: Genre Classification
+
+    struct GenreClassification {
+        let genre: Genre; let confidence: Double; let secondaryGenres: [(Genre, Double)]; let interpretationMode: InterpretationMode; let features: GenreFeatures
+    }
+    enum Genre: String, CaseIterable { case newsArticle = "nyhetsartikel"; case academicText = "akademisk text"; case casualConversation = "vardagssamtal"; case formalLetter = "formellt brev"; case instructionManual = "instruktion"; case opinionPiece = "opinion/ledare"; case narrativeFiction = "skönlitteratur"; case poetry = "poesi"; case advertisement = "annons/reklam"; case legalText = "juridisk text"; case email = "e-post"; case socialMedia = "sociala medier"; case unknown = "okänd" }
+    enum InterpretationMode: String { case factChecking = "faktagranskning"; case hedgingAware = "hedging-medveten"; case metaphorHeavy = "metaforintensiv"; case imperativeDriven = "imperativstyrd"; case persuasionAware = "persuasionsmedveten"; case legalInterpretation = "juridisk tolkning"; case casual = "vardaglig"; case standard = "standard" }
+    struct GenreFeatures { let avgSentenceLength: Double; let lexicalDiversity: Double; let formalWordRatio: Double; let punctuationDensity: Double; let hasHeadline: Bool; let hasCitations: Bool; let hasImperatives: Bool; let hasEmojis: Bool }
+
+    private static let newsIndicators: Set<String> = ["enligt uppgift", "polis meddelar", "källa uppger", "nyhetsbyrån", "presstjänsten", "TT", "reporter", "korrespondent", "breaking", "senaste nytt", "just nu", "publicerad", "uppdaterad"]
+    private static let academicIndicators: Set<String> = ["enligt studien", "forskningsresultat", "hypotes", "metod", "empirisk", "kvantitativ", "kvalitativ", "signifikant", "korrelation", "kausal", "sammanfattning", "abstract", "referens", "citerad", "litteratur", "avhandling"]
+    private static let casualIndicators: Set<String> = ["asså", "typ", "liksom", "va", "ju", "haha", "lol", "fan", "sjukt", "grymt", "nice"]
+    private static let formalLetterIndicators: Set<String> = ["bästa", "bäste", "med vänliga hälsningar", "vänliga hälsningar", "högaktningsfullt", "härmed", "bifogas", "åberopar", "diarienummer"]
+    private static let instructionIndicators: Set<String> = ["gör så här", "steg", "instruktion", "observera", "viktigt", "säkerhet", "montera", "installera", "koppla", "anslut", "tryck", "klicka", "öppna", "välj", "spara"]
+    private static let opinionIndicators: Set<String> = ["jag anser", "jag tycker", "enligt min mening", "det är dags", "vi bör", "vi måste", "det är fel att", "regeringen borde", "ledare", "krönika", "debattartikel"]
+    private static let fictionIndicators: Set<String> = ["det var en gång", "han gick", "hon såg", "de stod", "plötsligt", "då hände", "berättade", "sade", "svarade", "tänkte", "kände", "viskade", "ropade"]
+    private static let poetryIndicators: Set<String> = ["vers", "strof", "rim", "rytm", "dikt", "poesi", "låt", "sång", "melodi"]
+    private static let advertisementIndicators: Set<String> = ["köp nu", "erbjudande", "rea", "rabatt", "begränsad tid", "exklusivt", "missa inte", "just nu", "billigt", "kampanj", "nyhet", "fri frakt", "prova gratis"]
+    private static let legalIndicators: Set<String> = ["enligt lag", "paragraf", "lagrum", "rättsfall", "domstol", "åtal", "rättighet", "skyldighet", "avtal", "villkor", "bestämmelse", "föreskrift", "stadga", "förordning", "lagen"]
+    private static let emailIndicators: Set<String> = ["hej", "bästa", "mvh", "hälsningar", "bilaga", "vidarebefordra", "svara alla", "cc", "bcc"]
+    private static let socialMediaIndicators: Set<String> = ["#", "@", "follow", "like", "share", "retweet", "tagga", "story", "post", "uppdatering", "följare", "gilla"]
+
+    func classifyGenre(text: String) -> GenreClassification {
+        let lower = text.lowercased()
+        let words = lower.components(separatedBy: .whitespacesAndNewlines).map { $0.trimmingCharacters(in: .punctuationCharacters) }.filter { !$0.isEmpty }
+        let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?;")).map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.count > 3 }
+        let totalWords = words.count; let totalSentences = max(1, sentences.count)
+        let avgSentenceLength = Double(totalWords) / Double(totalSentences)
+        let uniqueWords = Set(words); let lexicalDiversity = uniqueWords.isEmpty ? 0.0 : Double(uniqueWords.count) / Double(max(1, totalWords))
+        let formalCount = words.filter { ["härmed", "bifogas", "enligt", "beträffande", "avseende", "vederbörande", "följaktligen", "således"].contains($0) }.count
+        let formalWordRatio = Double(formalCount) / Double(max(1, totalWords))
+        let punctuationCount = text.filter { ".!?,;:".contains($0) }.count
+        let punctuationDensity = Double(punctuationCount) / Double(max(1, text.count))
+        let hasHeadline = (sentences.first?.count ?? 0) < 30 && totalSentences > 2
+        let hasCitations = lower.contains("\"") || lower.contains("enligt ")
+        let hasImperatives = words.contains { ["gör", "öppna", "stäng", "tryck", "klicka", "välj", "spara", "montera", "installera"].contains($0) }
+        let hasEmojis = text.unicodeScalars.contains { $0.properties.isEmojiPresentation == true }
+        let features = GenreFeatures(avgSentenceLength: avgSentenceLength, lexicalDiversity: lexicalDiversity, formalWordRatio: formalWordRatio, punctuationDensity: punctuationDensity, hasHeadline: hasHeadline, hasCitations: hasCitations, hasImperatives: hasImperatives, hasEmojis: hasEmojis)
+
+        var scores: [Genre: Double] = [:]
+        scores[.newsArticle] = Double(words.filter { Self.newsIndicators.contains($0) }.count) * 0.3 + (hasCitations ? 0.3 : 0.0) + (hasHeadline ? 0.2 : 0.0) + (avgSentenceLength > 15 && avgSentenceLength < 30 ? 0.2 : 0.0)
+        scores[.academicText] = Double(words.filter { Self.academicIndicators.contains($0) }.count) * 0.3 + (avgSentenceLength > 20 ? 0.3 : 0.0) + (lexicalDiversity > 0.6 ? 0.2 : 0.0) + (formalWordRatio > 0.05 ? 0.2 : 0.0)
+        scores[.casualConversation] = Double(words.filter { Self.casualIndicators.contains($0) }.count) * 0.3 + (hasEmojis ? 0.4 : 0.0) + (avgSentenceLength < 10 ? 0.2 : 0.0)
+        scores[.formalLetter] = Double(words.filter { Self.formalLetterIndicators.contains($0) }.count) * 0.4 + (formalWordRatio > 0.05 ? 0.3 : 0.0)
+        scores[.instructionManual] = Double(words.filter { Self.instructionIndicators.contains($0) }.count) * 0.3 + (hasImperatives ? 0.4 : 0.0) + (avgSentenceLength < 15 ? 0.2 : 0.0)
+        scores[.opinionPiece] = Double(words.filter { Self.opinionIndicators.contains($0) }.count) * 0.3 + (lower.contains("jag tycker") || lower.contains("jag anser") ? 0.3 : 0.0)
+        scores[.narrativeFiction] = Double(words.filter { Self.fictionIndicators.contains($0) }.count) * 0.3 + (lower.contains("han ") && lower.contains("hon ") ? 0.2 : 0.0) + (avgSentenceLength > 10 && avgSentenceLength < 25 ? 0.2 : 0.0)
+        let lineCount = text.components(separatedBy: .newlines).filter { $0.trimmingCharacters(in: .whitespaces).count > 0 }.count
+        scores[.poetry] = Double(words.filter { Self.poetryIndicators.contains($0) }.count) * 0.3 + (lineCount > totalSentences ? 0.4 : 0.0) + (avgSentenceLength < 8 ? 0.2 : 0.0)
+        scores[.advertisement] = Double(words.filter { Self.advertisementIndicators.contains($0) }.count) * 0.3 + (hasImperatives ? 0.2 : 0.0) + (lower.contains("!") ? 0.2 : 0.0)
+        scores[.legalText] = Double(words.filter { Self.legalIndicators.contains($0) }.count) * 0.3 + (formalWordRatio > 0.08 ? 0.3 : 0.0) + (avgSentenceLength > 25 ? 0.2 : 0.0)
+        scores[.email] = Double(words.filter { Self.emailIndicators.contains($0) }.count) * 0.3 + (lower.hasPrefix("hej") || lower.hasPrefix("bästa") ? 0.3 : 0.0)
+        scores[.socialMedia] = Double(words.filter { Self.socialMediaIndicators.contains($0) }.count) * 0.3 + (hasEmojis ? 0.3 : 0.0) + (avgSentenceLength < 8 ? 0.2 : 0.0)
+
+        let sorted = scores.sorted { $0.value > $1.value }
+        let primaryGenre = sorted.first?.key ?? .unknown
+        let primaryScore = sorted.first?.value ?? 0.0
+        let secondaryGenres = sorted.dropFirst(1).prefix(2).map { ($0.key, min(0.99, $0.value)) }.filter { $0.1 > 0.1 }
+        let mode: InterpretationMode
+        switch primaryGenre {
+        case .newsArticle: mode = .factChecking
+        case .academicText: mode = .hedgingAware
+        case .poetry, .narrativeFiction: mode = .metaphorHeavy
+        case .instructionManual: mode = .imperativeDriven
+        case .opinionPiece, .advertisement: mode = .persuasionAware
+        case .legalText: mode = .legalInterpretation
+        case .casualConversation, .socialMedia: mode = .casual
+        default: mode = .standard
+        }
+        return GenreClassification(genre: primaryGenre, confidence: min(0.95, primaryScore), secondaryGenres: secondaryGenres, interpretationMode: mode, features: features)
+    }
+
+    // MARK: - Iteration 68: Sentiment Trajectory Analysis
+
+    struct SentimentTrajectory {
+        let perSentenceSentiment: [SentenceSentiment]; let sentimentShifts: [SentimentShift]; let turningPoints: [TurningPoint]
+        let emotionalArc: EmotionalArcType; let valenceStart: Double; let valenceEnd: Double; let valenceRange: ClosedRange<Double>
+        let mixedSentiment: Bool; let bodyBudgetUpdate: BodyBudgetEffect
+    }
+    struct SentenceSentiment: Identifiable { let id = UUID(); let sentence: String; let index: Int; let valence: Double; let arousal: Double; let emotion: String }
+    struct SentimentShift: Identifiable {
+        let id = UUID(); let fromIndex: Int; let toIndex: Int; let fromValence: Double; let toValence: Double; let shiftMagnitude: Double; let shiftType: ShiftType
+        enum ShiftType: String { case rising, falling, volatile, stable }
+    }
+    struct TurningPoint: Identifiable {
+        let id = UUID(); let sentenceIndex: Int; let sentence: String; let valence: Double; let type: TurningPointType
+        enum TurningPointType: String { case peak, trough, inflection }
+    }
+    enum EmotionalArcType: String { case rising = "stigande"; case falling = "fallande"; case risingFalling = "stigande-fallande"; case fallingRising = "fallande-stigande"; case stable = "stabil"; case volatile = "volatil"; case complex = "komplex" }
+    struct BodyBudgetEffect { let effect: BodyBudgetEffectType; let intensity: Double; enum BodyBudgetEffectType: String { case energizing = "energigivande"; case draining = "energitömmande"; case calming = "lugnande"; case stimulating = "stimulerande"; case neutral = "neutral" } }
+
+    func analyzeSentimentTrajectory(text: String) -> SentimentTrajectory {
+        let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?;")).map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.count > 3 }
+        guard !sentences.isEmpty else { return SentimentTrajectory(perSentenceSentiment: [], sentimentShifts: [], turningPoints: [], emotionalArc: .stable, valenceStart: 0, valenceEnd: 0, valenceRange: 0...0, mixedSentiment: false, bodyBudgetUpdate: BodyBudgetEffect(effect: .neutral, intensity: 0)) }
+
+        var perSentence: [SentenceSentiment] = []
+        for (idx, sentence) in sentences.enumerated() {
+            let result = analyzeEmotionalValence(sentence)
+            perSentence.append(SentenceSentiment(sentence: sentence, index: idx, valence: result.valence, arousal: result.arousal, emotion: result.emotion))
+        }
+
+        var shifts: [SentimentShift] = []
+        for i in 0..<(perSentence.count - 1) {
+            let from = perSentence[i], to = perSentence[i + 1]
+            let magnitude = abs(to.valence - from.valence)
+            if magnitude > 0.3 {
+                let type: SentimentShift.ShiftType
+                if to.valence > from.valence + 0.3 { type = .rising }
+                else if to.valence < from.valence - 0.3 { type = .falling }
+                else if magnitude > 0.6 { type = .volatile }
+                else { type = .stable }
+                shifts.append(SentimentShift(fromIndex: i, toIndex: i + 1, fromValence: from.valence, toValence: to.valence, shiftMagnitude: magnitude, shiftType: type))
+            }
+        }
+
+        var turningPoints: [TurningPoint] = []
+        for i in 1..<(perSentence.count - 1) {
+            let prev = perSentence[i - 1].valence, curr = perSentence[i].valence, next = perSentence[i + 1].valence
+            if curr > prev && curr > next { turningPoints.append(TurningPoint(sentenceIndex: i, sentence: perSentence[i].sentence, valence: curr, type: .peak)) }
+            else if curr < prev && curr < next { turningPoints.append(TurningPoint(sentenceIndex: i, sentence: perSentence[i].sentence, valence: curr, type: .trough)) }
+            else if (curr - prev) * (next - curr) < 0 { turningPoints.append(TurningPoint(sentenceIndex: i, sentence: perSentence[i].sentence, valence: curr, type: .inflection)) }
+        }
+
+        let valenceStart = perSentence.first?.valence ?? 0; let valenceEnd = perSentence.last?.valence ?? 0
+        let allValences = perSentence.map { $0.valence }; let valenceMin = allValences.min() ?? 0; let valenceMax = allValences.max() ?? 0
+        let overallDelta = valenceEnd - valenceStart; let shiftCount = shifts.count
+        let arcType: EmotionalArcType
+        if shiftCount >= 3 && abs(overallDelta) < 0.3 { arcType = .volatile }
+        else if shiftCount >= 4 { arcType = .complex }
+        else if overallDelta > 0.3 { arcType = .rising }
+        else if overallDelta < -0.3 { arcType = .falling }
+        else if turningPoints.count == 1 && turningPoints[0].type == .peak { arcType = .risingFalling }
+        else if turningPoints.count == 1 && turningPoints[0].type == .trough { arcType = .fallingRising }
+        else { arcType = .stable }
+
+        let positiveCount = perSentence.filter { $0.valence > 0.3 }.count; let negativeCount = perSentence.filter { $0.valence < -0.3 }.count
+        let mixedSentiment = positiveCount > 0 && negativeCount > 0 && Double(min(positiveCount, negativeCount)) / Double(perSentence.count) > 0.2
+
+        let avgArousal = perSentence.map { $0.arousal }.reduce(0, +) / Double(max(1, perSentence.count))
+        let avgValence = allValences.reduce(0, +) / Double(max(1, allValences.count))
+        let bodyBudget: BodyBudgetEffect
+        if avgValence > 0.3 && avgArousal > 0.5 { bodyBudget = BodyBudgetEffect(effect: .energizing, intensity: min(1.0, avgValence * avgArousal)) }
+        else if avgValence < -0.3 && avgArousal > 0.5 { bodyBudget = BodyBudgetEffect(effect: .draining, intensity: min(1.0, abs(avgValence) * avgArousal)) }
+        else if avgArousal < 0.3 { bodyBudget = BodyBudgetEffect(effect: .calming, intensity: min(1.0, 1.0 - avgArousal)) }
+        else if avgValence > 0 && avgArousal > 0.3 { bodyBudget = BodyBudgetEffect(effect: .stimulating, intensity: min(1.0, avgArousal)) }
+        else { bodyBudget = BodyBudgetEffect(effect: .neutral, intensity: 0) }
+
+        return SentimentTrajectory(perSentenceSentiment: perSentence, sentimentShifts: shifts, turningPoints: turningPoints, emotionalArc: arcType, valenceStart: valenceStart, valenceEnd: valenceEnd, valenceRange: valenceMin...valenceMax, mixedSentiment: mixedSentiment, bodyBudgetUpdate: bodyBudget)
+    }
+
+    // MARK: - Iteration 69: Semantic Role Labeling
+
+    struct SemanticRole: Identifiable { let id = UUID(); let predicate: String; let roles: [RoleFiller]; let sentence: String; let confidence: Double }
+    struct RoleFiller: Codable { let role: SemanticRoleType; let filler: String; let position: String; let confidence: Double }
+    enum SemanticRoleType: String, CaseIterable { case agent = "agens"; case patient = "patiens"; case instrument = "instrument"; case source = "källa"; case goal = "mål"; case location = "lokal"; case time = "tid"; case manner = "sätt"; case cause = "orsak"; case experiencer = "experiens"; case beneficiary = "gynnare" }
+
+    private static let agentPreps: Set<String> = ["av", "genom", "med hjälp av"]
+    private static let sourcePreps: Set<String> = ["från", "ur", "av", "ifrån"]
+    private static let goalPreps: Set<String> = ["till", "mot", "in i", "upp till"]
+    private static let locationPreps: Set<String> = ["i", "på", "vid", "under", "över", "bredvid", "mellan", "framför", "bakom"]
+    private static let instrumentPreps: Set<String> = ["med", "genom", "med hjälp av"]
+    private static let timePreps: Set<String> = ["på", "i", "under", "före", "efter", "mellan", "vid", "innan", "sedan", "tills"]
+    private static let mannerPreps: Set<String> = ["på", "med", "utan", "genom"]
+    private static let causePreps: Set<String> = ["på grund av", "genom", "tack vare", "av", "av skäl"]
+    private static let beneficiaryPreps: Set<String> = ["för", "till", "åt"]
+    private static let psychVerbs: Set<String> = ["älska", "hata", "frukta", "älskar", "hatar", "fruktar", "beundra", "beundrar", "ogilla", "ogillar", "gilla", "gillar", "tycka", "tycker", "tro", "tror", "känna", "känner", "uppleva", "upplever"]
+
+    func labelSemanticRoles(sentence: String) -> [SemanticRole] {
+        let lower = sentence.lowercased()
+        let words = lower.components(separatedBy: .whitespacesAndNewlines).map { $0.trimmingCharacters(in: .punctuationCharacters) }.filter { !$0.isEmpty }
+        var roles: [SemanticRole] = []
+
+        for (i, word) in words.enumerated() {
+            let isVerb = isLikelyVerbWord(word)
+            guard isVerb else { continue }
+            var roleFillers: [RoleFiller] = []
+            let isPsychVerb = Self.psychVerbs.contains(word)
+
+            // Subject = agent/experiencer
+            if i >= 1 {
+                let subject = words[max(0, i - 1)]
+                let skipWords = Set(["och", "eller", "men", "för", "att", "som", "när", "om", "inte", "där", "här"])
+                if !skipWords.contains(subject) && subject.count > 1 {
+                    roleFillers.append(RoleFiller(role: isPsychVerb ? .experiencer : .agent, filler: subject, position: subject, confidence: 0.75))
+                }
+            }
+
+            // Object = patient
+            if i + 1 < words.count {
+                var patientWords: [String] = []
+                for w in words[(i + 1)...] {
+                    if isPrepositionWord(w) { break }
+                    let skipWords = Set(["och", "eller", "men", "för", "att", "som", "när", "om", "inte", "där", "här", "också", "bara", "redan", "alltid", "aldrig"])
+                    if !skipWords.contains(w) && w.count > 1 { patientWords.append(w) }
+                }
+                if !patientWords.isEmpty { roleFillers.append(RoleFiller(role: .patient, filler: patientWords.joined(separator: " "), position: patientWords.joined(separator: " "), confidence: 0.65)) }
+            }
+
+            // Preposition-based role filling
+            var cIdx = i
+            while cIdx < words.count - 1 {
+                cIdx += 1; let w = words[cIdx]
+                if Self.agentPreps.contains(w) && cIdx + 1 < words.count { roleFillers.append(RoleFiller(role: .agent, filler: words[cIdx + 1], position: "\(w) \(words[cIdx + 1])", confidence: 0.8)) }
+                else if Self.sourcePreps.contains(w) && cIdx + 1 < words.count { roleFillers.append(RoleFiller(role: .source, filler: words[cIdx + 1], position: "\(w) \(words[cIdx + 1])", confidence: 0.8)) }
+                else if Self.goalPreps.contains(w) && cIdx + 1 < words.count { roleFillers.append(RoleFiller(role: .goal, filler: words[cIdx + 1], position: "\(w) \(words[cIdx + 1])", confidence: 0.8)) }
+                else if Self.locationPreps.contains(w) && cIdx + 1 < words.count { roleFillers.append(RoleFiller(role: .location, filler: words[cIdx + 1], position: "\(w) \(words[cIdx + 1])", confidence: 0.75)) }
+                else if Self.instrumentPreps.contains(w) && cIdx + 1 < words.count { roleFillers.append(RoleFiller(role: .instrument, filler: words[cIdx + 1], position: "\(w) \(words[cIdx + 1])", confidence: 0.75)) }
+                else if Self.timePreps.contains(w) && cIdx + 1 < words.count { let tp = collectPhrase(from: cIdx + 1, in: words); roleFillers.append(RoleFiller(role: .time, filler: tp, position: "\(w) \(tp)", confidence: 0.7)) }
+                else if Self.mannerPreps.contains(w) && cIdx + 1 < words.count { roleFillers.append(RoleFiller(role: .manner, filler: words[cIdx + 1], position: "\(w) \(words[cIdx + 1])", confidence: 0.65)) }
+                else if Self.causePreps.contains(w) && cIdx + 1 < words.count { let cp = collectPhrase(from: cIdx + 1, in: words); roleFillers.append(RoleFiller(role: .cause, filler: cp, position: "\(w) \(cp)", confidence: 0.7)) }
+                else if Self.beneficiaryPreps.contains(w) && cIdx + 1 < words.count { roleFillers.append(RoleFiller(role: .beneficiary, filler: words[cIdx + 1], position: "\(w) \(words[cIdx + 1])", confidence: 0.75)) }
+            }
+
+            // Passive detection
+            if word.hasSuffix("s") && word.count > 3, let avIdx = words.firstIndex(of: "av"), avIdx + 1 < words.count {
+                roleFillers.append(RoleFiller(role: .agent, filler: words[avIdx + 1], position: "av \(words[avIdx + 1])", confidence: 0.85))
+            }
+
+            if !roleFillers.isEmpty {
+                let avgConf = roleFillers.map { $0.confidence }.reduce(0, +) / Double(roleFillers.count)
+                roles.append(SemanticRole(predicate: word, roles: roleFillers, sentence: sentence, confidence: avgConf))
+            }
+        }
+        return roles
+    }
+
+    private func isLikelyVerbWord(_ word: String) -> Bool {
+        let commonVerbs: Set<String> = ["är", "var", "bli", "ha", "få", "kunna", "måste", "ska", "vill", "gör", "säger", "går", "kommer", "tar", "ger", "ser", "hör", "vet", "tror", "tycker", "känner", "minns", "glömmer", "skriver", "läser", "tänker", "arbetar", "sover", "äter", "dricker", "springer", "åker", "reser", "flyger", "simmar", "cyklar", "kör", "köper", "säljer", "betalar", "kostar", "sparar", "bygger", "skapar", "fixar", "lagar", "hjälper", "älskar", "hatar", "gillar", "ogillar", "börjar", "slutar", "fortsätter", "försöker", "lyckas", "öppnar", "stänger", "ställer", "lägger", "sätter", "håller", "frågar", "svarar", "berättar", "förklarar", "ändrar", "påverkar", "leder", "följer", "stannar", "stiger", "faller", "ökar", "minskar", "växer"]
+        if commonVerbs.contains(word) { return true }
+        return word.hasSuffix("ar") || word.hasSuffix("er") || word.hasSuffix("r") || word.hasSuffix("ade") || word.hasSuffix("de") || word.hasSuffix("te") || word.hasSuffix("at") || word.hasSuffix("t") || word.hasSuffix("it") || word.hasSuffix("as") || word.hasSuffix("es")
+    }
+    private func isPrepositionWord(_ word: String) -> Bool {
+        ["på", "i", "av", "för", "med", "till", "från", "om", "under", "över", "mellan", "genom", "utan", "vid", "efter", "före", "inom", "utanför", "bredvid", "framför", "bakom", "längs", "runt", "tack", "på", "grund", "med", "hjälp"].contains(word)
+    }
+    private func collectPhrase(from index: Int, in words: [String]) -> String {
+        var phrase = ""; var idx = index
+        while idx < words.count { let w = words[idx]; if isPrepositionWord(w) && idx > index { break }; if w == "och" || w == "eller" { break }; phrase += (phrase.isEmpty ? "" : " ") + w; idx += 1 }
+        return phrase.isEmpty ? (index < words.count ? words[index] : "") : phrase
     }
 }
 
