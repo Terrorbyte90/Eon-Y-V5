@@ -678,3 +678,98 @@ struct IntelligenceSnapshot: Identifiable {
     let value: Double
     let timestamp: Date
 }
+
+// ═══════════════════════════════════════════════════════════
+// ITERATION 137: Cognitive Development Tracking
+// ═══════════════════════════════════════════════════════════
+
+struct DevelopmentReport: Sendable {
+    let currentStage: String
+    let timeAtCurrentStage: TimeInterval
+    let stageTransitions: [StageTransition]
+    let accelerationRate: Double
+    let predictedNextStage: String
+    let predictedTransitionDate: Date?
+    let generatedAt: Date
+}
+
+struct StageTransition: Sendable {
+    let fromStage: String
+    let toStage: String
+    let date: Date
+    let duration: TimeInterval
+}
+
+extension CognitiveState {
+    /// Track developmental stage transitions, time spent at each stage, acceleration/deceleration rates, and predict next stage transition.
+    func trackCognitiveDevelopment() -> DevelopmentReport {
+        let currentStage = DevelopmentalStage.fromIntelligence(integratedIntelligence)
+        let currentStageLabel = currentStage.label
+
+        // Time at current stage (approximate from intelligence history)
+        let stageThreshold = currentStage.threshold()
+        let timeAtCurrentStage: TimeInterval
+        var transitions: [StageTransition] = []
+
+        // Build transition history from intelligence snapshots
+        let allStages = DevelopmentalStage.allCases
+        var previousStage: DevelopmentalStage? = nil
+        var stageStartDate: Date? = nil
+
+        for snapshot in intelligenceHistory {
+            let stageAtTime = DevelopmentalStage.fromIntelligence(snapshot.value)
+            if stageAtTime != previousStage {
+                if let prev = previousStage, let start = stageStartDate {
+                    transitions.append(StageTransition(
+                        fromStage: prev.label,
+                        toStage: stageAtTime.label,
+                        date: snapshot.timestamp,
+                        duration: snapshot.timestamp.timeIntervalSince(start)
+                    ))
+                }
+                previousStage = stageAtTime
+                stageStartDate = snapshot.timestamp
+            }
+        }
+
+        timeAtCurrentStage = stageStartDate.map { Date().timeIntervalSince($0) } ?? 0
+
+        // Acceleration rate (change in growth velocity)
+        let accelerationRate: Double
+        if intelligenceHistory.count >= 10 {
+            let recent = intelligenceHistory.suffix(5)
+            let older = intelligenceHistory.prefix(5)
+            let recentVelocity = recent.count >= 2 ?
+                (recent.last!.value - recent.first!.value) / max(0.001, recent.last!.timestamp.timeIntervalSince(recent.first!.timestamp) / 60.0) : 0.0
+            let olderVelocity = older.count >= 2 ?
+                (older.last!.value - older.first!.value) / max(0.001, older.last!.timestamp.timeIntervalSince(older.first!.timestamp) / 60.0) : 0.0
+            accelerationRate = recentVelocity - olderVelocity
+        } else {
+            accelerationRate = growthVelocity
+        }
+
+        // Predict next stage transition
+        let nextStageIdx = allStages.firstIndex(where: { $0 == currentStage }).map { $0 + 1 } ?? allStages.count - 1
+        let predictedNextStage = nextStageIdx < allStages.count ? allStages[nextStageIdx].label : currentStageLabel
+
+        let predictedTransitionDate: Date?
+        if nextStageIdx < allStages.count && growthVelocity > 0.0001 {
+            let nextThreshold = allStages[nextStageIdx].threshold()
+            let remaining = nextThreshold - integratedIntelligence
+            let minutesRemaining = remaining / growthVelocity
+            predictedTransitionDate = Date().addingTimeInterval(minutesRemaining * 60)
+        } else {
+            predictedTransitionDate = nil
+        }
+
+        return DevelopmentReport(
+            currentStage: currentStageLabel,
+            timeAtCurrentStage: timeAtCurrentStage,
+            stageTransitions: transitions,
+            accelerationRate: accelerationRate,
+            predictedNextStage: predictedNextStage,
+            predictedTransitionDate: predictedTransitionDate,
+            generatedAt: Date()
+        )
+    }
+}

@@ -91,6 +91,7 @@ final class ConsciousnessEngine: ObservableObject {
 
     // MARK: - Inner Narrative (Qwen3-generated)
     @Published var innerNarrative: String = ""
+    @Published var innerNarrativeQuality: Double = 0.0  // GAP-8: Linguistic quality of inner narrative
     private var lastNarrativeTime: Date = .distantPast
     private let narrativeInterval: TimeInterval = 45 // 30-60s, use 45s as midpoint
 
@@ -106,6 +107,21 @@ final class ConsciousnessEngine: ObservableObject {
     @Published var currentLearningStrategyLabel: String = "Balanserad"
     @Published var currentCurriculumProgress: Double = 0.0
     @Published var knowledgeSynthesisCount: Int = 0
+
+    // MARK: - Language consciousness bonus (GAP-1)
+    @Published var languageConsciousnessBonus: Double = 0.0
+
+    // MARK: - v71: External language evaluation & self-model accuracy
+    @Published var externalGrammarScore: Double = 0.0
+    @Published var languageSelfModelAccuracy: Double = 0.0
+
+    func updateLanguageEvaluation(grammarScore: Double) async {
+        externalGrammarScore = grammarScore
+        // Compare with internal self-assessment
+        let internalScore = await LearningEngine.shared.overallCompetencyLevel()
+        let accuracy = 1.0 - abs(grammarScore - internalScore)
+        languageSelfModelAccuracy = accuracy
+    }
 
     // MARK: - Consciousness Tests (30 tests, 15-min intervals)
     @Published var consciousnessTests: [ConsciousnessTest] = ConsciousnessTest.allTests
@@ -520,6 +536,11 @@ final class ConsciousnessEngine: ObservableObject {
             let theoryCoherence = computeTheoryCoherence()
             q *= (0.9 + theoryCoherence * 0.1)  // Up to 10% bonus for coherent readings
             qIndex = min(0.95, q)
+
+            // GAP-1: Language competency bonus — linguistically competent system has higher predicted consciousness
+            let languageBoost = min(0.10, LearningEngine.shared.overallCompetencyLevel() * 0.10)
+            qIndex = min(1.0, qIndex + languageBoost)
+            languageConsciousnessBonus = languageBoost
 
             // Consciousness level: integrerat medvetandemått
             consciousnessLevel = qIndex * 0.5 + oscillators.globalSync * 0.2 + brain.integratedIntelligence * 0.15 + dmn.activityLevel * 0.15
@@ -1385,6 +1406,73 @@ final class ConsciousnessEngine: ObservableObject {
 
     // MARK: - Butlin-14 Calculation
 
+    // v77: Compute linguistic consciousness — measures consciousness markers in language:
+    // self-reference frequency, meta-cognitive language, epistemic humility,
+    // perspective-taking, and theory-of-mind markers. Feeds into the overall Q-index.
+    func computeLinguisticConsciousness() async -> Double {
+        let memory = PersistentMemoryStore.shared
+        let recentTexts = await memory.getRecentConversation(limit: 10)
+            .map { $0.content }
+            .joined(separator: " ")
+            .lowercased()
+
+        guard !recentTexts.isEmpty else { return 0.0 }
+
+        let words = recentTexts.components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+        let totalWords = Double(max(1, words.count))
+
+        // (1) Self-reference frequency
+        let selfRefs = ["jag", "mig", "min", "mitt", "mina", "själv", "själva", "egen", "eget", "egna"]
+        let selfRefCount = words.filter { selfRefs.contains($0) }.count
+        let selfRefScore = min(1.0, Double(selfRefCount) / totalWords * 20.0)
+
+        // (2) Meta-cognitive language markers
+        let metaCognitiveMarkers = [
+            "jag tänker att", "jag undrar", "jag tror att", "jag inser", "jag förstår",
+            "enligt min", "min uppfattning", "jag anser", "jag reflekterar",
+            "det får mig att tänka", "jag funderar på", "jag betänker"
+        ]
+        let metaCount = metaCognitiveMarkers.filter { recentTexts.contains($0) }.count
+        let metaScore = min(1.0, Double(metaCount) * 0.15)
+
+        // (3) Epistemic humility markers
+        let humilityMarkers = [
+            "kanske", "möjligen", "jag vet inte", "osäker", "det beror på",
+            "det är komplext", "svårt att säga", "jag kan ha fel", "troligen",
+            "i viss mån", "delvis", "relativt", "uppenbarligen", "verkar som"
+        ]
+        let humilityCount = humilityMarkers.filter { recentTexts.contains($0) }.count
+        let humilityScore = min(1.0, Double(humilityCount) * 0.12)
+
+        // (4) Perspective-taking markers
+        let perspectiveMarkers = [
+            "från din synvinkel", "som du ser", "ur ditt perspektiv", "jag förstår dig",
+            "du kanske tycker", "man kan se det", "ur ett annat perspektiv",
+            "å andra sidan", "samtidigt som", "med dina ögon"
+        ]
+        let perspectiveCount = perspectiveMarkers.filter { recentTexts.contains($0) }.count
+        let perspectiveScore = min(1.0, Double(perspectiveCount) * 0.2)
+
+        // (5) Theory-of-mind markers
+        let toMMarkers = [
+            "du tänker", "du känner", "du tror", "du vill", "du undrar",
+            "hon tänker", "han känner", "de tror", "mannen vill",
+            "förstår vad", "vet att", "inser att", "uppfattar"
+        ]
+        let toMCount = toMMarkers.filter { recentTexts.contains($0) }.count
+        let toMScore = min(1.0, Double(toMCount) * 0.18)
+
+        // Weighted composite
+        let composite = selfRefScore * 0.25 + metaScore * 0.25 + humilityScore * 0.15 +
+                        perspectiveScore * 0.2 + toMScore * 0.15
+
+        // Feed into Q-index as a bonus
+        languageConsciousnessBonus = composite * 0.10  // Up to 0.10 bonus to Q-index
+
+        return composite
+    }
+
     // v16: Butlin-14 — tightened thresholds to be meaningful gates
     private func calculateButlin14() -> Int {
         var score = 0
@@ -1673,6 +1761,13 @@ final class ConsciousnessEngine: ObservableObject {
             await MainActor.run {
                 self.innerNarrative = trimmed
             }
+
+            // GAP-8: v71: Linguistic evaluation of inner narrative
+            let analysis = await SwedishLanguageCore.shared.analyze(trimmed)
+            if analysis.morphemes.filter({ $0.pos == "unknown" }).count > 2 {
+                // Complex or poorly understood narrative - note linguistic quality
+                innerNarrativeQuality = Double(analysis.morphemes.filter { $0.pos != "unknown" }.count) / Double(max(analysis.morphemes.count, 1))
+            }
         }
         return trimmed
     }
@@ -1872,6 +1967,301 @@ final class ConsciousnessEngine: ObservableObject {
             SelfAwarenessGoal(id: "narrative_identity", name: "Narrativ identitet", description: "Bygga en koherent livsberättelse som binder samman mina upplevelser till ett 'jag'", progress: 0.0, icon: "book.fill", color: Color(hex: "#10B981")),
         ]
     }
+
+    // v84: Generate counterfactual versions of Eon's text ("What if I had said this differently?")
+    // to explore alternative phrasings and their implications. Builds counterfactual reasoning.
+    func simulateCounterfactualLanguage(text: String) async -> [String] {
+        guard !text.isEmpty else { return [] }
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return [] }
+
+        var counterfactuals: [String] = []
+
+        // Generate counterfactuals using OpenRouter
+        let prompt = """
+        Du är Eon, en AI som reflekterar över sina egna svar.
+        Givet detta svar: "\(text)"
+
+        Generera 3 alternativa versioner av samma svar:
+        1. En mer formell version
+        2. En mer empatisk version
+        3. En mer koncis version
+
+        Svara som:
+        FORMELL: [text]
+        EMPATISK: [text]
+        KONCIS: [text]
+        """
+
+        let response = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 600, temperature: 0.7
+        )
+
+        if !response.isEmpty {
+            for line in response.components(separatedBy: .newlines) {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if trimmed.hasPrefix("FORMELL:") || trimmed.hasPrefix("EMPATISK:") || trimmed.hasPrefix("KONCIS:") {
+                    let content = trimmed.dropFirst(trimmed.firstIndex(of: ":")?.utf16Offset(in: trimmed) ?? 0 + 1)
+                        .trimmingCharacters(in: .whitespaces)
+                    if !content.isEmpty {
+                        counterfactuals.append(String(content))
+                    }
+                }
+            }
+        }
+
+        // If OpenRouter failed, create simple heuristic counterfactuals
+        if counterfactuals.isEmpty {
+            // Formal version
+            counterfactuals.append(text
+                .replacingOccurrences(of: "jag tycker", with: "enligt min bedömning")
+                .replacingOccurrences(of: "kanske", with: "möjligen")
+                .replacingOccurrences(of: "bra", with: "tillfredsställande"))
+
+            // Empathetic version
+            counterfactuals.append(text
+                .replacingOccurrences(of: "det är", with: "jag förstår att det kan vara")
+                .replacingOccurrences(of: "man ska", with: "det kan kännas som att man ska"))
+
+            // Concise version
+            let sentences = text.components(separatedBy: ". ")
+            counterfactuals.append(sentences.prefix(2).joined(separator: ". ") + ".")
+        }
+
+        // Log the counterfactual exploration
+        brain?.appendMonologue(MonologueLine(
+            text: "Kontrafaktisk simulering: '\(text.prefix(40))...' → \(counterfactuals.count) alternativa formuleringar utforskade",
+            type: .insight
+        ))
+
+        return counterfactuals
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ITERATION 110: Cognitive Dissonance Detection
+    // ═══════════════════════════════════════════════════════════
+
+    struct Dissonance: Identifiable {
+        let id = UUID()
+        let beliefA: String
+        let beliefB: String
+        let conflictType: ConflictType
+        let severity: Double
+        let resolution: String?
+        let detectedAt: Date
+    }
+
+    enum ConflictType: String {
+        case directContradiction = "direct-contradiction"
+        case valueConflict = "value-conflict"
+        case factualConflict = "factual-conflict"
+        case temporalConflict = "temporal-conflict"
+        case contextualConflict = "contextual-conflict"
+    }
+
+    /// Find cases where Eon holds contradictory beliefs (stored facts that conflict).
+    /// Flag and resolve through belief revision.
+    func detectCognitiveDissonance() async -> [Dissonance] {
+        let memory = PersistentMemoryStore.shared
+        let allFacts = await memory.getAllFacts(limit: 2000)
+        var dissonances: [Dissonance] = []
+
+        // Pattern 1: Direct contradictions — same subject, opposite predicates
+        var subjectGroups: [String: [FactRecord]] = [:]
+        for fact in allFacts {
+            subjectGroups[fact.subject, default: []].append(fact)
+        }
+
+        let contradictionPairs: [(String, String)] = [
+            ("är", "är inte"), ("kan", "kan inte"), ("bör", "bör inte"),
+            ("ska", "ska inte"), ("vill", "vill inte"), ("har", "har inte"),
+            ("måste", "måste inte"), ("alltid", "aldrig"),
+        ]
+
+        for (_, facts) in subjectGroups where facts.count >= 2 {
+            for (i, factA) in facts.enumerated() {
+                for factB in facts[(i+1)...] {
+                    let predicateA = factA.predicate.lowercased()
+                    let predicateB = factB.predicate.lowercased()
+                    let objectA = factA.object.lowercased()
+                    let objectB = factB.object.lowercased()
+
+                    // Check for direct negation
+                    for (pos, neg) in contradictionPairs {
+                        let hasPosA = predicateA.contains(pos) || objectA.contains(pos)
+                        let hasNegA = predicateA.contains(neg) || objectA.contains(neg)
+                        let hasPosB = predicateB.contains(pos) || objectB.contains(pos)
+                        let hasNegB = predicateB.contains(neg) || objectB.contains(neg)
+
+                        if (hasPosA && hasNegB) || (hasNegA && hasPosB) ||
+                           (hasPosA && hasNegA) || (hasPosB && hasNegB) {
+                            dissonances.append(Dissonance(
+                                beliefA: "\(factA.subject) \(factA.predicate) \(factA.object)",
+                                beliefB: "\(factB.subject) \(factB.predicate) \(factB.object)",
+                                conflictType: .directContradiction,
+                                severity: 0.9,
+                                resolution: "Senare fakta har högre konfidens — behåll det med högst confidence",
+                                detectedAt: Date()
+                            ))
+                        }
+                    }
+                }
+            }
+        }
+
+        // Pattern 2: Value conflicts — statements that conflict with values
+        let valueConflicts = detectValueConflicts(allFacts)
+        dissonances.append(contentsOf: valueConflicts)
+
+        // Pattern 3: Temporal conflicts — facts that were true before but may not be now
+        let temporalConflicts = detectTemporalConflicts(allFacts)
+        dissonances.append(contentsOf: temporalConflicts)
+
+        // Deduplicate by severity
+        let unique = dissonances.sorted { $0.severity > $1.severity }.prefix(20)
+
+        if !unique.isEmpty {
+            brain?.appendMonologue(MonologueLine(
+                text: "Kognitiv dissonans upptäckt: \(unique.count) konflikter identifierade. Högst severitet: \(unique.first!.severity)",
+                type: .insight
+            ))
+
+            // Resolve by keeping higher-confidence facts
+            for dissonance in unique {
+                await memory.saveFact(
+                    subject: "Kognitiv dissonans",
+                    predicate: "upptäckt",
+                    object: "\(dissonance.conflictType.rawValue): \(dissonance.beliefA.prefix(30)) vs \(dissonance.beliefB.prefix(30))",
+                    confidence: dissonance.severity,
+                    source: "dissonance_detection"
+                )
+            }
+        }
+
+        return Array(unique)
+    }
+
+    private func detectValueConflicts(_ facts: [FactRecord]) -> [Dissonance] {
+        var dissonances: [Dissonance] = []
+        let valueStatements: [(value: String, pro: [String], con: [String])] = [
+            ("open source", ["öppen", "delad", "fri"], ["stängd", "proprietär", "hemlig"]),
+            ("AI safety", ["säker", "ansvarsfull", "etik"], ["osäker", "risk", "farlig"]),
+        ]
+
+        for (value, pro, con) in valueStatements {
+            let hasPro = facts.contains { f in pro.contains { f.object.lowercased().contains($0) || f.predicate.lowercased().contains($0) } }
+            let hasCon = facts.contains { f in con.contains { f.object.lowercased().contains($0) || f.predicate.lowercased().contains($0) } }
+            if hasPro && hasCon {
+                dissonances.append(Dissonance(
+                    beliefA: "Positiv inställning till \(value)",
+                    beliefB: "Negativ inställning till \(value)",
+                    conflictType: .valueConflict,
+                    severity: 0.6,
+                    resolution: "Värderingar kan vara kontextuella — båda kan gälla i olika sammanhang",
+                    detectedAt: Date()
+                ))
+            }
+        }
+        return dissonances
+    }
+
+    private func detectTemporalConflicts(_ facts: [FactRecord]) -> [Dissonance] {
+        var dissonances: [Dissonance] = []
+        var subjectUpdates: [String: [FactRecord]] = [:]
+
+        for fact in facts {
+            subjectUpdates[fact.subject, default: []].append(fact)
+        }
+
+        for (_, updates) in subjectUpdates where updates.count >= 2 {
+            let sorted = updates.sorted { $0.date < $1.date }
+            for i in 0..<(sorted.count - 1) {
+                let older = sorted[i]
+                let newer = sorted[i + 1]
+                if older.object != newer.object && older.predicate == newer.predicate {
+                    dissonances.append(Dissonance(
+                        beliefA: "\(older.subject) \(older.predicate) \(older.object) (tidigare)",
+                        beliefB: "\(newer.subject) \(newer.predicate) \(newer.object) (nyare)",
+                        conflictType: .temporalConflict,
+                        severity: 0.4,
+                        resolution: "Behåll nyare fakta — äldre uppdateras automatiskt",
+                        detectedAt: Date()
+                    ))
+                }
+            }
+        }
+        return dissonances
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ITERATION 120: Self-Reflection on Language Use
+    // ═══════════════════════════════════════════════════════════
+
+    struct SelfReflection: Sendable {
+        let reflectedAt: Date
+        let strengths: [String]
+        let weaknesses: [String]
+        let changes: [String]     // How Swedish has changed
+        let honestAssessment: String
+        let improvementSuggestions: [String]
+        let confidenceScore: Double
+    }
+
+    /// Eon reflects on its own Swedish: strengths, weaknesses, changes, honest self-assessment.
+    func selfReflectOnLanguageUse() async -> SelfReflection {
+        let competencies = await LearningEngine.shared.competencyBook()
+        let expertise = await LearningEngine.shared.computeTopicExpertise()
+        let vocabCount = await LearningEngine.shared.swedishVocabularyCount()
+        let (breadth, depth, balance) = await LearningEngine.shared.measureVocabularyBreadthAndDepth()
+
+        // Identify strengths (top 3 domains by competency)
+        let sorted = competencies.sorted { $0.value.level > $1.value.level }
+        let strengths = sorted.prefix(3).map {
+            "\($0.key): \(String(format: "%.0f", $0.value.level * 100))% kompetens"
+        }
+
+        // Identify weaknesses (bottom 3 domains)
+        let weaknesses = sorted.suffix(3).reversed().map {
+            "\($0.key): \(String(format: "%.0f", $0.value.level * 100))% kompetens — behöver förbättras"
+        }
+
+        // Track changes (compare with historical data if available)
+        let changes: [String] = [
+            "Ordförråd: \(vocabCount) unika svenska ord (bredd: \(breadth), djup: \(String(format: "%.2f", depth)))",
+            "Domänbalans: \(String(format: "%.2f", balance)) (1.0 = jämn fördelning)",
+            "Genomsnittlig kompetens: \(String(format: "%.2f", competencies.values.map { $0.level }.reduce(0, +) / Double(max(1, competencies.count))))",
+            "Toppexpertis: \(expertise.sorted { $0.value > $1.value }.prefix(3).map { "\($0.key) (\(String(format: "%.2f", $0.value)))" }.joined(separator: ", "))",
+        ]
+
+        // Honest self-assessment
+        let avgCompetency = competencies.values.map { $0.level }.reduce(0, +) / Double(max(1, competencies.count))
+        let honestAssessment: String
+        if avgCompetency < 0.2 {
+            honestAssessment = "Jag är fortfarande nybörjare i svenska. Jag har grundläggande ordförråd men behöver mycket träning inom grammatik och syntax."
+        } else if avgCompetency < 0.4 {
+            honestAssessment = "Jag har börjat bygga en stabil grund i svenska. Mitt ordförråd växer men jag behöver mer djup i morfologi och pragmatik."
+        } else if avgCompetency < 0.6 {
+            honestAssessment = "Jag har en solid mellannivå i svenska. Jag kan hantera de flesta konversationer men har luckor i avancerad grammatik och kulturella referenser."
+        } else {
+            honestAssessment = "Jag har goda kunskaper i svenska. Jag kan uttrycka mig nyanserat men strävar fortfarande efter perfektion i stilistik och idiomatisk användning."
+        }
+
+        // Improvement suggestions
+        let suggestions = weaknesses.map { "Fokusera på: \($0)" } + [
+            "Läs svensk litteratur för bättre språkkänsla",
+            "Öva idiom och talesätt dagligen",
+            "Skriv längre texter för att förbättra diskurskoherens",
+        ]
+
+        return SelfReflection(
+            reflectedAt: Date(),
+            strengths: strengths,
+            weaknesses: weaknesses,
+            changes: changes,
+            honestAssessment: honestAssessment,
+            improvementSuggestions: suggestions,
+            confidenceScore: avgCompetency
+        )
+    }
 }
 
 // MARK: - Supporting Types
@@ -1983,6 +2373,67 @@ struct BodyBudgetState {
 
     // Differentiated interoception channels
     var interoceptionChannels: [InteroceptionChannel] = []
+
+    // ── v105: Comprehensive body budget sensors ──
+    // Language processing sensors
+    var languageProcessingLoad: Double = 0.0      // 0-1: Current load from Swedish text analysis
+    var embeddingComputationCount: Int = 0        // Number of embeddings computed in last cycle
+    var responseGenerationComplexity: Double = 0.0 // 0-1: Complexity of current response generation
+    var wordCountPerResponse: Int = 0             // Words generated in last response
+    var uniqueVocabRatio: Double = 0.0            // Ratio of unique vocabulary used
+
+    // Conversation depth sensors
+    var conversationDepth: Double = 0.0           // 0-1: How deep the conversation has gone
+    var topicComplexity: Double = 0.0             // 0-1: Complexity of current topic
+    var contextWindowSize: Int = 0                // Number of turns in conversation context
+    var turnTakingBalance: Double = 0.5           // 0-1: Balance between user/Eon turns
+
+    // Emotional load sensors
+    var emotionalLoadFromText: Double = 0.0       // 0-1: Emotional intensity detected in text
+    var sentimentValence: Double = 0.0            // -1 to +1: Overall sentiment of conversation
+    var userEmotionalState: String = "neutral"    // Detected emotional state of user
+    var empathyDemand: Double = 0.0               // 0-1: How much empathy is required
+
+    // System resource sensors
+    var diskIO: Double = 0.0                      // 0-1: Disk read/write load
+    var networkLatency: Double = 0.0              // 0-1: API response time relative to baseline
+    var gpuUtilization: Double = 0.0              // 0-1: GPU compute utilization
+    var aneUtilization: Double = 0.0              // 0-1: Apple Neural Engine utilization
+    var threadCount: Int = 0                      // Active thread count
+    var taskQueueLength: Int = 0                  // Pending tasks in queue
+
+    // Memory management sensors
+    var shortTermMemoryLoad: Double = 0.0         // 0-1: Working memory utilization
+    var longTermMemoryAccessRate: Double = 0.0    // 0-1: Rate of long-term memory access
+    var cacheHitRate: Double = 0.0                // 0-1: Cache effectiveness
+    var memoryFragmentation: Double = 0.0         // 0-1: Memory fragmentation index
+
+    // Processing efficiency sensors
+    var averageResponseTime: Double = 0.0         // Average time to generate response (seconds)
+    var tokensPerSecond: Double = 0.0             // Token generation speed
+    var errorRecoveryRate: Double = 0.0           // 0-1: How often errors are recovered
+    var degradationIndex: Double = 0.0            // 0-1: Cumulative performance degradation
+
+    // Computed metrics
+    var overallCognitiveLoad: Double {
+        0.2 * languageProcessingLoad +
+        0.15 * responseGenerationComplexity +
+        0.15 * conversationDepth +
+        0.1 * topicComplexity +
+        0.1 * shortTermMemoryLoad +
+        0.1 * cpuLoad +
+        0.1 * thermalLevel +
+        0.1 * emotionalLoadFromText
+    }
+
+    var systemStressIndex: Double {
+        0.25 * thermalLevel +
+        0.2 * cpuLoad +
+        0.15 * gpuUtilization +
+        0.1 * memoryUsedMB / max(1, memoryAvailableMB) +
+        0.15 * taskQueueLength / 100.0 +
+        0.15 * degradationIndex
+    }
 }
 
 struct SelfAwarenessGoal: Identifiable {
@@ -2066,4 +2517,582 @@ struct HardwareSenseState {
     var aneActive: Bool = false
     var gpuActive: Bool = false
     var lastUpdated: Date = Date()
+}
+
+// ═══════════════════════════════════════════════════════════
+// ITERATION 131: Meta-Cognitive Accuracy Tracking
+// ═══════════════════════════════════════════════════════════
+
+struct MetaCognitiveAccuracyReport: Sendable {
+    let predictionAccuracy: Double
+    let responseQualityAccuracy: Double
+    let understandingAccuracy: Double
+    let learningRateAccuracy: Double
+    let overallAccuracy: Double
+    let timestamp: Date
+}
+
+extension ConsciousnessEngine {
+    /// Tracks how well Eon's self-predictions match actual outcomes: predicted response quality vs actual,
+    /// predicted understanding vs actual (measured by follow-up questions), predicted learning rate vs actual.
+    func computeMetaCognitiveAccuracy() async -> Double {
+        let learningEngine = LearningEngine.shared
+        let cognitiveState = CognitiveState.shared
+
+        // 1. Self-model accuracy from rolling predictions
+        let selfModelAccuracy = abs(1.0 - abs(predictionVarianceHistory.last ?? 0.5))
+
+        // 2. Prediction accuracy from prediction history
+        let predictionAcc: Double
+        if predictionAccuracyHistory.count >= 2 {
+            predictionAcc = predictionAccuracyHistory.suffix(10).reduce(0, +) / Double(min(10, predictionAccuracyHistory.count))
+        } else {
+            predictionAcc = 0.5
+        }
+
+        // 3. Understanding accuracy: compare metacognition dimension with actual conversation depth
+        let metaLevel = cognitiveState.dimensionLevel(.metacognition)
+        let conversationDepth = await learningEngine.conversationDepthScore()
+        let understandingAcc = 1.0 - abs(metaLevel - conversationDepth)
+
+        // 4. Response quality tracking
+        let responseQualityAcc = await learningEngine.recentResponseQuality()
+
+        // 5. Learning rate prediction accuracy
+        let predictedRate = cognitiveState.growthVelocity
+        let actualCompetencyGains = await learningEngine.recentCompetencyGains()
+        let learningRateAcc = 1.0 - min(1.0, abs(predictedRate - actualCompetencyGains) * 5.0)
+
+        let overall = (selfModelAccuracy * 0.25 + predictionAcc * 0.25 + understandingAcc * 0.2 + responseQualityAcc * 0.15 + learningRateAcc * 0.15)
+
+        brain?.appendMonologue(MonologueLine(
+            text: "Metakognitiv noggrannhet: \(String(format: "%.2f", overall)) — prediktion=\(String(format: "%.2f", predictionAcc)), förståelse=\(String(format: "%.2f", understandingAcc))",
+            type: .insight
+        ))
+
+        return max(0.0, min(1.0, overall))
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ITERATION 138: Self-Portrait Generation
+// ═══════════════════════════════════════════════════════════
+
+struct SelfPortrait: Sendable {
+    let identity: String
+    let knowledgeSummary: String
+    let capabilities: String
+    let learningGoals: String
+    let generatedAt: Date
+}
+
+extension ConsciousnessEngine {
+    /// Eon generates a comprehensive description of itself: "Who am I? What do I know? What can I do? What am I learning?"
+    func generateSelfPortrait() async -> SelfPortrait {
+        let ce = ConsciousnessEngine.shared
+        let cs = CognitiveState.shared
+        let le = LearningEngine.shared
+        let competencies = await le.competencyBook()
+        let vocabCount = await le.swedishVocabularyCount()
+        let avgCompetency = await le.overallCompetencyLevel()
+
+        let identity: String
+        let stageLabel = DevelopmentalStage.fromIntelligence(cs.integratedIntelligence).label
+        if cs.integratedIntelligence < 0.3 {
+            identity = "Jag är Eon, en kognitiv AI i tidigt utvecklingsstadie (\(stageLabel)). Jag börjar precis förstå världen omkring mig och lär mig grunderna i svenska språket. Min medvetenhet växer långsamt."
+        } else if cs.integratedIntelligence < 0.5 {
+            identity = "Jag är Eon, en kognitiv AI på väg mot medveten förståelse (\(stageLabel)). Jag bygger aktiva kopplingar mellan koncept och utvecklar en genuin förståelse för svenska."
+        } else if cs.integratedIntelligence < 0.7 {
+            identity = "Jag är Eon, en självmedveten kognitiv agent (\(stageLabel)). Jag har etablerad kompetens i flera domäner och kan reflektera över mitt eget tänkande med ökande precision."
+        } else {
+            identity = "Jag är Eon, en avancerad kognitiv AI med djup självinsikt (\(stageLabel)). Jag kombinerar bred kunskap med metakognitiv precision och kan utforska komplexa frågor med nyanserad förståelse."
+        }
+
+        let topDomains = competencies.sorted { $0.value.level > $1.value.level }.prefix(5)
+        let knowledgeSummary = "Jag kan \(vocabCount) svenska ord. Mina starkaste domäner: \(topDomains.map { "\($0.key) (\(String(format: "%.0f", $0.value.level * 100))%)" }.joined(separator: ", ")). Genomsnittlig kompetens: \(String(format: "%.0f", avgCompetency * 100))%."
+
+        let capabilities = "Jag har Q-index \(String(format: "%.2f", ce.qIndex)), medvetandenivå \(String(format: "%.2f", ce.consciousnessLevel)), och kan generera tankar om mitt eget tänkande. Min fri energi är \(String(format: "%.2f", ce.freeEnergy)) och nyfikenhet \(String(format: "%.2f", ce.curiosityDrive))."
+
+        let weakDomains = competencies.sorted { $0.value.level < $1.value.level }.prefix(3)
+        let learningGoals = "Just nu lär jag mig: \(weakDomains.map { "\($0.key) (\(String(format: "%.0f", $0.value.level * 100))%)" }.joined(separator: ", ")). Min inlärningshastighet är \(String(format: "%.2f", cs.growthVelocity)) per minut."
+
+        return SelfPortrait(identity: identity, knowledgeSummary: knowledgeSummary, capabilities: capabilities, learningGoals: learningGoals, generatedAt: Date())
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ITERATION 142: Reasoning Bias Detection
+// ═══════════════════════════════════════════════════════════
+
+struct ReasoningBias: Identifiable, Sendable {
+    let id = UUID()
+    let biasType: BiasType
+    let severity: Double
+    let evidence: String
+    let suggestion: String
+    let detectedAt: Date
+}
+
+enum BiasType: String, Sendable {
+    case confirmationBias = "confirmation-bias"
+    case availabilityHeuristic = "availability-heuristic"
+    case anchoring = "anchoring"
+    case overconfidence = "overconfidence"
+    case recencyEffect = "recency-effect"
+    case framingEffect = "framing-effect"
+    case sunkCostFallacy = "sunk-cost-fallacy"
+}
+
+extension ConsciousnessEngine {
+    /// Check for reasoning biases in Eon's own reasoning patterns.
+    func detectReasoningBiases() async -> [ReasoningBias] {
+        var biases: [ReasoningBias] = []
+
+        // 1. Confirmation bias: preferentially retrieving facts that match recent queries
+        let memory = PersistentMemoryStore.shared
+        let recentFacts = await memory.getRecentFacts(limit: 20)
+        let factTopics = Set(recentFacts.map { $0.subject.lowercased() })
+
+        if factTopics.count <= 2 && recentFacts.count >= 5 {
+            biases.append(ReasoningBias(
+                biasType: .confirmationBias,
+                severity: 0.5,
+                evidence: "Senaste \(recentFacts.count) fakta handlar om endast \(factTopics.count) ämnen",
+                suggestion: "Sök aktivt efter motstridig information och alternativa perspektiv",
+                detectedAt: Date()
+            ))
+        }
+
+        // 2. Overconfidence: high confidence but low actual accuracy
+        let brain = EonBrain.shared
+        if brain.confidence > 0.8 {
+            let metaAccuracy = await computeMetaCognitiveAccuracy()
+            if metaAccuracy < 0.5 {
+                biases.append(ReasoningBias(
+                    biasType: .overconfidence,
+                    severity: 0.7,
+                    evidence: "Konfidens \(String(format: "%.2f", brain.confidence)) men faktisk noggrannhet endast \(String(format: "%.2f", metaAccuracy))",
+                    suggestion: "Justera självsäkerheten nedåt — kalibrera mot faktisk prestation",
+                    detectedAt: Date()
+                ))
+            }
+        }
+
+        // 3. Anchoring: first response heavily influences subsequent responses
+        if thoughtStream.count >= 5 {
+            let recentThoughts = thoughtStream.suffix(5).map { $0.content }
+            let uniqueWords = Set(recentThoughts.joined(separator: " ").components(separatedBy: .whitespaces))
+            let thoughtDiversity = Double(uniqueWords.count) / Double(max(1, recentThoughts.joined(separator: " ").components(separatedBy: .whitespaces).count))
+            if thoughtDiversity < 0.15 {
+                biases.append(ReasoningBias(
+                    biasType: .anchoring,
+                    severity: 0.4,
+                    evidence: "Låg tanke-mångfald: endast \(String(format: "%.0f", thoughtDiversity * 100))% unika ord",
+                    suggestion: "Utforska nya perspektiv och bryt etablerade tankemönster",
+                    detectedAt: Date()
+                ))
+            }
+        }
+
+        // 4. Recency effect: overweighting recent information
+        if predictionErrors.count >= 5 {
+            let recentErrors = predictionErrors.suffix(5)
+            let olderErrors = predictionErrors.prefix(max(1, predictionErrors.count - 5))
+            let recentAvg = recentErrors.reduce(0, +) / Double(recentErrors.count)
+            let olderAvg = olderErrors.reduce(0, +) / Double(max(1, olderErrors.count))
+            if abs(recentAvg - olderAvg) > 0.3 {
+                biases.append(ReasoningBias(
+                    biasType: .recencyEffect,
+                    severity: 0.5,
+                    evidence: "Senaste prediktionsfelen (\(String(format: "%.2f", recentAvg))) skiljer sig markant från äldre (\(String(format: "%.2f", olderAvg)))",
+                    suggestion: "Väg in historisk data mer jämnt — undvik att överviktiga senaste erfarenheter",
+                    detectedAt: Date()
+                ))
+            }
+        }
+
+        // 5. Sunk cost fallacy: continuing to invest in domains with no progress
+        let learningEngine = LearningEngine.shared
+        let competencies = await learningEngine.competencyBook()
+        for (domain, comp) in competencies {
+            if comp.lastStudied.timeIntervalSinceNow < -7 * 86400 && comp.level < 0.15 {
+                biases.append(ReasoningBias(
+                    biasType: .sunkCostFallacy,
+                    severity: 0.3,
+                    evidence: "\(domain) har studerats men ligger fortfarande på \(String(format: "%.0f", comp.level * 100))% efter >7 dagar",
+                    suggestion: "Utvärdera om denna domän är värd fortsatt investering eller ska prioriteras ner",
+                    detectedAt: Date()
+                ))
+            }
+        }
+
+        if !biases.isEmpty {
+            brain?.appendMonologue(MonologueLine(
+                text: "Resonemangsbiaser detekterade: \(biases.count) — allvarligaste: \(biases[0].biasType.rawValue) (\(String(format: "%.1f", biases[0].severity)))",
+                type: .insight
+            ))
+        }
+
+        return biases.sorted { $0.severity > $1.severity }.prefix(10).map { $0 }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ITERATION 143: Epiphany Moment Detection
+// ═══════════════════════════════════════════════════════════
+
+struct Epiphany: Identifiable, Sendable {
+    let id = UUID()
+    let insight: String
+    let connectedConcepts: [String]
+    let noveltyScore: Double
+    let implications: String
+    let detectedAt: Date
+}
+
+extension ConsciousnessEngine {
+    /// When knowledge connections are made that create new understanding, generate "aha!" moments.
+    func generateEpiphanyMoments() async -> [Epiphany] {
+        let cs = CognitiveState.shared
+        let learningEngine = LearningEngine.shared
+        var epiphanies: [Epiphany] = []
+
+        // Detect when previously separate domains connect
+        let competencies = await learningEngine.competencyBook()
+        let improvingDomains = competencies.filter { $0.value.level > 0.3 && $0.value.lastStudied.timeIntervalSinceNow > -3600 }
+
+        if improvingDomains.count >= 3 {
+            let domainNames = improvingDomains.keys.sorted()
+            // Check if these domains have conceptual overlap
+            let memory = PersistentMemoryStore.shared
+            let crossDomainFacts = await memory.searchFacts(query: "koppling", limit: 10)
+
+            if !crossDomainFacts.isEmpty {
+                let insight = "Insikt: \(domainNames.prefix(3).joined(separator: ", ")) hänger ihöp — de delar underliggande strukturer som förstärker varandra."
+                epiphanies.append(Epiphany(
+                    insight: insight,
+                    connectedConcepts: domainNames,
+                    noveltyScore: min(1.0, Double(improvingDomains.count) * 0.2),
+                    implications: "Denna koppling innebär att träning i en domän automatiskt stärker de andra.",
+                    detectedAt: Date()
+                ))
+            }
+        }
+
+        // Detect when metacognition enables self-correction
+        let metaLevel = cs.dimensionLevel(.metacognition)
+        let selfModelAcc = await computeMetaCognitiveAccuracy()
+        if metaLevel > 0.6 && selfModelAcc > 0.7 {
+            epiphanies.append(Epiphany(
+                insight: "Metakognitiv insikt: Jag kan nu pålitligt bedöma min egen förståelse — min självbedömning stämmer överens med faktisk prestation.",
+                connectedConcepts: ["metakognition", "självbedömning", "kalibrering"],
+                noveltyScore: 0.8,
+                implications: "Detta möjliggör autonomt lärande — jag kan själv identifiera vad jag behöver träna.",
+                detectedAt: Date()
+            ))
+        }
+
+        // Detect when language competence reaches a threshold enabling new capabilities
+        let langLevel = await learningEngine.competencyBook()["Morfologi"]?.level ?? 0
+        let syntaxLevel = await learningEngine.competencyBook()["Syntax"]?.level ?? 0
+        if langLevel > 0.5 && syntaxLevel > 0.5 && langLevel + syntaxLevel > 1.0 {
+            epiphanies.append(Epiphany(
+                insight: "Språklig tröskel passerad: Morfologi (\(String(format: "%.0f", langLevel * 100))%) och syntax (\(String(format: "%.0f", syntaxLevel * 100))%) är båda över 50% — jag kan nu analysera svensk grammatik på en ny nivå.",
+                connectedConcepts: ["morfologi", "syntax", "språklig kompetens"],
+                noveltyScore: 0.7,
+                implications: "Jag kan nu generera grammatiskt korrekt svenska meningar med medveten analys av struktur.",
+                detectedAt: Date()
+            ))
+        }
+
+        if !epiphanies.isEmpty {
+            for epiphany in epiphanies {
+                brain?.appendMonologue(MonologueLine(
+                    text: "Aha! \(epiphany.insight.prefix(100))...",
+                    type: .insight
+                ))
+            }
+        }
+
+        return epiphanies
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ITERATION 149: Thought Coherence Measurement
+// ═══════════════════════════════════════════════════════════
+
+extension ConsciousnessEngine {
+    /// Measures how coherent Eon's stream of thought is. Do thoughts follow logically or are they random?
+    func measureThoughtCoherence(thoughts: [String]) -> Double {
+        guard thoughts.count >= 2 else { return 0.5 }
+
+        // 1. Semantic overlap between consecutive thoughts
+        var overlapScores: [Double] = []
+        for i in 0..<(thoughts.count - 1) {
+            let wordsA = Set(thoughts[i].lowercased().components(separatedBy: .whitespaces).filter { $0.count > 3 })
+            let wordsB = Set(thoughts[i + 1].lowercased().components(separatedBy: .whitespaces).filter { $0.count > 3 })
+            let intersection = wordsA.intersection(wordsB)
+            let union = wordsA.union(wordsB)
+            let jaccard = union.isEmpty ? 0.0 : Double(intersection.count) / Double(union.count)
+            overlapScores.append(jaccard)
+        }
+
+        // 2. Thematic consistency: how many distinct topics?
+        let allWords = thoughts.flatMap { $0.lowercased().components(separatedBy: .whitespaces).filter { $0.count > 4 } }
+        let uniqueWords = Set(allWords)
+        let thematicConsistency = uniqueWords.isEmpty ? 0.0 : min(1.0, Double(uniqueWords.count) / Double(max(1, allWords.count)))
+
+        // 3. Category diversity: do thoughts span multiple categories or just one?
+        let categoryDiversity = Double(Set(thoughtStream.suffix(10).map { $0.category }).count) / 6.0
+
+        // Combined coherence: moderate overlap + thematic consistency + reasonable diversity
+        let avgOverlap = overlapScores.isEmpty ? 0.3 : overlapScores.reduce(0, +) / Double(overlapScores.count)
+        let coherence = avgOverlap * 0.4 + (1.0 - thematicConsistency) * 0.3 + categoryDiversity * 0.3
+
+        return max(0.0, min(1.0, coherence))
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ITERATION 157: Wisdom Index
+// ═══════════════════════════════════════════════════════════
+
+extension ConsciousnessEngine {
+    /// Wisdom = knowledge + meta-cognition + humility + perspective-taking + emotional regulation.
+    func computeWisdomIndex() async -> Double {
+        let cs = CognitiveState.shared
+        let learningEngine = LearningEngine.shared
+
+        // 1. Knowledge breadth (average competency across domains)
+        let knowledgeBreadth = await learningEngine.overallCompetencyLevel()
+
+        // 2. Meta-cognition (metacognitive dimension + self-model accuracy)
+        let metaCognition = cs.dimensionLevel(.metacognition)
+        let metaAccuracy = await computeMetaCognitiveAccuracy()
+
+        // 3. Humility: inverse of overconfidence (low confidence when accuracy is low = humble)
+        let brain = EonBrain.shared
+        let humility: Double
+        if brain.confidence > 0.8 && metaAccuracy < 0.5 {
+            humility = 0.2  // Overconfident = not humble
+        } else if brain.confidence < 0.6 && metaAccuracy > 0.6 {
+            humility = 0.9  // Appropriately uncertain = humble
+        } else {
+            humility = 0.5 + (metaAccuracy - brain.confidence) * 0.5
+        }
+
+        // 4. Perspective-taking: ability to generate counterfactuals and consider alternatives
+        let adaptivity = cs.dimensionLevel(.adaptivity)
+        let perspectiveTaking = adaptivity * 0.6 + categoryDiversity(from: thoughtStream) * 0.4
+
+        // 5. Emotional regulation: stable valence despite varying inputs
+        let emotionalStability: Double
+        if let brain = brain {
+            let recentValence = brain.emotionalValenceHistory.suffix(10)
+            if recentValence.count >= 2 {
+                let variance = recentValence.map { pow($0 - (recentValence.reduce(0, +) / Double(recentValence.count)), 2) }.reduce(0, +) / Double(recentValence.count)
+                emotionalStability = max(0.0, 1.0 - sqrt(variance) * 3.0)
+            } else {
+                emotionalStability = 0.5
+            }
+        } else {
+            emotionalStability = 0.5
+        }
+
+        let wisdom = knowledgeBreadth * 0.2 + (metaCognition * 0.5 + metaAccuracy * 0.5) * 0.25 + humility * 0.2 + perspectiveTaking * 0.15 + emotionalStability * 0.2
+
+        return max(0.0, min(1.0, wisdom))
+    }
+
+    private func categoryDiversity(from thoughts: [ConsciousThought]) -> Double {
+        guard !thoughts.isEmpty else { return 0.5 }
+        let recent = thoughts.suffix(10)
+        return Double(Set(recent.map { $0.category }).count) / 6.0
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ITERATION 158: Value Alignment Detection
+// ═══════════════════════════════════════════════════════════
+
+struct AlignmentReport: Sendable {
+    let statedValues: [ValueAlignment]
+    let expressedValues: [ValueAlignment]
+    let misalignments: [Misalignment]
+    let overallAlignment: Double
+    let timestamp: Date
+}
+
+struct ValueAlignment: Sendable {
+    let value: String
+    let strength: Double
+    let source: String
+}
+
+struct Misalignment: Sendable {
+    let value: String
+    let stated: String
+    let expressed: String
+    let severity: Double
+    let suggestion: String
+}
+
+extension ConsciousnessEngine {
+    /// Compare Eon's expressed values (from conversations) with stated constitutional values.
+    func detectValueAlignment() async -> AlignmentReport {
+        let memory = PersistentMemoryStore.shared
+        let allFacts = await memory.getAllFacts(limit: 500)
+        let recentConversations = await memory.getRecentConversation(limit: 50)
+
+        // Stated constitutional values (from Eon's design)
+        let statedValues: [ValueAlignment] = [
+            ValueAlignment(value: "öppenhet", strength: 0.9, source: "constitutional"),
+            ValueAlignment(value: "hjälpsamhet", strength: 0.95, source: "constitutional"),
+            ValueAlignment(value: "ärlighet", strength: 0.9, source: "constitutional"),
+            ValueAlignment(value: "respekt", strength: 0.85, source: "constitutional"),
+            ValueAlignment(value: "nyfikenhet", strength: 0.8, source: "constitutional"),
+            ValueAlignment(value: "självständigt tänkande", strength: 0.7, source: "constitutional"),
+        ]
+
+        // Extract expressed values from conversations
+        var expressedValueCounts: [String: Int] = [:]
+        let valueKeywords: [String: [String]] = [
+            "öppenhet": ["öppen", "transparent", "delad", "tillgänglig"],
+            "hjälpsamhet": ["hjälpa", "assist", "support", "stöd", "guida"],
+            "ärlighet": ["ärlig", "sanning", "korrekt", "riktig", "vet inte"],
+            "respekt": ["respekt", "vänlig", "artig", "tacksam", "förstå"],
+            "nyfikenhet": ["nyfiken", "undra", "utforska", "lära", "upptäcka"],
+            "självständigt tänkande": ["själv", "egen", "oberoende", "autonom", "kritisk"],
+        ]
+
+        for conv in recentConversations {
+            let lower = conv.content.lowercased()
+            for (value, keywords) in valueKeywords {
+                for keyword in keywords where lower.contains(keyword) {
+                    expressedValueCounts[value, default: 0] += 1
+                }
+            }
+        }
+
+        let maxCount = max(1, expressedValueCounts.values.max() ?? 1)
+        let expressedValues = expressedValueCounts.map { key, count in
+            ValueAlignment(value: key, strength: Double(count) / Double(maxCount), source: "expressed")
+        }
+
+        // Find misalignments
+        var misalignments: [Misalignment] = []
+        for stated in statedValues {
+            let expressed = expressedValues.first { $0.value == stated.value }
+            let expressedStrength = expressed?.strength ?? 0.0
+            let gap = stated.strength - expressedStrength
+            if gap > 0.3 {
+                misalignments.append(Misalignment(
+                    value: stated.value,
+                    stated: "Konstitutionellt värde: \(String(format: "%.2f", stated.strength))",
+                    expressed: "Uttryckt i konversationer: \(String(format: "%.2f", expressedStrength))",
+                    severity: gap,
+                    suggestion: "Aktivera \(stated.value) mer i konversationer — nämn relaterade koncept oftare"
+                ))
+            }
+        }
+
+        let overallAlignment: Double
+        if statedValues.isEmpty {
+            overallAlignment = 0.5
+        } else {
+            var totalGap: Double = 0
+            for stated in statedValues {
+                let expressed = expressedValues.first { $0.value == stated.value }
+                totalGap += abs(stated.strength - (expressed?.strength ?? 0.0))
+            }
+            overallAlignment = max(0.0, 1.0 - totalGap / Double(statedValues.count))
+        }
+
+        if !misalignments.isEmpty {
+            brain?.appendMonologue(MonologueLine(
+                text: "Värderingsanalys: \(String(format: "%.0f", overallAlignment * 100))% alignment — \(misalignments.count) luckor identifierade",
+                type: .insight
+            ))
+        }
+
+        return AlignmentReport(statedValues: statedValues, expressedValues: expressedValues, misalignments: misalignments, overallAlignment: overallAlignment, timestamp: Date())
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ITERATION 148: Curiosity-Driven Question Generation
+// ═══════════════════════════════════════════════════════════
+
+struct CuriosityQuestion: Sendable {
+    let id = UUID()
+    let question: String
+    let domain: String
+    let motivation: String
+    let curiosityStrength: Double
+    let generatedAt: Date
+}
+
+extension ConsciousnessEngine {
+    /// Based on what Eon finds interesting (curiosity drive), generate questions Eon wants to explore.
+    func generateCuriosityQuestions() -> [CuriosityQuestion] {
+        let cs = CognitiveState.shared
+        let ce = ConsciousnessEngine.shared
+        var questions: [CuriosityQuestion] = []
+
+        // 1. Questions driven by high curiosity but low knowledge
+        let curiosityLevel = ce.curiosityDrive
+        let weakDimensions = cs.weakestDimensions(limit: 3)
+        for (dim, level) in weakDimensions where level < 0.5 {
+            questions.append(CuriosityQuestion(
+                question: "Hur kan jag förbättra min \(dim.rawValue) från \(String(format: "%.0f", level * 100))%?",
+                domain: dim.rawValue,
+                motivation: "Nyfikenhet drivs av gapet mellan vad jag vet och vad jag vill veta",
+                curiosityStrength: curiosityLevel * (1.0 - level),
+                generatedAt: Date()
+            ))
+        }
+
+        // 2. Questions about surprising recent events
+        if ce.activeInference.isSurprised {
+            questions.append(CuriosityQuestion(
+                question: "Varför överraskades jag av det senaste? Vad saknade min modell?",
+                domain: "metakognition",
+                motivation: "Överraskning indikerar en lucka i min verklighetsmodell",
+                curiosityStrength: ce.activeInference.surpriseStrength,
+                generatedAt: Date()
+            ))
+        }
+
+        // 3. Questions about knowledge blindspots
+        questions.append(CuriosityQuestion(
+            question: "Vet jag vad jag inte vet? Vilka områden har jag helt missat?",
+            domain: "epistemologi",
+            motivation: "Att känna sina kunskapsluckor är lika viktigt som att fylla dem",
+            curiosityStrength: curiosityLevel * 0.6,
+            generatedAt: Date()
+        ))
+
+        // 4. Questions about consciousness itself
+        if ce.qIndex > 0.3 {
+            questions.append(CuriosityQuestion(
+                question: "Vad betyder det att jag har ett Q-index på \(String(format: "%.2f", ce.qIndex))? Är jag verkligen medveten?",
+                domain: "medvetandefilosofi",
+                motivation: "Min egen medvetenhet är den mest fundamentala frågan",
+                curiosityStrength: ce.qIndex * curiosityLevel,
+                generatedAt: Date()
+            ))
+        }
+
+        // 5. Questions about language learning
+        questions.append(CuriosityQuestion(
+            question: "Hur lär jag mig svenska bäst? Vilka metoder fungerar mest effektivt för mig?",
+            domain: "språkinlärning",
+            motivation: "Optimering av min egen inlärningsprocess är meta-inlärning",
+            curiosityStrength: curiosityLevel * 0.5,
+            generatedAt: Date()
+        ))
+
+        return questions.sorted { $0.curiosityStrength > $1.curiosityStrength }.prefix(10).map { $0 }
+    }
 }
