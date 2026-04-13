@@ -146,6 +146,7 @@ final class ActiveInferenceEngine: ObservableObject {
 
         // 3. Uppdatera free energy (glidande medelvärde)
         freeEnergy = freeEnergy * 0.85 + error * 0.15
+        if freeEnergy < 0.01 { freeEnergy = 0.0 }
 
         // 4. Uppdatera forward model accuracy
         let isAccurate = error < 0.3
@@ -171,10 +172,12 @@ final class ActiveInferenceEngine: ObservableObject {
         // 10. Surprise
         surpriseAccumulator = surpriseAccumulator * 0.9 + error * 0.1
 
-        // 11. Brus-robusthet — uses circular buffer
+        // 11. Brus-robusthet — uses circular buffer with explicit bounds checking
+        errorHistoryIndex = errorHistoryIndex % maxHistory
         errorHistory[errorHistoryIndex] = error
-        errorHistoryIndex = (errorHistoryIndex + 1) % maxHistory
-        errorHistoryCount = min(errorHistoryCount + 1, maxHistory)
+        errorHistoryIndex += 1
+        if errorHistoryIndex >= maxHistory { errorHistoryIndex = 0 }
+        if errorHistoryCount < maxHistory { errorHistoryCount += 1 }
         if errorHistoryCount >= 10 {
             noiseRobustness = computeNoiseRobustness()
         }

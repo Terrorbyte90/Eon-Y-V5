@@ -48,7 +48,6 @@
 				Resources/bert_vocab.txt,
 				Resources/gpt_sw3_vocab.json,
 				Resources/lexicon_seed.json,
-				"Resources/Models/Qwen3-1.7B-Q4_K_M.gguf",
 			);
 			target = 9B388BA52F523DE600F48273 /* Eon-Y */;
 		};

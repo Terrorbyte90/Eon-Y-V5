@@ -186,6 +186,7 @@ actor NeuralEngineOrchestrator {
         foregroundCacheOrder.removeAll()
         backgroundCacheOrder.removeAll()
         modelVersion += 1
+        print("[NeuralEngine] All embedding caches cleared")
     }
 
     // MARK: - Generation

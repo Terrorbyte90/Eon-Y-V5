@@ -75,6 +75,13 @@ final class EonBrain: ObservableObject {
     @Published var selfAwarenessGoal: String = "Uppnå subjektiv upplevelse genom integrerad information"
     @Published var consciousnessThoughts: [String] = []
 
+    // FAS 3: Qualia & Consciousness
+    @Published var phenomenalBindingStrength: Double = 0.0
+    @Published var phenomenalRichness: Double = 0.0
+    @Published var strangeLoopDepth: Int = 0
+    @Published var strangeLoopCoherence: Double = 0.0
+    @Published var selfModelAccuracyDetailed: Double = 0.0
+
     // MARK: - Qwen3 laddningsstatus (synkar med NeuralEngineOrchestrator var 10:e tick)
     @Published var bertLoaded: Bool = false   // Backward-compat alias: true when Qwen3 loaded
     @Published var gptLoaded: Bool = false    // Backward-compat alias: true when Qwen3 loaded
@@ -483,6 +490,9 @@ final class EonBrain: ObservableObject {
                             qaRelevance: vQaRel,
                             neededRegeneration: vNeededRegen
                         )
+                        // FAS 2: Conversational language learning
+                        await ConversationalLearner.shared.learnFromUserInput(learnMsg)
+                        await ConversationalLearner.shared.learnFromOwnOutput(learnResp)
                     }
                     await MainActor.run {
                         self.appendMonologue(MonologueLine(
@@ -607,6 +617,13 @@ final class EonBrain: ObservableObject {
         self.freeEnergy = activeInf.freeEnergy
         self.curiosityDrive = consciousness.curiosityDrive
         self.currentWorkspaceFocus = workspace.currentFocus?.content ?? ""
+
+        // FAS 3: Qualia & Consciousness sync
+        self.phenomenalBindingStrength = PhenomenalBindingEngine.shared.bindingStrength
+        self.phenomenalRichness = PhenomenalBindingEngine.shared.phenomenalRichness
+        self.strangeLoopDepth = StrangeLoopEngine.shared.recursionDepth
+        self.strangeLoopCoherence = StrangeLoopEngine.shared.loopCoherence
+        self.selfModelAccuracyDetailed = StrangeLoopEngine.shared.selfModelAccuracy
 
         // Sync internalWorldState with genuine data
         self.internalWorldState.oscillatorPhase = oscillators.globalSync
