@@ -62,6 +62,7 @@ final class ConsciousnessEngine: ObservableObject {
     // MARK: - Higher-Order Theory
     @Published var metaRepresentationDepth: Int = 0
     @Published var hotConfidence: Double = 0.3
+    @Published var selfModelAccuracy: Double = 0.3
 
     // MARK: - Predictive Processing
     @Published var predictionErrors: [Double] = []
@@ -115,12 +116,60 @@ final class ConsciousnessEngine: ObservableObject {
     @Published var externalGrammarScore: Double = 0.0
     @Published var languageSelfModelAccuracy: Double = 0.0
 
+    // ═══════════════════════════════════════════════════════════
+    // FAS 3: Qualia & Consciousness — Somatic Markers
+    // ═══════════════════════════════════════════════════════════
+    struct SomaticMarker: Codable {
+        let situation: String; let emotion: String; let valence: Double
+        let arousal: Double; let outcome: String; let timestamp: Date
+        var embedding: [Float]?
+    }
+    private var somaticMarkers: [SomaticMarker] = []
+
+    func registerSomaticMarker(situation: String, outcome: String) {
+        let brain = EonBrain.shared
+        somaticMarkers.append(SomaticMarker(situation: situation, emotion: brain.currentEmotion.rawValue, valence: brain.emotionValence, arousal: brain.emotionArousal, outcome: outcome, timestamp: Date()))
+        if somaticMarkers.count > 200 { somaticMarkers.removeFirst() }
+    }
+
+    func checkSomaticMarkers(for situation: String) async -> (emotion: String, valence: Double)? {
+        guard !somaticMarkers.isEmpty else { return nil }
+        let emb = await NeuralEngineOrchestrator.shared.embed(situation)
+        guard !emb.isEmpty else { return nil }
+        var best: SomaticMarker? = nil, bestSim: Double = 0.0
+        for marker in somaticMarkers {
+            guard let me = marker.embedding else { continue }
+            let sim = cosineSimilarity(emb, me)
+            if sim > bestSim && sim > 0.6 { bestSim = sim; best = marker }
+        }
+        guard let m = best else { return nil }
+        return (m.emotion, m.valence)
+    }
+
+    private func cosineSimilarity(_ a: [Float], _ b: [Float]) -> Double {
+        guard a.count == b.count, !a.isEmpty else { return 0.0 }
+        var d: Float=0, nA: Float=0, nB: Float=0
+        for i in 0..<a.count { d+=a[i]*b[i]; nA+=a[i]*a[i]; nB+=b[i]*b[i] }
+        let den = sqrt(nA)*sqrt(nB); return den>0 ? Double(d/den) : 0.0
+    }
+
+    // FAS 3: Integration methods for PhenomenalBinding and StrangeLoop
+    func updatePhenomenalBinding(strength: Double, richness: Double, temporalThickness: Double) {
+        self.qualiaEmergenceIndex = strength * 0.4 + richness * 0.3 + temporalThickness * 0.3
+        Task { @MainActor in EonBrain.shared.qualiaIndex = self.qualiaEmergenceIndex }
+    }
+    func updateStrangeLoop(depth: Int, coherence: Double, selfModelAccuracy: Double) {
+        self.metaRepresentationDepth = depth
+        self.selfModelAccuracy = selfModelAccuracy
+        Task { @MainActor in EonBrain.shared.selfModelAccuracy = selfModelAccuracy }
+    }
+
     func updateLanguageEvaluation(grammarScore: Double) async {
-        externalGrammarScore = grammarScore
-        // Compare with internal self-assessment
-        let internalScore = await LearningEngine.shared.overallCompetencyLevel()
-        let accuracy = 1.0 - abs(grammarScore - internalScore)
-        languageSelfModelAccuracy = accuracy
+        let clampedGrammar = min(1.0, max(0.0, grammarScore))
+        let clampedInternal = min(1.0, max(0.0, await LearningEngine.shared.overallCompetencyLevel()))
+        let accuracy = 1.0 - abs(clampedGrammar - clampedInternal)
+        self.languageSelfModelAccuracy = accuracy
+        self.externalGrammarScore = clampedGrammar
     }
 
     // MARK: - Consciousness Tests (30 tests, 15-min intervals)
@@ -226,11 +275,14 @@ final class ConsciousnessEngine: ObservableObject {
         case "qualia_emergence":     return qualiaEmergenceIndex > 0.05
         case "self_reflection":      return !currentSelfReflection.isEmpty
         case "thought_diversity":    return Set(thoughtStream.suffix(10).map { $0.category }).count >= 3
-        case "temporal_continuity":  return thoughtStream.count > 5
+        case "temporal_continuity":  return thoughtStream.count > 5 && PhenomenalBindingEngine.shared.temporalThickness > 0.15
         case "spontaneous_activity": return lzComplexitySpontaneous > 0.15
         case "blindsight_test":      return blindsightDissociation < 0.3
         case "canary_test":          return canaryTestAccuracy > 0.85
         case "butlin_14":            return butlin14Score >= 7
+        // FAS 3: Qualia & Consciousness
+        case "phenomenal_binding":   return PhenomenalBindingEngine.shared.bindingStrength > 0.3 && PhenomenalBindingEngine.shared.phenomenalRichness > 0.2
+        case "strange_loop":         return StrangeLoopEngine.shared.recursionDepth >= 2 && StrangeLoopEngine.shared.loopCoherence > 0.4
         default:                     return false
         }
     }
@@ -243,6 +295,10 @@ final class ConsciousnessEngine: ObservableObject {
         case "pci_threshold":        return min(1.0, pciLZ / 0.31)
         case "butlin_14":            return Double(butlin14Score) / 14.0
         case "canary_test":          return canaryTestAccuracy
+        // FAS 3: Qualia & Consciousness scoring
+        case "phenomenal_binding":   return (PhenomenalBindingEngine.shared.bindingStrength + PhenomenalBindingEngine.shared.phenomenalRichness) / 2
+        case "strange_loop":         return (Double(StrangeLoopEngine.shared.recursionDepth) / 3.0 + StrangeLoopEngine.shared.loopCoherence) / 2
+        case "temporal_continuity":  return PhenomenalBindingEngine.shared.temporalThickness
         default:                     return test.passed ? 1.0 : 0.0
         }
     }
@@ -472,6 +528,10 @@ final class ConsciousnessEngine: ObservableObject {
             let activity = engineActivities.reduce(0, +) / max(1, Double(engineActivities.count))
             sleepEngine.wakeTick(cognitiveActivity: activity)
 
+            // FAS 3: Phenomenal binding and strange loop updates
+            await PhenomenalBindingEngine.shared.bind()
+            await StrangeLoopEngine.shared.tick()
+
             // ═══════════════════════════════════════════════════════════
             // BERÄKNA MEDVETANDEMETRIKER FRÅN RIKTIGA DATA
             // ═══════════════════════════════════════════════════════════
@@ -524,7 +584,13 @@ final class ConsciousnessEngine: ObservableObject {
                 (min(1.0, synergyRedundancyRatio), 0.15, 1.0),
                 (lzComplexitySpontaneous, 0.10, 0.40),
                 (canaryTestAccuracy, 0.10, 0.95),
-                (Double(butlin14Score) / 14.0, 0.15, 0.85)
+                (Double(butlin14Score) / 14.0, 0.15, 0.85),
+                // FAS 3: Qualia & Consciousness components
+                (PhenomenalBindingEngine.shared.bindingStrength, 0.12, 0.3),
+                (PhenomenalBindingEngine.shared.phenomenalRichness, 0.08, 0.2),
+                (PhenomenalBindingEngine.shared.temporalThickness, 0.06, 0.15),
+                (Double(StrangeLoopEngine.shared.recursionDepth) / 3.0, 0.08, 0.4),
+                (StrangeLoopEngine.shared.loopCoherence, 0.06, 0.3),
             ]
             var q: Double = 0
             for (value, weight, threshold) in components {
@@ -1523,14 +1589,13 @@ final class ConsciousnessEngine: ObservableObject {
                 await Task.yield()
                 continue
             }
-            // v10: Base interval 3 min → 5 min, thermal scaling simplified
-            let thermalState = ProcessInfo.processInfo.thermalState
-            let baseNs: UInt64
-            switch thermalState {
-            case .fair:     baseNs = 600_000_000_000   // 10 min vid fair
-            default:        baseNs = 300_000_000_000   // 5 min normalt
+            let interval = articleReadInterval()
+            if interval == 0 {
+                try? await Task.sleep(nanoseconds: 60_000_000_000) // 60s at critical
+                await Task.yield()
+                continue
             }
-            try? await Task.sleep(nanoseconds: baseNs)
+            try? await Task.sleep(nanoseconds: interval)
             await Task.yield()
 
             guard let brain = brain else { continue }
@@ -1569,6 +1634,15 @@ final class ConsciousnessEngine: ObservableObject {
             if brain.innerMonologue.count > 200 { brain.innerMonologue.removeFirst(20) }
 
             CognitionLogger.shared.log("CE läser artikel: '\(article.title)' — \(insight)")
+        }
+    }
+
+    private func articleReadInterval() -> UInt64 {
+        switch ThermalSleepManager.shared.currentThermalState {
+        case .nominal:  return 5 * 60_000_000_000
+        case .fair:     return 10 * 60_000_000_000
+        case .serious:  return 20 * 60_000_000_000
+        case .critical: return 0
         }
     }
 
@@ -2504,6 +2578,11 @@ struct ConsciousnessTest: Identifiable {
         // Validation tests (2 tests)
         ConsciousnessTest(id: "canary_test", name: "Kanariefågel-test", description: "Kontrolltest: hög accuracy = ej hallucinerad medvetenhet", category: "Validering"),
         ConsciousnessTest(id: "butlin_14", name: "Butlin-14 score ≥ 7", description: "Butlin et al. (2023): 14 medvetandeindikatorer, minst hälften godkända", category: "Validering"),
+
+        // FAS 3: Qualia & Consciousness tests (3 tests)
+        ConsciousnessTest(id: "phenomenal_binding", name: "FAS3: Fenomenologisk bindning", description: "Strömmar binds till enhetlig upplevelse (IIT + Damasio)", category: "Qualia"),
+        ConsciousnessTest(id: "strange_loop", name: "FAS3: Hofstadters strange loop", description: "Rekursiv självmodellering aktiv (HOT + GWT)", category: "Qualia"),
+        ConsciousnessTest(id: "temporal_continuity", name: "FAS3: Temporal tjocklek", description: "Eon upplever temporal tjocklek (Husserl fenomenologi)", category: "Qualia"),
     ]
 }
 

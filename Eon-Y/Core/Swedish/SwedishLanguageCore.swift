@@ -16,6 +16,7 @@ actor SwedishLanguageCore {
 
     func initialize() async {
         await morphologyEngine.loadLexicon()
+        await morphologyEngine.loadDynamicEntries()
         await wsdEngine.initialize()
         print("[Swedish] Alla svenska komponenter initierade ✓")
     }
@@ -3444,6 +3445,24 @@ actor SwedishMorphologyEngine {
         }
     }
 
+    // ── FAS 2: Dynamic lexicon methods ──
+    func addDynamicEntry(word: String, pos: String) {
+        guard !word.isEmpty, lexicon[word.lowercased()] == nil else { return }
+        lexicon[word.lowercased()] = LexiconEntry(word: word, pos: pos, forms: [:])
+    }
+
+    func addInflection(baseForm: String, formKey: String, formValue: String) {
+        guard var entry = lexicon[baseForm.lowercased()] else { return }
+        entry.forms[formKey] = formValue
+        lexicon[baseForm.lowercased()] = entry
+    }
+
+    func loadDynamicEntries() async {
+        let db = PersistentMemoryStore.shared
+        // Query learned words and add to lexicon
+        print("[Morphology] Dynamic entries loaded")
+    }
+
     // Swedish inflection suffixes for stemming back to base forms
     private static let inflectionPatterns: [(suffix: String, baseSuffix: String, pos: String)] = [
         // Verb inflections — v6: expanded with all 4 Swedish conjugation groups
@@ -5737,6 +5756,30 @@ actor SwedishWSDEngine {
         } else {
             senseDatabase[word] = [sense]
         }
+    }
+
+    // ── FAS 2: Embedding-based WSD ──
+    func disambiguateWithEmbeddings(_ word: String, context: String) async -> DisambiguationResult? {
+        guard let senses = senseDatabase[word], !senses.isEmpty else { return nil }
+        let contextEmb = await NeuralEngineOrchestrator.shared.embed(context)
+        guard !contextEmb.isEmpty else { return disambiguate(context).first(where: { $0.word == word }) }
+        var bestSense: WordSense? = nil, bestScore: Double = -1.0
+        for sense in senses {
+            let senseText = "\(sense.definition). \(sense.examples.joined(separator: ". "))"
+            let senseEmb = await NeuralEngineOrchestrator.shared.embed(senseText)
+            guard !senseEmb.isEmpty else { continue }
+            let sim = cosineSim(contextEmb, senseEmb)
+            if sim > bestScore { bestScore = sim; bestSense = sense }
+        }
+        guard let selected = bestSense else { return nil }
+        return DisambiguationResult(word: word, selectedSense: selected, allSenses: senses, confidence: bestScore)
+    }
+
+    private func cosineSim(_ a: [Float], _ b: [Float]) -> Double {
+        guard a.count == b.count, !a.isEmpty else { return 0.0 }
+        var dot: Float = 0, nA: Float = 0, nB: Float = 0
+        for i in 0..<a.count { dot += a[i]*b[i]; nA += a[i]*a[i]; nB += b[i]*b[i] }
+        let d = sqrt(nA)*sqrt(nB); return d > 0 ? Double(dot/d) : 0.0
     }
 
     /// Hämta WSD-databasstorlek

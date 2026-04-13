@@ -5519,4 +5519,23 @@ struct MasteryLoopReport: Identifiable, Codable {
         let olderAvg = older.reduce(0, +) / Double(max(1, older.count))
         return max(0.0, recentAvg - olderAvg)
     }
+
+    // ═══════════════════════════════════════════════════════════
+    // FAS 2: Language System — Vocabulary & Competency
+    // ═══════════════════════════════════════════════════════════
+
+    func registerNewVocabulary(word: String, context: String) async {
+        uniqueSwedishWords.insert(word)
+        wordsLearnedToday += 1
+        persistState()
+        addFSRSItem(topic: "Ord: \(word)", domain: "Semantik", initialDifficulty: 0.3)
+    }
+
+    func adjustCompetency(_ domain: String, delta: Double) async {
+        guard var comp = competencyBook[domain] else { return }
+        comp.level = min(1.0, max(0.0, comp.level + delta))
+        comp.lastStudied = Date()
+        competencyBook[domain] = comp
+        UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
+    }
 }

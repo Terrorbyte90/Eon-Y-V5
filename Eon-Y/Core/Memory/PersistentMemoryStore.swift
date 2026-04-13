@@ -10,6 +10,13 @@ private func sqlText(_ stmt: OpaquePointer?, _ col: Int32) -> String {
     return String(cString: ptr)
 }
 
+// Nullable variant — returnerar nil vid SQLITE_NULL
+private func sqlTextOptional(_ stmt: OpaquePointer?, _ col: Int32) -> String? {
+    guard sqlite3_column_type(stmt, col) != SQLITE_NULL else { return nil }
+    guard let ptr = sqlite3_column_text(stmt, col) else { return nil }
+    return String(cString: ptr)
+}
+
 // Säker sqlite3_bind_text via NSString — garanterar giltig C-sträng-livstid
 // under hela bind-anropet, oavsett Swift ARC-optimeringar.
 @inline(__always)
@@ -213,6 +220,23 @@ actor PersistentMemoryStore {
         execute("CREATE INDEX IF NOT EXISTS idx_articles_created ON articles(created_at)")
         execute("CREATE INDEX IF NOT EXISTS idx_letters_created ON eon_letters(created_at)")
         execute("CREATE INDEX IF NOT EXISTS idx_awareness_created ON awareness_test_runs(created_at)")
+
+        // ── FAS 2: Language System tables ──
+        // Learned words
+        execute("""CREATE TABLE IF NOT EXISTS learned_words (id INTEGER PRIMARY KEY AUTOINCREMENT, word TEXT NOT NULL, pos TEXT DEFAULT 'unknown', context TEXT, source TEXT DEFAULT 'unknown', confidence REAL DEFAULT 0.3, reinforcement_count INTEGER DEFAULT 0, first_seen TEXT DEFAULT (datetime('now')), last_seen TEXT DEFAULT (datetime('now')), embedding BLOB, UNIQUE(word))""")
+        execute("CREATE INDEX IF NOT EXISTS idx_learned_words_word ON learned_words(word)")
+
+        // Collocations
+        execute("""CREATE TABLE IF NOT EXISTS collocations (id INTEGER PRIMARY KEY AUTOINCREMENT, phrase TEXT NOT NULL UNIQUE, frequency INTEGER DEFAULT 1, first_seen TEXT DEFAULT (datetime('now')), last_seen TEXT DEFAULT (datetime('now')))""")
+
+        // Grammar patterns
+        execute("""CREATE TABLE IF NOT EXISTS grammar_patterns (id INTEGER PRIMARY KEY AUTOINCREMENT, pattern TEXT NOT NULL UNIQUE, frequency INTEGER DEFAULT 1, first_seen TEXT DEFAULT (datetime('now')))""")
+
+        // Corrections
+        execute("""CREATE TABLE IF NOT EXISTS corrections (id INTEGER PRIMARY KEY AUTOINCREMENT, wrong_form TEXT NOT NULL, correct_form TEXT NOT NULL, context TEXT, created_at TEXT DEFAULT (datetime('now')))""")
+
+        // Language snapshots
+        execute("""CREATE TABLE IF NOT EXISTS language_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL UNIQUE, vocabulary_size INTEGER, morphology_mastery REAL, syntax_mastery REAL, semantic_mastery REAL, pragmatic_mastery REAL, overall_level REAL, unknown_word_ratio REAL, avg_sentence_complexity REAL)""")
     }
 
     // MARK: - Conversation operations
@@ -920,6 +944,54 @@ actor PersistentMemoryStore {
             _ = sqlite3_step(stmt)
         }
         sqlite3_finalize(stmt)
+    }
+
+    func queryInt(_ sql: String) -> Int? {
+        guard db != nil else { return nil }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
+        defer { sqlite3_finalize(stmt) }
+        return sqlite3_step(stmt) == SQLITE_ROW ? Int(sqlite3_column_int(stmt, 0)) : nil
+    }
+
+    // MARK: - FAS 2: Language System CRUD methods
+
+    func insertLearnedWord(word: String, pos: String, context: String, source: String, confidence: Double) async {
+        let sql = "INSERT INTO learned_words (word, pos, context, source, confidence) VALUES (?, ?, ?, ?, ?) ON CONFLICT(word) DO UPDATE SET reinforcement_count = reinforcement_count + 1, last_seen = datetime('now'), confidence = min(1.0, confidence + 0.05)"
+        execute(sql, params: [word, pos, context, source, confidence])
+    }
+
+    func reinforceLearnedWord(_ word: String) async {
+        execute("UPDATE learned_words SET reinforcement_count = reinforcement_count + 1, last_seen = datetime('now'), confidence = min(1.0, confidence + 0.02) WHERE word = ?", params: [word])
+    }
+
+    func registerCollocation(_ phrase: String) async {
+        execute("INSERT INTO collocations (phrase) VALUES (?) ON CONFLICT(phrase) DO UPDATE SET frequency = frequency + 1, last_seen = datetime('now')", params: [phrase])
+    }
+
+    func registerGrammarPattern(_ pattern: String) async {
+        execute("INSERT OR IGNORE INTO grammar_patterns (pattern) VALUES (?)", params: [pattern])
+    }
+
+    func insertCorrection(wrong: String, correct: String, context: String) async {
+        execute("INSERT INTO corrections (wrong_form, correct_form, context) VALUES (?, ?, ?)", params: [wrong, correct, context])
+    }
+
+    func getLearnedVocabularySize() async -> Int {
+        queryInt("SELECT COUNT(*) FROM learned_words WHERE confidence > 0.3") ?? 0
+    }
+
+    func getRecentlyLearnedWords(limit: Int = 20) async -> [(word: String, confidence: Double)] {
+        let sql = "SELECT word, confidence FROM learned_words ORDER BY last_seen DESC LIMIT ?"
+        let rows = query(sql, params: [limit])
+        return rows.compactMap { row in
+            guard let word = row[0] as? String, let conf = row[1] as? Double else { return nil }
+            return (word: word, confidence: conf)
+        }
+    }
+
+    func insertLanguageSnapshot(date: String, vocabSize: Int, morphMastery: Double, syntaxMastery: Double, semMastery: Double, pragMastery: Double, overall: Double, unknownRatio: Double, avgComplexity: Double) async {
+        execute("INSERT OR REPLACE INTO language_snapshots (date, vocabulary_size, morphology_mastery, syntax_mastery, semantic_mastery, pragmatic_mastery, overall_level, unknown_word_ratio, avg_sentence_complexity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", params: [date, vocabSize, morphMastery, syntaxMastery, semMastery, pragMastery, overall, unknownRatio, avgComplexity])
     }
 
     // MARK: - Helper

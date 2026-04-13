@@ -19,6 +19,7 @@ actor QwenHandler {
 
     // Token tracking for anti-repetition
     private var generatedTokenHistory: [llama_token] = []
+    private let maxTokenHistory = 2000
 
     // Thermal cooldown: timestamp of last generation completion
     private var lastGenerationEnd: Date = .distantPast
@@ -301,8 +302,8 @@ actor QwenHandler {
         }
 
         generatedTokenHistory.append(contentsOf: generatedTokens)
-        if generatedTokenHistory.count > 500 {
-            generatedTokenHistory.removeFirst(generatedTokenHistory.count - 500)
+        if generatedTokenHistory.count > maxTokenHistory {
+            generatedTokenHistory.removeFirst(generatedTokenHistory.count - maxTokenHistory)
         }
 
         lastGenerationEnd = Date()

@@ -34,11 +34,18 @@ final class ThermalSleepManager: ObservableObject {
     private var lastThermalState: ProcessInfo.ThermalState = .nominal
     private var checkTask: Task<Void, Never>?
 
+    /// Current thermal state snapshot — safe to read from any context
+    nonisolated var currentThermalState: ProcessInfo.ThermalState {
+        ProcessInfo.processInfo.thermalState
+    }
+
     /// Global thermal circuit breaker: when critical thermal state is detected,
     /// ALL non-essential Qwen inference is blocked for at least 60 seconds.
     /// This timestamp records when the circuit breaker was last tripped.
     private var circuitBreakerTrippedAt: Date = .distantPast
     private let circuitBreakerCooldown: TimeInterval = 60.0
+
+    private let pauseLock = NSLock()
 
     private init() {}
 
@@ -223,6 +230,8 @@ extension ThermalSleepManager {
     /// Returnerar true om bakgrundsarbete ska pausas.
     /// Tar hänsyn till både termisk sömn och direkt termisk state.
     nonisolated func shouldPauseWork() -> Bool {
+        pauseLock.lock()
+        defer { pauseLock.unlock() }
         let thermal = ProcessInfo.processInfo.thermalState
         return thermal == .critical || thermal == .serious
     }
