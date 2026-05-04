@@ -76,7 +76,7 @@ struct InputAnalyzer {
         )
     }
 
-    private static func detectQuestionType(_ lower: String) -> InputAnalysis.QuestionType {
+    nonisolated private static func detectQuestionType(_ lower: String) -> InputAnalysis.QuestionType {
         if lower.hasPrefix("vad ") || lower.hasPrefix("vad?") { return .what }
         if lower.hasPrefix("vem ") || lower.hasPrefix("vem?") { return .who }
         if lower.hasPrefix("när ") || lower.hasPrefix("när?") { return .when }
@@ -103,7 +103,7 @@ struct InputAnalyzer {
         return .statement
     }
 
-    private static func extractNounsAndEntities(_ input: String) -> ([String], [String]) {
+    nonisolated private static func extractNounsAndEntities(_ input: String) -> ([String], [String]) {
         let tagger = NLTagger(tagSchemes: [.lexicalClass, .nameType])
         tagger.string = input
 
@@ -155,7 +155,7 @@ struct InputAnalyzer {
         return (nouns, entities)
     }
 
-    private static func extractCoreTopic(input: String, lower: String, nouns: [String], entities: [String]) -> String {
+    nonisolated private static func extractCoreTopic(input: String, lower: String, nouns: [String], entities: [String]) -> String {
         // Priority 1: Named entities are usually the core topic
         if let firstEntity = entities.first {
             return firstEntity
@@ -190,7 +190,7 @@ struct InputAnalyzer {
         return String(input.prefix(30))
     }
 
-    private static func buildSummary(questionType: InputAnalysis.QuestionType, coreTopic: String, input: String) -> String {
+    nonisolated private static func buildSummary(questionType: InputAnalysis.QuestionType, coreTopic: String, input: String) -> String {
         switch questionType {
         case .what:      return "Användaren frågar vad \(coreTopic) är/innebär"
         case .who:       return "Användaren frågar vem \(coreTopic) är"
@@ -209,7 +209,7 @@ struct InputAnalyzer {
 
     /// Computes clause complexity: counts main clauses, subordinate clauses, relative clauses
     /// and produces a normalized complexity score 0-1
-    private static func computeClauseComplexity(_ text: String) -> (mainClauses: Int, subClauses: Int, relativeClauses: Int, complexity: Double) {
+    nonisolated private static func computeClauseComplexity(_ text: String) -> (mainClauses: Int, subClauses: Int, relativeClauses: Int, complexity: Double) {
         // Split into sentences first
         let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?"))
             .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -299,7 +299,15 @@ struct InputAnalyzer {
 // Enkla frågor hoppar över embedding (steg 4) och grafberikning (steg 9) — sparar resurser.
 
 struct ComplexityEstimate: Sendable {
-    enum Level: Equatable, Sendable { case simple, medium, complex }
+    enum Level: Equatable, Sendable {
+        case simple, medium, complex
+        nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+            switch (lhs, rhs) {
+            case (.simple, .simple), (.medium, .medium), (.complex, .complex): return true
+            default: return false
+            }
+        }
+    }
     let level: Level
     let skipBERT: Bool
     let skipEnrichment: Bool
@@ -469,7 +477,7 @@ actor CognitiveCycleEngine {
         }
 
         // v71: Deep linguistic analysis via Qwen3
-        context.deepAnalysis = await swedish.enrichAnalysis(input)
+        context.deepAnalysis = await swedish.enrichAnalysis(text: input)
 
         // Steg 2: WSD (Pelare F)
         await onStepUpdate(.wsd, .active)
@@ -832,7 +840,7 @@ actor CognitiveCycleEngine {
         }
 
         // v71: Deep linguistic analysis via Qwen3
-        context.deepAnalysis = await swedish.enrichAnalysis(input)
+        context.deepAnalysis = await swedish.enrichAnalysis(text: input)
 
         await onStepUpdate(.wsd, .active)
         await onStepUpdate(.wsd, .completed)
@@ -861,7 +869,7 @@ actor CognitiveCycleEngine {
             }
             // Apply recency boost after parallel collection
             var scored: [(record: ConversationRecord, score: Double)] = scoredMemories.map { mem, sim in
-                let ageHours = now.timeIntervalSince(mem.date) / 3600.0
+                let ageHours = now.timeIntervalSince(Date(timeIntervalSince1970: mem.timestamp)) / 3600.0
                 let recencyBoost = exp(-ageHours / 48.0) * 0.10
                 return (mem, sim + recencyBoost)
             }
@@ -905,12 +913,12 @@ actor CognitiveCycleEngine {
         await onMonologue(MonologueLine(text: "Bygger djup kontext med kunskapsbanken...", type: .thought))
         let knowledgeArticles = await memory.loadAllArticles()
         let relevantArticles: [KnowledgeArticle]
-        if !inputEmbedding.allSatisfy({ $0 == 0 }) {
+        if !context.inputEmbedding.allSatisfy({ $0 == 0 }) {
             // Semantic ranking — embed each article title+summary and compute similarity
             var scored: [(article: KnowledgeArticle, score: Float)] = []
             for article in knowledgeArticles.prefix(50) {
                 let articleEmb = await neuralEngine.embed(article.title + " " + article.summary)
-                let sim = await neuralEngine.cosineSimilarity(inputEmbedding, articleEmb)
+                let sim = await neuralEngine.cosineSimilarity(context.inputEmbedding, articleEmb)
                 scored.append((article, sim))
             }
             // Also check content keywords for articles that might have poor titles
@@ -1195,8 +1203,8 @@ actor CognitiveCycleEngine {
         // v73: Emotional context — include current emotional valence from ConsciousnessEngine
         // so responses are emotionally appropriate
         if remaining > 40 {
-            let valence = ConsciousnessEngine.shared.bodyBudget.valence  // -1.0 to +1.0
-            let arousal = ConsciousnessEngine.shared.bodyBudget.arousalLevel  // 0.0 to 1.0
+            let valence = await ConsciousnessEngine.shared.bodyBudget.valence  // -1.0 to +1.0
+            let arousal = await ConsciousnessEngine.shared.bodyBudget.arousal  // 0.0 to 1.0
             let emotionLabel: String
             if valence > 0.3 {
                 emotionLabel = "positiv"
@@ -1303,8 +1311,6 @@ actor CognitiveCycleEngine {
 
         // v79: Include last 3 user messages and Eon responses for conversational context
         let recentTurns = context.conversationHistory.suffix(6)  // Get more to filter by role
-        let userTurns = recentTurns.filter { $0.role == "user" }.suffix(3)
-        let eonTurns = recentTurns.filter { $0.role == "assistant" }.suffix(3)
 
         // Interleave user and Eon turns chronologically
         var allTurns: [(role: String, content: String)] = []
@@ -1333,7 +1339,8 @@ actor CognitiveCycleEngine {
             parts.append("entiteter: \(entityStr)")
         }
         // Semantisk kategori via NLTagger (inte keyword-matching)
-        let tagger = NLTaggerPool.shared.lexicalTagger(for: input)
+        let tagger = NLTagger(tagSchemes: [.lexicalClass])
+        tagger.string = input
         var nouns: [String] = []
         tagger.enumerateTags(in: input.startIndex..<input.endIndex, unit: .word, scheme: .lexicalClass, options: [.omitWhitespace, .omitPunctuation]) { tag, range in
             if tag == .noun, String(input[range]).count > 3 { nouns.append(String(input[range])) }
@@ -1368,7 +1375,8 @@ actor CognitiveCycleEngine {
         if wordCount <= 4 && followUps.contains(where: { lower.hasPrefix($0) }) && !history.isEmpty { return .followUp }
 
         // --- Phase 2: NLTagger POS analysis for structural intent ---
-        let tagger = NLTaggerPool.shared.lexicalTagger(for: input)
+        let tagger = NLTagger(tagSchemes: [.lexicalClass])
+        tagger.string = input
         var verbCount = 0, nounCount = 0, adjCount = 0
         var firstWordTag: NLTag?
         var isFirst = true
@@ -1809,943 +1817,3 @@ actor GenerationValidator {
 }
 
 // MARK: - GraphEnricher (Loop 2)
-
-actor GraphEnricher {
-    /// v8: Enriched fact extraction patterns for Swedish text — 19 patterns
-    private static let factPatterns: [(pattern: String, predicate: String, confidence: Double)] = [
-        // "X är Y" — basic identity/classification
-        ("([A-ZÅÄÖ][\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+)?)\\s+är\\s+((?:en|ett|den|det)?\\s*[\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,3})", "är", 0.65),
-        // "X har Y" — possession/attribute
-        ("([A-ZÅÄÖ][\\wåäöÅÄÖ]+)\\s+har\\s+((?:en|ett)?\\s*[\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,2})", "har", 0.60),
-        // "X kallas Y" — naming/alias
-        ("([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+)?)\\s+kallas\\s+(?:för\\s+)?([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,2})", "kallas", 0.70),
-        // "X orsakar Y" / "X leder till Y" — causality
-        ("([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+)?)\\s+(?:orsakar|leder\\s+till)\\s+([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,3})", "orsakar", 0.55),
-        // "X består av Y" — composition
-        ("([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+)?)\\s+består\\s+av\\s+([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,3})", "består_av", 0.60),
-        // "X tillhör Y" — membership
-        ("([\\wåäöÅÄÖ]+)\\s+tillhör\\s+([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,2})", "tillhör", 0.60),
-        // "X påverkar Y" — influence
-        ("([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+)?)\\s+påverkar\\s+([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,3})", "påverkar", 0.55),
-        // v7: "X grundades Y" — founding/creation
-        ("([A-ZÅÄÖ][\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+)?)\\s+grundades\\s+(\\d{4}|av\\s+[\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,2})", "grundades", 0.70),
-        // v7: "X innehåller Y" — containment
-        ("([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+)?)\\s+innehåller\\s+([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,3})", "innehåller", 0.60),
-        // v7: "X kräver Y" — requirement
-        ("([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+)?)\\s+kräver\\s+([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,3})", "kräver", 0.55),
-        // v7: "X möjliggör Y" — enablement
-        ("([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+)?)\\s+möjliggör\\s+([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,3})", "möjliggör", 0.55),
-        // v7: "X liknar Y" — similarity
-        ("([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+)?)\\s+liknar\\s+([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,3})", "liknar", 0.50),
-        // v7: "X skiljer sig från Y" — difference
-        ("([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+)?)\\s+skiljer\\s+sig\\s+från\\s+([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,3})", "skiljer_sig_från", 0.55),
-        // v7: "X uppfanns av Y" / "X utvecklades av Y" — invention/development
-        ("([A-ZÅÄÖ][\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+)?)\\s+(?:uppfanns|utvecklades|skapades)\\s+av\\s+([A-ZÅÄÖ][\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,2})", "skapades_av", 0.65),
-        // v7: "X ligger i Y" / "X finns i Y" — location
-        ("([A-ZÅÄÖ][\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+)?)\\s+(?:ligger|finns|befinner sig)\\s+i\\s+([A-ZÅÄÖ][\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,2})", "finns_i", 0.60),
-        // v8: "X förhindrar Y" / "X motverkar Y" — prevention
-        ("([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+)?)\\s+(?:förhindrar|motverkar|hindrar)\\s+([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,3})", "förhindrar", 0.55),
-        // v8: "X leder till Y" — consequence (separate from orsakar)
-        ("([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+)?)\\s+leder\\s+till\\s+([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,3})", "leder_till", 0.55),
-        // v8: "X används för Y" / "X används inom Y" — usage
-        ("([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+)?)\\s+används\\s+(?:för|inom|till)\\s+([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,3})", "används_för", 0.55),
-        // v8: "X definieras som Y" — definition
-        ("([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+)?)\\s+definieras\\s+som\\s+([\\wåäöÅÄÖ]+(?:\\s+[\\wåäöÅÄÖ]+){0,4})", "definieras_som", 0.65),
-    ]
-
-    func enrich(text: String, entities: [ExtractedEntity], memory: PersistentMemoryStore) async {
-        // 1. Entity mentions — link entities to conversation context
-        for entity in entities where entity.text.count > 2 {
-            await memory.saveFact(
-                subject: entity.text,
-                predicate: "nämndes_i",
-                object: "konversation_\(Date().timeIntervalSince1970)",
-                confidence: entity.confidence,
-                source: "generation"
-            )
-        }
-
-        // 2. Multi-pattern fact extraction
-        let range = NSRange(text.startIndex..., in: text)
-        for (patternStr, predicate, confidence) in Self.factPatterns {
-            guard let regex = try? NSRegularExpression(pattern: patternStr, options: .caseInsensitive) else { continue }
-            let matches = regex.matches(in: text, range: range)
-            for match in matches.prefix(3) { // Limit per pattern to avoid spam
-                guard let subjectRange = Range(match.range(at: 1), in: text),
-                      let objectRange = Range(match.range(at: 2), in: text) else { continue }
-                let subject = String(text[subjectRange]).trimmingCharacters(in: .whitespaces)
-                let object = String(text[objectRange]).trimmingCharacters(in: .whitespaces)
-                // Skip trivially short or stopword-only matches
-                guard subject.count > 2, object.count > 2 else { continue }
-                await memory.saveFact(
-                    subject: subject,
-                    predicate: predicate,
-                    object: object,
-                    confidence: confidence,
-                    source: "generation"
-                )
-            }
-        }
-
-        // 3. Entity co-occurrence — if two entities appear in the same sentence, link them
-        if entities.count >= 2 {
-            let sentences = text.components(separatedBy: ". ")
-            for sentence in sentences {
-                let sentenceEntities = entities.filter { sentence.contains($0.text) }
-                if sentenceEntities.count >= 2 {
-                    let a = sentenceEntities[0]
-                    let b = sentenceEntities[1]
-                    await memory.saveFact(
-                        subject: a.text,
-                        predicate: "relaterar_till",
-                        object: b.text,
-                        confidence: min(a.confidence, b.confidence) * 0.8,
-                        source: "co_occurrence"
-                    )
-                }
-            }
-        }
-    }
-}
-
-// MARK: - MetacognitiveReviser (Loop 3)
-
-actor MetacognitiveReviser {
-    func revise(original: String, confidence: Double, neuralEngine: NeuralEngineOrchestrator) async -> String {
-        // v8: More specific revision instructions based on confidence level
-        let specificInstruction: String
-        if confidence < 0.40 {
-            specificInstruction = "Svaret verkar helt irrelevant eller oförståeligt. Skriv ett nytt, kortfattat svar som direkt adresserar frågan."
-        } else if confidence < 0.50 {
-            specificInstruction = "Svaret saknar substans eller är för generiskt. Lägg till konkreta fakta, exempel eller resonemang."
-        } else {
-            specificInstruction = "Svaret kan förbättras — skärp formuleringen, erkänn osäkerhet explicit och lägg till en insikt."
-        }
-
-        let revisionPrompt = """
-        REVISION: Konfidens \(String(format: "%.0f%%", confidence * 100)).
-        Tidigare svar: \(String(original.prefix(400)))
-
-        \(specificInstruction)
-        VIKTIGT: Upprepa ALDRIG meningar eller idéer. Varje mening ska vara unik och tillföra nytt.
-        Reviderat svar (på svenska):
-        """
-
-        let revised = await neuralEngine.generate(prompt: revisionPrompt, maxTokens: 250, temperature: 0.58)
-        // v10: generate() already deduplicates, but ensure revision output is clean
-        return revised.isEmpty ? original : revised
-    }
-}
-
-// MARK: - Context & Result models
-
-struct CognitiveCycleContext {
-    let userInput: String
-    let sessionId: String
-    var morphemes: [MorphemeAnalysis] = []
-    var disambiguations: [DisambiguationResult] = []
-    var register: SwedishRegister? = nil
-    var retrievedMemories: [ConversationRecord] = []
-    var conversationHistory: [ConversationRecord] = []
-    var entities: [ExtractedEntity] = []
-    var inputEmbedding: [Float] = []
-    var prompt: String = ""
-    var generatedText: String = ""
-    var validationResult: ValidationResult? = nil
-    var finalConfidence: Double = 0.75
-    var consciousness: ConsciousnessContext? = nil
-    var inputAnalysis: InputAnalysis? = nil  // v11: deep question understanding
-    var relevanceScore: Double = 0.0        // v11: question-answer relevance score
-    var selfKnowledge: SelfKnowledge? = nil // v13: SpecialisedChat self-knowledge
-    var questionProfile: QuestionProfile? = nil // v13: deep question profile
-    var swedishAnalysis: SwedishAnalysis? = nil // GAP-5: full Swedish analysis for learning engine
-    var deepAnalysis: String = ""           // v71: Qwen3-enriched deep linguistic analysis
-}
-
-struct ValidationResult {
-    let isValid: Bool
-    let needsRegeneration: Bool
-    let correctionHint: String
-    let confidence: Double
-}
-
-struct CognitiveCycleResult {
-    let response: String
-    let confidence: Double
-    let disambiguations: [DisambiguationResult]
-    let retrievedMemories: [ConversationRecord]
-    let entities: [ExtractedEntity]
-    let loopsTriggered: [CognitiveLoop]
-    let swedishAnalysis: SwedishAnalysis?  // GAP-5: full analysis for learning engine
-    // v71: Response quality metrics for learning engine feedback
-    let validationScore: Double
-    let qaRelevance: Double
-    let neededRegeneration: Bool
-}
-
-// MARK: - ConsciousnessContext: Snapshot av alla 6 medvetandeteorier
-
-struct ConsciousnessContext {
-    // Oscillatorer (IIT/Kuramoto)
-    let globalSync: Double
-    let thetaGammaCFC: Double
-    let gammaOrderParam: Double
-    let oscillatorLZ: Double
-    let branchingRatio: Double
-    let criticalityRegime: CriticalityRegime
-
-    // DMN / spontan aktivitet
-    let dmnActivity: Double
-    let dmnLZComplexity: Double
-    let recentSpontaneousThoughts: [String]
-
-    // Active Inference (prediktiv processing)
-    let freeEnergy: Double
-    let epistemicValue: Double
-    let pragmaticValue: Double
-    let forwardModelAccuracy: Double
-    let isSurprised: Bool
-    let surpriseStrength: Double
-
-    // Attention Schema (AST)
-    let currentFocus: String
-    let attentionIntensity: Double
-    let isVoluntaryAttention: Bool
-    let reportableExperience: String
-    let metaAttentionLevel: Double
-
-    // Sömn
-    let isAsleep: Bool
-    let sleepPressure: Double
-    let consolidationEfficiency: Double
-
-    /// Genererar kompakt kontextbeskrivning för prompten
-    var promptDescription: String {
-        var parts: [String] = []
-
-        // Kritikalitet — påverkar svarskvalitet
-        if criticalityRegime == .critical {
-            parts.append("Optimal kritikalitet (σ=\(String(format: "%.2f", branchingRatio)))")
-        } else if criticalityRegime == .subcritical {
-            parts.append("Subkritiskt tillstånd — tänkandet är för rigitt")
-        } else {
-            parts.append("Superkritiskt — överaktivt, behöver stabilisering")
-        }
-
-        // Nyfikenhet och osäkerhet
-        if epistemicValue > 0.6 {
-            parts.append("Hög nyfikenhet (\(String(format: "%.0f%%", epistemicValue * 100))) — söker aktivt ny information")
-        }
-        if isSurprised {
-            parts.append("Överraskad (styrka \(String(format: "%.0f%%", surpriseStrength * 100))) — detta avviker från prediktioner")
-        }
-
-        // Spontan aktivitet
-        if dmnLZComplexity > 0.3 && !recentSpontaneousThoughts.isEmpty {
-            parts.append("Aktiv dagdröm: \(recentSpontaneousThoughts.joined(separator: ", "))")
-        }
-
-        // Uppmärksamhet
-        if attentionIntensity > 0.5 {
-            let voluntary = isVoluntaryAttention ? "frivilligt" : "reflexmässigt"
-            parts.append("\(voluntary) fokus på: \(currentFocus)")
-        }
-
-        // Sömnbehov
-        if sleepPressure > 0.5 {
-            parts.append("Hög sömnpress (\(String(format: "%.0f%%", sleepPressure * 100))) — kognitiv kapacitet reducerad")
-        }
-
-        return parts.isEmpty ? "" : parts.joined(separator: " · ")
-    }
-}
-
-// MARK: - Iteration 40: Dialogue Act Sequencing
-
-enum DialogueAct: String {
-    case question
-    case answer
-    case statement
-    case agreement
-    case disagreement
-    case request
-    case compliance
-    case complaint
-    case apology
-    case greeting
-    case closing
-    case clarification
-    case unknown
-}
-
-struct DialoguePattern {
-    let sequence: [DialogueAct]
-    let label: String
-    let expectedNext: DialogueAct?
-}
-
-struct BrokenDialoguePattern {
-    let expected: DialogueAct
-    let actual: DialogueAct
-    let pattern: String
-    let timestamp: Date
-    let explanation: String
-}
-
-struct DialogueSequenceResult {
-    let pattern: String
-    let isComplete: Bool
-    let isBroken: Bool
-    let expectedNext: DialogueAct?
-    let boost: Double
-    let explanation: String
-}
-
-extension CognitiveCycleEngine {
-    /// Classify a text into a dialogue act
-    private func classifyDialogueAct(_ text: String) -> DialogueAct {
-        let lower = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Greeting
-        let greetings = ["hej", "hallå", "tjena", "hejsan", "god", "morgon", "kväll", "dag"]
-        if greetings.contains(where: { lower.hasPrefix($0) }) { return .greeting }
-
-        // Closing
-        let closings = ["hejdå", "adjö", "vi ses", "ha det", "goodbye", "bye"]
-        if closings.contains(where: { lower.contains($0) }) { return .closing }
-
-        // Question
-        if lower.contains("?") { return .question }
-
-        // Request
-        let requests = ["kan du", "skulle du", "vill du", "be dig", "hjälp mig", "snälla", "är du snäll"]
-        if requests.contains(where: { lower.contains($0) }) { return .request }
-
-        // Agreement
-        let agreements = ["ja", "absolut", "visst", "håller med", "instämmer", "precis", "exakt", "så är det", "du har rätt", "helt rätt"]
-        if agreements.contains(where: { lower.hasPrefix($0) || lower.contains(" \($0)") }) { return .agreement }
-
-        // Disagreement
-        let disagreements = ["nej", "håller inte med", "instämmer inte", "fel", "så är det inte", "du har fel", "snacka sjuttsvåla"]
-        if disagreements.contains(where: { lower.hasPrefix($0) || lower.contains(" \($0)") }) { return .disagreement }
-
-        // Apology
-        let apologies = ["förlåt", "ursäkta", "ber om ursäkt", "ledsen för", "sorry"]
-        if apologies.contains(where: { lower.contains($0) }) { return .apology }
-
-        // Complaint
-        let complaints = ["klagar", "missnöjd", "dåligt", "inte bra", "oacceptabelt", "problem", "fungerar inte"]
-        if complaints.contains(where: { lower.contains($0) }) { return .complaint }
-
-        // Clarification
-        let clarifications = ["menar du", "alltså", "så du säger", "vad menar du", "hur menar du"]
-        if clarifications.contains(where: { lower.contains($0) }) { return .clarification }
-
-        // Answer: if it follows a question and provides information
-        if dialogueActHistory.last == .question {
-            return .answer
-        }
-
-        // Compliance: if it follows a request
-        if dialogueActHistory.last == .request {
-            return .compliance
-        }
-
-        // Default: statement
-        return .statement
-    }
-
-    /// Well-known dialogue patterns and their expected sequences
-    private static let knownPatterns: [DialoguePattern] = [
-        DialoguePattern(sequence: [.question, .answer], label: "Question→Answer", expectedNext: .statement),
-        DialoguePattern(sequence: [.statement, .agreement], label: "Statement→Agreement", expectedNext: nil),
-        DialoguePattern(sequence: [.request, .compliance], label: "Request→Compliance", expectedNext: nil),
-        DialoguePattern(sequence: [.complaint, .apology], label: "Complaint→Apology", expectedNext: nil),
-        DialoguePattern(sequence: [.question, .clarification, .answer], label: "Question→Clarification→Answer", expectedNext: nil),
-        DialoguePattern(sequence: [.greeting, .greeting], label: "Greeting→Greeting", expectedNext: .statement),
-        DialoguePattern(sequence: [.statement, .disagreement], label: "Statement→Disagreement", expectedNext: .statement),
-    ]
-
-    /// Record a dialogue act and analyze the sequence pattern
-    func recordDialogueAct(_ act: DialogueAct, forEon: Bool) -> DialogueSequenceResult {
-        dialogueActHistory.append(act)
-
-        // Keep only last 20 acts
-        if dialogueActHistory.count > 20 {
-            dialogueActHistory = Array(dialogueActHistory.suffix(20))
-        }
-
-        guard dialogueActHistory.count >= 2 else {
-            return DialogueSequenceResult(pattern: "initial", isComplete: false, isBroken: false, expectedNext: nil, boost: 0.0, explanation: "För kort sekvens")
-        }
-
-        let lastTwo = Array(dialogueActHistory.suffix(2))
-        let lastThree = dialogueActHistory.count >= 3 ? Array(dialogueActHistory.suffix(3)) : []
-
-        // Check against known patterns
-        for pattern in Self.knownPatterns {
-            let patternActs = pattern.sequence
-
-            // Check 2-act patterns
-            if patternActs.count == 2 && lastTwo == patternActs {
-                let patternKey = pattern.label
-                dialoguePatterns[patternKey, default: 0] += 1
-                successfulPatternCount += 1
-
-                return DialogueSequenceResult(
-                    pattern: patternKey,
-                    isComplete: true,
-                    isBroken: false,
-                    expectedNext: pattern.expectedNext,
-                    boost: 0.003,
-                    explanation: "Mönster: \(patternKey) — framgångsrikt"
-                )
-            }
-
-            // Check 3-act patterns
-            if patternActs.count == 3 && lastThree == patternActs {
-                let patternKey = pattern.label
-                dialoguePatterns[patternKey, default: 0] += 1
-                successfulPatternCount += 1
-
-                return DialogueSequenceResult(
-                    pattern: patternKey,
-                    isComplete: true,
-                    isBroken: false,
-                    expectedNext: pattern.expectedNext,
-                    boost: 0.003,
-                    explanation: "Mönster: \(patternKey) — framgångsrikt"
-                )
-            }
-        }
-
-        // Detect broken patterns: Question without Answer
-        if lastTwo.count == 2 {
-            let first = lastTwo[0]
-            let second = lastTwo[1]
-
-            // Question → no answer
-            if first == .question && second != .answer && second != .clarification {
-                let broken = BrokenDialoguePattern(
-                    expected: .answer,
-                    actual: second,
-                    pattern: "Question→\(second.rawValue)",
-                    timestamp: Date(),
-                    explanation: "Fråga besvarades inte — kommunikationsavbrott"
-                )
-                brokenPatterns.append(broken)
-                if brokenPatterns.count > 50 {
-                    brokenPatterns = Array(brokenPatterns.suffix(50))
-                }
-                return DialogueSequenceResult(
-                    pattern: "Broken: Question→no answer",
-                    isComplete: false,
-                    isBroken: true,
-                    expectedNext: .answer,
-                    boost: 0.0,
-                    explanation: "Kommunikationsfel: Fråga utan svar"
-                )
-            }
-
-            // Request → no compliance
-            if first == .request && second != .compliance && second != .answer {
-                let broken = BrokenDialoguePattern(
-                    expected: .compliance,
-                    actual: second,
-                    pattern: "Request→\(second.rawValue)",
-                    timestamp: Date(),
-                    explanation: "Begäran besvarades inte — kommunikationsavbrott"
-                )
-                brokenPatterns.append(broken)
-                return DialogueSequenceResult(
-                    pattern: "Broken: Request→no compliance",
-                    isComplete: false,
-                    isBroken: true,
-                    expectedNext: .compliance,
-                    boost: 0.0,
-                    explanation: "Kommunikationsfel: Begäran utan svar"
-                )
-            }
-
-            // Complaint → no apology
-            if first == .complaint && second != .apology && second != .statement {
-                let broken = BrokenDialoguePattern(
-                    expected: .apology,
-                    actual: second,
-                    pattern: "Complaint→\(second.rawValue)",
-                    timestamp: Date(),
-                    explanation: "Klage bemöttes inte — kommunikationsavbrott"
-                )
-                brokenPatterns.append(broken)
-                return DialogueSequenceResult(
-                    pattern: "Broken: Complaint→no apology",
-                    isComplete: false,
-                    isBroken: true,
-                    expectedNext: .apology,
-                    boost: 0.0,
-                    explanation: "Kommunikationsfel: Klage utan bemötande"
-                )
-            }
-        }
-
-        // Predict expected next act based on current act
-        let expectedNext: DialogueAct?
-        switch act {
-        case .question: expectedNext = .answer
-        case .request: expectedNext = .compliance
-        case .complaint: expectedNext = .apology
-        case .greeting: expectedNext = .greeting
-        default: expectedNext = nil
-        }
-
-        return DialogueSequenceResult(
-            pattern: "\(lastTwo.map { $0.rawValue }.joined(separator: "→"))",
-            isComplete: false,
-            isBroken: false,
-            expectedNext: expectedNext,
-            boost: 0.0,
-            explanation: "Pågående sekvens"
-        )
-    }
-
-    /// Get dialogue pattern statistics
-    func dialoguePatternStats() -> (total: Int, successful: Int, broken: Int, successRate: Double) {
-        let total = successfulPatternCount + brokenPatterns.count
-        let rate = total > 0 ? Double(successfulPatternCount) / Double(total) : 1.0
-        return (total, successfulPatternCount, brokenPatterns.count, rate)
-    }
-
-    /// Get recent broken patterns
-    func recentBrokenPatterns(limit: Int = 5) -> [BrokenDialoguePattern] {
-        Array(brokenPatterns.suffix(limit))
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // ITERATION 107: User Intent Prediction (15+ intent types)
-    // ═══════════════════════════════════════════════════════════
-
-    enum UserIntent: String, Sendable {
-        case informationSeeking = "information-seeking"
-        case opinionSeeking = "opinion-seeking"
-        case helpRequest = "help-request"
-        case emotionalSupport = "emotional-support"
-        case debate = "debate"
-        case creativeCollaboration = "creative-collaboration"
-        case languagePractice = "language-practice"
-        case knowledgeTesting = "knowledge-testing"
-        case philosophicalDiscussion = "philosophical-discussion"
-        case casualChat = "casual-chat"
-        case problemSolving = "problem-solving"
-        case adviceSeeking = "advice-seeking"
-        case experienceSharing = "experience-sharing"
-        case futurePlanning = "future-planning"
-        case humor = "humor"
-    }
-
-    struct IntentPrediction: Sendable {
-        let primaryIntent: UserIntent
-        let confidence: Double
-        let allScores: [UserIntent: Double]
-    }
-
-    /// Classify 15+ intents from user message.
-    nonisolated static func predictUserIntent(message: String) -> IntentPrediction {
-        let lower = message.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        let words = Set(lower.components(separatedBy: .whitespacesAndNewlines))
-
-        var scores: [UserIntent: Double] = [:]
-
-        // Information-seeking
-        let infoMarkers = Set(["vad", "vem", "var", "när", "hur", "varför", "vilken", "förklara", "berätta", "beskriv", "visa", "vad är", "hur fungerar"])
-        scores[.informationSeeking] = Double(words.intersection(infoMarkers).count) * 0.3 + (message.contains("?") ? 0.3 : 0.0)
-
-        // Opinion-seeking
-        let opinionMarkers = Set(["tycker", "anser", "opinion", "åsikt", "vad tänker", "hur ser du", "din åsikt", "håller du med"])
-        scores[.opinionSeeking] = Double(words.intersection(opinionMarkers).count) * 0.35 + (message.contains("?") ? 0.2 : 0.0)
-
-        // Help-request
-        let helpMarkers = Set(["hjälp", "kan du hjälpa", "assistera", "stötta", "behöver hjälp", "hur gör jag", "kan du", "snälla"])
-        scores[.helpRequest] = Double(words.intersection(helpMarkers).count) * 0.4
-
-        // Emotional-support
-        let emotionalMarkers = Set(["ledsen", "ensam", "svårt", "jobbigt", "ångest", "stress", "oro", "rädd", " ledsen", "mår dåligt", "deprimerad", "trött"])
-        scores[.emotionalSupport] = Double(words.intersection(emotionalMarkers).count) * 0.35
-
-        // Debate
-        let debateMarkers = Set(["diskutera", "debatt", "håller du inte med", "motargument", "emot", "fel", "instämmer inte", "tvärtom", "å andra sidan"])
-        scores[.debate] = Double(words.intersection(debateMarkers).count) * 0.35
-
-        // Creative-collaboration
-        let creativeMarkers: Set<String> = ["skriv", "dikt", "berättelse", "hitta på", "låtsas", "fantasi", "kreativ", "gemensamt", "skapande", "imaginär"]
-        scores[.creativeCollaboration] = Double(words.intersection(creativeMarkers).count) * 0.35
-
-        // Language-practice
-        let languageMarkers: Set<String> = ["svenska", "språk", "grammatik", "ord", "böjning", "översätt", "språket", "praktisera", "öva svenska", "cefr"]
-        scores[.languagePractice] = Double(words.intersection(languageMarkers).count) * 0.35
-
-        // Knowledge-testing
-        let testMarkers: Set<String> = ["testa", "quiz", "fråga mig", "test", "prov", "utmana", "kan jag", "vad kan jag", "testa mig"]
-        scores[.knowledgeTesting] = Double(words.intersection(testMarkers).count) * 0.35
-
-        // Philosophical-discussion
-        let philosophyMarkers: Set<String> = ["filosofi", "existens", "medvetande", "mening", "etik", "moral", "vad är", "verklighet", "sanning", "fri vilja", "ontologi"]
-        scores[.philosophicalDiscussion] = Double(words.intersection(philosophyMarkers).count) * 0.35
-
-        // Casual-chat
-        let casualMarkers: Set<String> = ["hej", "tjena", "hallå", "läget", "hur mår", "vad händer", "tja", "god morgon", "god kväll", "hoj", "hejsan"]
-        scores[.casualChat] = Double(words.intersection(casualMarkers).count) * 0.4
-
-        // Problem-solving
-        let problemMarkers: Set<String> = ["problem", "lösning", "hur löser", "fixa", "fungerar inte", "fel", "krånglar", "bugg"]
-        scores[.problemSolving] = Double(words.intersection(problemMarkers).count) * 0.3
-
-        // Advice-seeking
-        let adviceMarkers: Set<String> = ["råd", "tips", "vad borde", "bör jag", "ska jag", "rekommendation", "förslag", "vad tycker du att jag"]
-        scores[.adviceSeeking] = Double(words.intersection(adviceMarkers).count) * 0.35
-
-        // Experience-sharing
-        let experienceMarkers: Set<String> = ["jag upplevde", "min erfarenhet", "när jag", "en gång", "hände mig", "berätta om", "jag tyckte", "jag kände"]
-        scores[.experienceSharing] = Double(words.intersection(experienceMarkers).count) * 0.3
-
-        // Future-planning
-        let futureMarkers: Set<String> = ["ska vi", "planera", "framtid", "nästa", "kommande", "ska jag", "tänkte", "kommer att", "mål", "plan"]
-        scores[.futurePlanning] = Double(words.intersection(futureMarkers).count) * 0.3
-
-        // Humor
-        let humorMarkers: Set<String> = ["skämt", "roligt", "haha", "lol", "skoja", "skämtar", "rolig", "kul", "fniss", "humor"]
-        scores[.humor] = Double(words.intersection(humorMarkers).count) * 0.35
-
-        // Normalize scores to 0-1 range
-        let maxScore = scores.values.max() ?? 0
-        if maxScore > 0 {
-            for key in scores.keys {
-                scores[key] = min(1.0, scores[key]! / max(1.0, maxScore))
-            }
-        }
-
-        // Apply baseline adjustments
-        for intent in UserIntent.allCases {
-            if scores[intent] == nil { scores[intent] = 0.05 }
-        }
-
-        // Determine primary intent
-        let primaryIntent = scores.max { $0.value < $1.value }?.key ?? .casualChat
-        let confidence = scores[primaryIntent] ?? 0.1
-
-        // Boost informationSeeking for questions as default
-        if message.contains("?") && scores[.informationSeeking]! < 0.3 {
-            scores[.informationSeeking] = max(scores[.informationSeeking]!, 0.3)
-        }
-
-        return IntentPrediction(
-            primaryIntent: primaryIntent,
-            confidence: confidence,
-            allScores: scores
-        )
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // ITERATION 118: Conversational Flow Analysis
-    // ═══════════════════════════════════════════════════════════
-
-    struct FlowAnalysis: Sendable {
-        let turnTakingBalance: Double    // -1 to 1 (negative = user dominates, positive = Eon dominates)
-        let topicContinuity: Double      // 0-1 (how much topic stays consistent)
-        let questionAnswerRatio: Double  // questions / answers
-        let statementQuestionRatio: Double // statements / questions
-        let engagementLevel: Double      // 0-1 (overall engagement)
-        let averageTurnLength: Double    // Average words per turn
-        let topicShifts: Int             // Number of topic changes
-        let flowQuality: Double          // Overall flow quality 0-1
-    }
-
-    /// Measure conversational flow: turn-taking balance, topic continuity, ratios, engagement.
-    nonisolated static func analyzeConversationalFlow(messages: [String]) -> FlowAnalysis {
-        guard messages.count >= 2 else {
-            return FlowAnalysis(turnTakingBalance: 0, topicContinuity: 0.5, questionAnswerRatio: 0, statementQuestionRatio: 0, engagementLevel: 0.1, averageTurnLength: 0, topicShifts: 0, flowQuality: 0.1)
-        }
-
-        // Turn-taking balance: compare average length of alternating turns
-        var eonTurns: [Double] = []
-        var userTurns: [Double] = []
-        for (i, msg) in messages.enumerated() {
-            let wordCount = Double(msg.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.count)
-            if i % 2 == 0 { userTurns.append(wordCount) } else { eonTurns.append(wordCount) }
-        }
-
-        let avgUserLen = userTurns.isEmpty ? 0 : userTurns.reduce(0, +) / Double(userTurns.count)
-        let avgEonLen = eonTurns.isEmpty ? 0 : eonTurns.reduce(0, +) / Double(eonTurns.count)
-        let turnTakingBalance: Double
-        if avgUserLen + avgEonLen > 0 {
-            turnTakingBalance = (avgEonLen - avgUserLen) / (avgEonLen + avgUserLen)
-        } else {
-            turnTakingBalance = 0
-        }
-
-        // Topic continuity: measure word overlap between consecutive messages
-        var topicContinuities: [Double] = []
-        for i in 0..<(messages.count - 1) {
-            let words1 = Set(messages[i].lowercased().components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 3 })
-            let words2 = Set(messages[i+1].lowercased().components(separatedBy: .whitespacesAndNewlines).filter { $0.count > 3 })
-            let overlap = words1.intersection(words2).count
-            let union = words1.union(words2).count
-            if union > 0 {
-                topicContinuities.append(Double(overlap) / Double(union))
-            }
-        }
-        let topicContinuity = topicContinuities.isEmpty ? 0.5 : topicContinuities.reduce(0, +) / Double(topicContinuities.count)
-
-        // Question/Answer ratios
-        var questionCount = 0
-        var statementCount = 0
-        for msg in messages {
-            if msg.contains("?") { questionCount += 1 }
-            else { statementCount += 1 }
-        }
-        let questionAnswerRatio = questionCount > 0 ? Double(messages.count - questionCount) / Double(questionCount) : 0
-        let statementQuestionRatio = questionCount > 0 ? Double(statementCount) / Double(questionCount) : Double(statementCount)
-
-        // Engagement level: based on message length diversity, question frequency, and response rate
-        let avgTurnLength = messages.map { Double($0.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.count) }
-        let overallAvgLen = avgTurnLength.isEmpty ? 0 : avgTurnLength.reduce(0, +) / Double(avgTurnLength.count)
-        let lengthEngagement = min(1.0, overallAvgLen / 20.0)  // 20 words = high engagement
-        let questionEngagement = min(1.0, Double(questionCount) / Double(max(1, messages.count)))
-        let engagementLevel = lengthEngagement * 0.5 + questionEngagement * 0.5
-
-        // Topic shifts: count when overlap drops below 0.2
-        var topicShifts = 0
-        for continuity in topicContinuities where continuity < 0.2 {
-            topicShifts += 1
-        }
-
-        // Overall flow quality
-        let balanceScore = 1.0 - abs(turnTakingBalance)  // Closer to 0 = better balance
-        let continuityScore = topicContinuity
-        let engagementScore = engagementLevel
-        let flowQuality = balanceScore * 0.3 + continuityScore * 0.3 + engagementScore * 0.4
-
-        return FlowAnalysis(
-            turnTakingBalance: turnTakingBalance,
-            topicContinuity: continuityScore,
-            questionAnswerRatio: questionAnswerRatio,
-            statementQuestionRatio: statementQuestionRatio,
-            engagementLevel: engagementLevel,
-            averageTurnLength: overallAvgLen,
-            topicShifts: topicShifts,
-            flowQuality: min(1.0, flowQuality)
-        )
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // ITERATION 124: Logical Fallacy Detection (15 types)
-    // ═══════════════════════════════════════════════════════════
-
-    struct Fallacy: Identifiable, Sendable {
-        let id = UUID()
-        let type: FallacyType
-        let text: String
-        let explanation: String
-        let severity: Double
-    }
-
-    enum FallacyType: String, Sendable, CaseIterable {
-        case adHominem = "ad hominem"
-        case strawMan = "straw man"
-        case falseDichotomy = "false dichotomy"
-        case slipperySlope = "slippery slope"
-        case circularReasoning = "cirkelresonemang"
-        case appealToAuthority = "auktoritetsargument"
-        case appealToEmotion = "känsloargument"
-        case hastyGeneralization = "förhastad generalisering"
-        case redHerring = "röd sill"
-        case tuQuoque = "du också"
-        case burdenOfProof = "bevisbörda"
-        case equivocation = "ekvivokation"
-        case postHoc = "post hoc"
-        case bandwagon = "bandvagn"
-        case noTrueScotsman = "no true Scotsman"
-    }
-
-    /// Detect 15 types of logical fallacies in text.
-    nonisolated static func detectLogicalFallacies(text: String) -> [Fallacy] {
-        let lower = text.lowercased()
-        var fallacies: [Fallacy] = []
-
-        let fallacyPatterns: [(pattern: String, type: FallacyType, explanation: String)] = [
-            // Ad Hominem
-            ("(du|han|hon|de).*(är|verkar).*(naiv|dum|okunnig|enfaldig|idiot)", .adHominem, "Personangrepp: attackerar personen istället för argumentet"),
-            ("(din|hans|hennes).*(brist|okunnighet|naivitet|dumhet)", .adHominem, "Personangrepp: fokuserar på personens brister istället för argumentet"),
-
-            // Straw Man
-            ("(du|ni|de).*(tycker|menar|hävdar) alltså att.*(alla|alltid|aldrig|inget|bara)", .strawMan, "Straw man: överdriver eller förenklar motståndarens position"),
-            ("så.*(du|ni|de) vill.*(inget|aldrig|bara|enbart|bara)", .strawMan, "Straw man: förenklar motståndarens argument till en karikatyr"),
-
-            // False Dichotomy
-            ("(antingen|endast).*(eller|annars).*(inte|aldrig|två)", .falseDichotomy, "Falsk dikotomi: presenterar bara två alternativ när det finns fler"),
-            ("(är|vill) du.*(för|mot|med|emot)", .falseDichotomy, "Falsk dikotomi: tvingar fram ett binärt val"),
-
-            // Slippery Slope
-            ("om.*(då|sedan|sen|efter|leda|resultera|betyda|innebär).*(och|sedan|sen|därefter)", .slipperySlope, "Sluttande plan: antar en kedja av oundvikliga konsekvenser"),
-            ("först.*(sen|sedan|därefter|efter det|nästa|till slut).*(sedan|sen|till slut)", .slipperySlope, "Sluttande plan: kedja av osannolika konsekvenser"),
-
-            // Circular Reasoning
-            ("(det är sant för|bevisar att).*(för|eftersom|därför att).*(är sant|bevisar)", .circularReasoning, "Cirkelresonemang: slutsatsen används som premiss"),
-            ("(det måste vara|är uppenbart) för.*(måste vara|uppenbart)", .circularReasoning, "Cirkelresonemang: påståendet bevisar sig självt"),
-
-            // Appeal to Authority
-            ("(experter säger|forskare visar|forskningen visar|enligt experter|auktoriteter)", .appealToAuthority, "Auktoritetsargument: appellerar till auktoritet istället för evidens"),
-            ("(professor|doktor|expert).*(säger|hävdar|bevisar) att", .appealToAuthority, "Auktoritetsargument: använder titel som bevis"),
-
-            // Appeal to Emotion
-            ("tänk på.*(barn|gamla|sjuka|djur|offer|lidande)", .appealToEmotion, "Känsloargument: appellerar till känslor istället för logik"),
-            ("det är.*(hjärtskärande|fruktansvärt|hemskt|gripande|chockerande)", .appealToEmotion, "Känsloargument: använder starka känsloladdade ord"),
-
-            // Hasty Generalization
-            ("(alla|alla människor|alla vet).*(är|vet|tycker)", .hastyGeneralization, "Förhastad generalisering: drar slutsats från för lite data"),
-            ("(jag känner|jag vet).*(alla|alla som|de flesta)", .hastyGeneralization, "Förhastad generalisering: generaliserar från personlig erfarenhet"),
-
-            // Red Herring
-            ("(men det är inte|men vad om|men tänk på|men vi borde).*(istället|snarare|egentligen)", .redHerring, "Röd sill: byter ämne för att undvika huvudargumentet"),
-
-            // Tu Quoque
-            ("(du gör|du säger|du praktiserar).*(samma|själv|också)", .tuQuoque, "Tu quoque: avvisar kritik genom att peka på att motparten gör samma sak"),
-            ("(du också|du med|samma sak|hypokrit)", .tuQuoque, "Tu quoque: 'du är lika dålig' istället för att bemöta argumentet"),
-
-            // Burden of Proof
-            ("(bevisa att|bevis att|kan inte motbevisa)", .burdenOfProof, "Bevisbörda: flyttar bevisbördan till motståndaren"),
-            ("(du kan inte|ingen kan).*(motbevisa|bevisa fel|visar att det inte)", .burdenOfProof, "Bevisbörda: kräver att motståndaren motbevisar påståendet"),
-
-            // Equivocation
-            // Detects using the same word with potentially different meanings
-            ("(fri|frihet).*(fri|frihet)", .equivocation, "Ekvivokation: samma ord används med olika betydelser"),
-
-            // Post Hoc
-            ("(efter|sedan|efter det).*(berodde på|orsakades av|ledde till|på grund av)", .postHoc, "Post hoc: antar att A orsakade B bara för att A kom före B"),
-            ("(först|hände).*(sedan|efter).*(därför|beror på|orsak)", .postHoc, "Post hoc: kronologi förväxlas med kausalitet"),
-
-            // Bandwagon
-            ("(alla tycker|alla vet|alla gör|alla säger|flertalet)", .bandwagon, "Bandvagn: alla gör det, så det måste vara rätt"),
-            ("(populärt|vanligt|normalt|alla gör det).*(därför|rätt|bra)", .bandwagon, "Bandvagn: popularitet används som bevis för korrekthet"),
-
-            // No True Scotsman
-            ("(ingen riktig|ingen sann|en riktig).*(skulle|skulle aldrig|aldrig)", .noTrueScotsman, "No true Scotsman: ändrar definitionen för att undvika motexempel"),
-            ("(det räknas inte|det gäller inte).*(riktig|äkta|sann)", .noTrueScotsman, "No true Scotsman: utesluter motexempel genom definition"),
-        ]
-
-        for (pattern, type, explanation) in fallacyPatterns {
-            if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
-                let nsRange = NSRange(lower.startIndex..., in: lower)
-                if regex.firstMatch(in: lower, range: nsRange) != nil {
-                    fallacies.append(Fallacy(type: type, text: text, explanation: explanation, severity: 0.7))
-                }
-            }
-        }
-
-        return fallacies
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // ITERATION 153: Conversational Repair Detection
-    // ═══════════════════════════════════════════════════════════
-
-    struct Repair: Sendable {
-        let id = UUID()
-        let repairType: RepairType
-        let trigger: String
-        let repairAction: String
-        let success: Bool
-        let timestamp: Date
-    }
-
-    enum RepairType: String, Sendable {
-        case clarificationRequest = "clarification-request"
-        case rephrasing = "rephrasing"
-        case example = "example"
-        case acknowledgment = "acknowledgment"
-        case topicShift = "topic-shift"
-        case elaboration = "elaboration"
-    }
-
-    /// Track conversational repairs: when misunderstandings occur and how Eon repairs them.
-    func detectConversationalRepair(conversation: [String]) -> [Repair] {
-        guard conversation.count >= 2 else { return [] }
-
-        var repairs: [Repair] = []
-
-        for i in 1..<conversation.count {
-            let prev = conversation[i - 1].lowercased()
-            let current = conversation[i].lowercased()
-
-            // 1. Clarification requests
-            let clarificationMarkers = ["vad menar du", "hur menar du", "kan du förtydliga", "förlåt", "ursäkta", "jag förstår inte", "kan du upprepa"]
-            if clarificationMarkers.contains(where: { current.contains($0) }) {
-                repairs.append(Repair(
-                    repairType: .clarificationRequest,
-                    trigger: prev.prefix(80),
-                    repairAction: "Bad om förtydligande",
-                    success: true,
-                    timestamp: Date()
-                ))
-            }
-
-            // 2. Rephrasing (saying the same thing differently)
-            let rephraseMarkers = ["med andra ord", "annorlunda sagt", "det vill säga", "alltså", "som sagt", "jag menar"]
-            if rephraseMarkers.contains(where: { current.contains($0) }) {
-                repairs.append(Repair(
-                    repairType: .rephrasing,
-                    trigger: prev.prefix(80),
-                    repairAction: "Formulerade om",
-                    success: true,
-                    timestamp: Date()
-                ))
-            }
-
-            // 3. Providing examples to clarify
-            let exampleMarkers = ["till exempel", "exempelvis", "som när", "tänk dig", "föreställ dig", "som i"]
-            if exampleMarkers.contains(where: { current.contains($0) }) {
-                repairs.append(Repair(
-                    repairType: .example,
-                    trigger: prev.prefix(80),
-                    repairAction: "Gav exempel för att förtydliga",
-                    success: true,
-                    timestamp: Date()
-                ))
-            }
-
-            // 4. Acknowledgment of misunderstanding
-            let ackMarkers = ["ah okej", "jag förstår", "just", "nästan", "du har rätt", "stämmer", "precis"]
-            if ackMarkers.contains(where: { current.contains($0) }) && (prev.contains("?") || prev.contains("inte")) {
-                repairs.append(Repair(
-                    repairType: .acknowledgment,
-                    trigger: prev.prefix(80),
-                    repairAction: "Bekräftade förståelse",
-                    success: true,
-                    timestamp: Date()
-                ))
-            }
-
-            // 5. Elaboration (adding more detail after possible confusion)
-            let elaborationMarkers = ["dessutom", "ytterligare", "också", "dessutom kan", "vi kan också", "dessutom bör"]
-            if elaborationMarkers.contains(where: { current.contains($0) }) && current.count > prev.count * 0.5 {
-                repairs.append(Repair(
-                    repairType: .elaboration,
-                    trigger: prev.prefix(80),
-                    repairAction: "Utökade med mer information",
-                    success: true,
-                    timestamp: Date()
-                ))
-            }
-        }
-
-        // Track success rate
-        let totalAttempts = repairs.count
-        let successful = repairs.filter { $0.success }.count
-        let successRate = totalAttempts > 0 ? Double(successful) / Double(totalAttempts) : 1.0
-
-        if !repairs.isEmpty {
-            print("[ConversationalRepair] \(repairs.count) reparationer detekterade, framgångsgrad: \(String(format: "%.0f", successRate * 100))%")
-        }
-
-        return repairs
-    }
-}

@@ -332,8 +332,8 @@ struct AboutEonView: View {
                         ärlighet, ödmjukhet, icke-skada och koherens. Säkerställer att \
                         Eons autonoma utveckling förblir ansvarsfull.
 
-                        EonEvaluator — mäter kontinuerligt prestanda över 6 dimensioner: \
-                        korrekthet, djup, självkännedom, adaptivitet, koherens och kreativitet.
+                        EonEvaluator — mäter kontinuerligt prestanda över 5 dimensioner: \
+                        korrekthet, djup, adaptivitet, koherens och kreativitet.
                         """)
 
                         Divider().background(Color.white.opacity(0.08))

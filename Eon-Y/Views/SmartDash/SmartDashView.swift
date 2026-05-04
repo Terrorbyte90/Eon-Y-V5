@@ -152,8 +152,11 @@ struct SmartDashView: View {
     var smartDashSubtitle: String {
         let motors = motorController.motors.filter { $0.speed > 0.25 }.count
         let total = motorController.motors.count
-        return "\(motors)/\(total) motorer aktiva \u{00B7} \(brain.developmentalStage.displayName)"
+        return "\(motors)/\(total) motorer aktiva \(brain.developmentalStage.displayName)"
     }
+
+    /// Appens integrerade kognitionsnivå — alias för integratedIntelligence
+    var appCognitiveLevel: Double { brain.integratedIntelligence }
 
     // MARK: - Tab picker
 
@@ -198,11 +201,8 @@ struct SmartDashView: View {
             // Row 0.5: Learning Progress
             learningProgressCard
 
-            // Row 1: Live Kognition + Live Självmedvetenhet
-            HStack(spacing: 10) {
-                liveCognitionCard
-                liveSelfAwarenessCard
-            }
+            // Row 1: Live Kognition
+            liveCognitionCard
 
             // Row 2: Thermal + Resources
             HStack(spacing: 10) {
@@ -222,7 +222,6 @@ struct SmartDashView: View {
             // Row 6: Cognitive summaries
             HStack(spacing: 10) {
                 cognitiveSummaryCard(title: "App-kognition", level: appCognitiveLevel, color: Color(hex: "#34D399"))
-                cognitiveSummaryCard(title: "Självmedvetande", level: consciousnessCognitiveLevel, color: Color(hex: "#A78BFA"))
             }
 
             // Row 7: Consciousness tests summary
@@ -501,54 +500,6 @@ struct SmartDashView: View {
         .background(dashGlass(accent: Color(hex: "#34D399")))
     }
 
-    // MARK: - Live Self-Awareness Card
-
-    var liveSelfAwarenessCard: some View {
-        let thoughts = consciousness.thoughtStream.suffix(3)
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 4) {
-                ZStack {
-                    Circle().fill(Color(hex: "#A78BFA").opacity(0.3)).frame(width: 7, height: 7)
-                    Circle().fill(Color(hex: "#A78BFA")).frame(width: 4, height: 4)
-                }.scaleEffect(orbPulse)
-                Text("MEDVETANDE")
-                    .font(.system(size: 7, weight: .black, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.4))
-                Spacer()
-                Text("\u{03A6} \(String(format: "%.2f", brain.phiValue))")
-                    .font(.system(size: 7, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.2))
-            }
-            if !consciousness.currentSelfReflection.isEmpty {
-                Text(consciousness.currentSelfReflection)
-                    .font(.system(size: 9, design: .rounded))
-                    .foregroundStyle(Color(hex: "#A78BFA").opacity(0.8))
-                    .lineLimit(2)
-                    .contextMenu {
-                        Button {
-                            UIPasteboard.general.string = consciousness.currentSelfReflection
-                        } label: {
-                            Label("Kopiera", systemImage: "doc.on.doc")
-                        }
-                    }
-            }
-            ForEach(Array(thoughts.reversed().enumerated()), id: \.offset) { idx, thought in
-                Text(thought.content)
-                    .font(.system(size: 9, design: .rounded))
-                    .foregroundStyle(.white.opacity(idx == 0 ? 0.75 : 0.35))
-                    .lineLimit(1)
-                    .contextMenu {
-                        Button {
-                            UIPasteboard.general.string = thought.content
-                        } label: {
-                            Label("Kopiera", systemImage: "doc.on.doc")
-                        }
-                    }
-            }
-        }
-        .padding(10)
-        .background(dashGlass(accent: Color(hex: "#A78BFA")))
-    }
 
     // MARK: - Thermal Card
 
@@ -748,13 +699,6 @@ struct SmartDashView: View {
                 oScoreItem(label: "Q-index", value: consciousness.qIndex, color: Color(hex: "#F472B6"))
                 oScoreItem(label: "Medvetande", value: brain.consciousnessLevel, color: Color(hex: "#7C3AED"))
             }
-            // Self-awareness scores
-            HStack(spacing: 0) {
-                oScoreItem(label: "LZ-kompl.", value: consciousness.lzComplexitySpontaneous, color: Color(hex: "#06B6D4"))
-                oScoreItem(label: "Självmod.", value: brain.selfModelAccuracy, color: Color(hex: "#EC4899"))
-                oScoreItem(label: "Qualia", value: brain.qualiaIndex, color: Color(hex: "#8B5CF6"))
-                oScoreItem(label: "Broadcast", value: brain.broadcastStrength, color: Color(hex: "#F97316"))
-            }
             // Growth velocity
             HStack(spacing: 12) {
                 HStack(spacing: 4) {
@@ -793,60 +737,39 @@ struct SmartDashView: View {
         .frame(maxWidth: .infinity)
     }
 
-    // MARK: - Cognitive Summary Cards
+    // MARK: - Cognitive summary card (App-kognition)
 
-    func cognitiveSummaryCard(title: String, level: String, color: Color) -> some View {
+    func cognitiveSummaryCard(title: String, level: Double, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
-                Circle().fill(color).frame(width: 5, height: 5).scaleEffect(orbPulse)
+                Image(systemName: "brain")
+                    .font(.system(size: 10))
+                    .foregroundStyle(color)
                 Text(title.uppercased())
                     .font(.system(size: 7, weight: .black, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.4))
+                Spacer()
             }
-            Text(level)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(color)
-            // Progress bar
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 3).fill(color.opacity(0.1)).frame(height: 4)
-                    RoundedRectangle(cornerRadius: 3).fill(color).frame(width: geo.size.width * brain.developmentalProgress, height: 4)
+            HStack(spacing: 8) {
+                Text(String(format: "%.3f", level))
+                    .font(.system(size: 18, weight: .bold, design: .monospaced))
+                    .foregroundStyle(color)
+                Spacer()
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.white.opacity(0.08))
+                            .frame(height: 6)
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(color)
+                            .frame(width: geo.size.width * CGFloat(min(level, 1.0)), height: 6)
+                    }
                 }
+                .frame(width: 80, height: 6)
             }
-            .frame(height: 4)
         }
         .padding(10)
         .background(dashGlass(accent: color))
-    }
-
-    var appCognitiveLevel: String {
-        let ii = brain.integratedIntelligence
-        switch ii {
-        case ..<0.15: return "Insekt-niv\u{00E5}"
-        case 0.15..<0.25: return "Reptil-niv\u{00E5}"
-        case 0.25..<0.35: return "F\u{00E5}gel-niv\u{00E5}"
-        case 0.35..<0.45: return "D\u{00E4}ggdjur (hund)"
-        case 0.45..<0.55: return "Primat (apa)"
-        case 0.55..<0.65: return "Tidigt m\u{00E4}nskligt"
-        case 0.65..<0.75: return "Barn (6\u{2013}10 \u{00E5}r)"
-        case 0.75..<0.85: return "Ton\u{00E5}ring"
-        case 0.85..<0.95: return "Vuxen m\u{00E4}nniska"
-        default: return "Avancerad m\u{00E4}nniska"
-        }
-    }
-
-    var consciousnessCognitiveLevel: String {
-        let cl = brain.consciousnessLevel
-        switch cl {
-        case ..<0.10: return "Ingen medvetenhet"
-        case 0.10..<0.20: return "Proto-medvetande"
-        case 0.20..<0.30: return "L\u{00E5}g medvetenhet"
-        case 0.30..<0.45: return "V\u{00E4}xande medvetenhet"
-        case 0.45..<0.60: return "Djurmedvetande"
-        case 0.60..<0.75: return "Pre-m\u{00E4}nsklig"
-        case 0.75..<0.90: return "M\u{00E4}nsklig-niv\u{00E5}"
-        default: return "Djupt medveten"
-        }
     }
 
     // MARK: - Tests summary card
@@ -1266,7 +1189,6 @@ struct SmartDashView: View {
         default: return Color(hex: "#34D399")
         }
     }
-
     var cpuColor: Color {
         let cpu = brain.cpuUsage
         if cpu < 0.3 { return Color(hex: "#34D399") }

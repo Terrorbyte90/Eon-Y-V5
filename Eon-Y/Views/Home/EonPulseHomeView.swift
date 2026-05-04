@@ -28,7 +28,7 @@ struct EonPulseHomeView: View {
     @State private var intelligentFlipped = false
     @State private var flipTimer: Timer? = nil
 
-    // Live kognition ↔ Live självmedvetenhet flip
+    // Live kognition flip (self-awareness removed)
     @State private var showingSelfAwareness = false
     @State private var awarenessFlipTimer: Timer? = nil
 
@@ -344,20 +344,20 @@ struct EonPulseHomeView: View {
             .onAppear { startFlipTimer() }
             .onDisappear { flipTimer?.invalidate() }
 
-            // Process-label — filtreras vid självmedvetenhet
+            // Process label without self-awareness condition
             HStack(spacing: 8) {
                 Circle()
-                    .fill(showingSelfAwareness ? Color(hex: "#A78BFA") : dominant)
+                    .fill(dominant)
                     .frame(width: 5, height: 5)
-                    .shadow(color: (showingSelfAwareness ? Color(hex: "#A78BFA") : dominant).opacity(0.9), radius: 5)
+                    .shadow(color: dominant.opacity(0.9), radius: 5)
                     .scaleEffect(orbPulse)
-                Text(showingSelfAwareness ? awarenessEventLabel : label)
+                Text(label)
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle((showingSelfAwareness ? Color(hex: "#A78BFA") : dominant).opacity(0.9))
+                    .foregroundStyle(dominant.opacity(0.9))
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .id(showingSelfAwareness ? awarenessEventLabel : label)
-                    .animation(.easeInOut(duration: 0.4), value: showingSelfAwareness)
+                    .id(label)
+                    .animation(.easeInOut(duration: 0.4), value: label)
             }
             .padding(.horizontal, 18).padding(.vertical, 9)
             .background(
@@ -369,19 +369,8 @@ struct EonPulseHomeView: View {
         }
     }
 
-    // Hämta senaste självmedvetenhet-event från thoughtStream
-    var awarenessEventLabel: String {
-        let ce = ConsciousnessEngine.shared
-        if !ce.currentSelfReflection.isEmpty {
-            let s = ce.currentSelfReflection
-            return String(s.prefix(60)) + (s.count > 60 ? "..." : "")
-        }
-        if let thought = ce.thoughtStream.last {
-            let s = thought.content
-            return String(s.prefix(60)) + (s.count > 60 ? "..." : "")
-        }
-        return "Självmedvetenhet aktiv..."
-    }
+    // Awareness event label removed
+    // var awarenessEventLabel: String has been removed
 
     var consciousnessShortLabel: String {
         switch brain.consciousnessLevel {
@@ -408,70 +397,25 @@ struct EonPulseHomeView: View {
         flipTimer = Timer.scheduledTimer(withTimeInterval: 6.0, repeats: true) { _ in runFlipCycle() }
     }
 
-    // MARK: - Awareness Flip Timer (30s kognition, 20s självmedvetenhet)
-
+    // Awareness flip timer removed - continuous cognition
     func startAwarenessFlipTimer() {
-        awarenessFlipTimer?.invalidate()
-        // Starta med kognition, flippa till självmedvetenhet efter 30s, tillbaka efter 20s
-        awarenessFlipTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
-            withAnimation(.easeInOut(duration: 0.7)) {
-                showingSelfAwareness = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 20.0) {
-                withAnimation(.easeInOut(duration: 0.7)) {
-                    showingSelfAwareness = false
-                }
-            }
-        }
+        // Always show cognition
+        showingSelfAwareness = false
     }
 
-    // MARK: - Öga-animation
-
+    // Eye animation removed - only brain visualization
     func startEyeAnimation() {
-        eyeLookTimer?.invalidate()
-        // v8: Thermal-aware eye animation — slower during thermal stress
-        let thermalState = ProcessInfo.processInfo.thermalState
-        let baseInterval: ClosedRange<Double> = thermalState == .serious || thermalState == .critical
-            ? 3.0...6.0  // Much slower under thermal stress
-            : thermalState == .fair ? 1.5...3.5 : 0.8...2.2
-        eyeLookTimer = Timer.scheduledTimer(withTimeInterval: Double.random(in: baseInterval), repeats: true) { _ in
-            let maxOffset: CGFloat = 8
-            let newOffset = CGSize(
-                width: CGFloat.random(in: -maxOffset...maxOffset),
-                height: CGFloat.random(in: -maxOffset...maxOffset)
-            )
-            withAnimation(.easeInOut(duration: 0.35)) {
-                eyePupilOffset = newOffset
-            }
-            // Blinka ibland
-            if Double.random(in: 0...1) < 0.25 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + Double.random(in: 0.1...0.5)) {
-                    withAnimation(.easeInOut(duration: 0.08)) { eyeBlinkScale = 0.05 }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        withAnimation(.easeInOut(duration: 0.12)) { eyeBlinkScale = 1.0 }
-                    }
-                }
-            }
-            // Pulsera glöd
-            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
-                eyeGlowPulse = 1.15
-            }
-        }
+        // Eye animation no longer needed
     }
 
-    // MARK: - Live Monologue / Självmedvetenhet
+    // MARK: - Live Monologue (cognition only)
 
     var monologueSection: some View {
         ZStack {
             cognitionPanel
-                .opacity(showingSelfAwareness ? 0 : 1)
-                .rotation3DEffect(.degrees(showingSelfAwareness ? -90 : 0), axis: (x: 0, y: 1, z: 0), perspective: 0)
-
-            selfAwarenessPanel
-                .opacity(showingSelfAwareness ? 1 : 0)
-                .rotation3DEffect(.degrees(showingSelfAwareness ? 0 : 90), axis: (x: 0, y: 1, z: 0), perspective: 0)
+                .opacity(1)
+                .rotation3DEffect(.degrees(0), axis: (x: 0, y: 1, z: 0), perspective: 0)
         }
-        .animation(.easeInOut(duration: 0.6), value: showingSelfAwareness)
     }
 
     var cognitionPanel: some View {
@@ -560,161 +504,7 @@ struct EonPulseHomeView: View {
         .background(glassCard(accent: Color(hex: "#34D399")))
     }
 
-    var selfAwarenessPanel: some View {
-        let ce = ConsciousnessEngine.shared
-        let thoughts = Array(ce.thoughtStream.suffix(3))
-        let reflection = ce.currentSelfReflection
-        let accentColor = Color(hex: "#A78BFA")
-
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
-                // Litet pulserande öga
-                ZStack {
-                    Circle()
-                        .fill(accentColor.opacity(0.2))
-                        .frame(width: 9, height: 9)
-                    Circle()
-                        .fill(accentColor)
-                        .frame(width: 5, height: 5)
-                }
-                .scaleEffect(orbPulse)
-                Text("LIVE SJÄLVMEDVETENHET")
-                    .font(.system(size: 9, weight: .black, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.35))
-                Spacer()
-                Text("Φ \(String(format: "%.2f", brain.phiValue))")
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.2))
-            }
-            .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 10)
-
-            Rectangle()
-                .fill(accentColor.opacity(0.08))
-                .frame(height: 0.5)
-                .padding(.horizontal, 14)
-
-            // Consciousness engine status strip
-            HStack(spacing: 10) {
-                HStack(spacing: 3) {
-                    Image(systemName: "waveform.path")
-                        .font(.system(size: 7))
-                        .foregroundStyle(Color(hex: "#38BDF8").opacity(0.6))
-                    Text(String(format: "%.0f%%", oscillators.globalSync * 100))
-                        .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        .foregroundStyle(Color(hex: "#38BDF8").opacity(0.6))
-                }
-                let regimeColor = critCtrl.regime == .critical ? Color(hex: "#34D399") :
-                                  critCtrl.regime == .subcritical ? Color(hex: "#FBBF24") : Color(hex: "#EF4444")
-                HStack(spacing: 3) {
-                    Circle().fill(regimeColor).frame(width: 4, height: 4)
-                    Text("σ\(String(format: "%.2f", critCtrl.branchingRatio))")
-                        .font(.system(size: 8, design: .monospaced))
-                        .foregroundStyle(regimeColor.opacity(0.7))
-                }
-                if sleepEng.isAsleep {
-                    HStack(spacing: 3) {
-                        Image(systemName: "moon.zzz.fill")
-                            .font(.system(size: 7))
-                        Text("Sover")
-                            .font(.system(size: 8, design: .monospaced))
-                    }
-                    .foregroundStyle(Color(hex: "#6366F1").opacity(0.7))
-                } else if sleepEng.sleepPressure > 0.5 {
-                    HStack(spacing: 3) {
-                        Image(systemName: "moon.stars")
-                            .font(.system(size: 7))
-                        Text("Tryck \(String(format: "%.0f%%", sleepEng.sleepPressure * 100))")
-                            .font(.system(size: 8, design: .monospaced))
-                    }
-                    .foregroundStyle(Color(hex: "#FBBF24").opacity(0.6))
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 14).padding(.vertical, 5)
-            .background(accentColor.opacity(0.03))
-
-            // Självreflektion
-            if !reflection.isEmpty {
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "quote.bubble.fill")
-                        .font(.system(size: 9))
-                        .foregroundStyle(accentColor.opacity(0.8))
-                        .frame(width: 18, height: 18)
-                        .background(Circle().fill(accentColor.opacity(0.12)))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("SJÄLVREFLEKTION")
-                            .font(.system(size: 8, weight: .black, design: .monospaced))
-                            .foregroundStyle(accentColor.opacity(0.7))
-                        Text(reflection)
-                            .font(.system(size: 11, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.88))
-                            .lineLimit(3)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer()
-                }
-                .padding(.horizontal, 14).padding(.vertical, 8)
-
-                Rectangle()
-                    .fill(accentColor.opacity(0.05))
-                    .frame(height: 0.5)
-                    .padding(.horizontal, 14)
-            }
-
-            // Tankeström
-            VStack(spacing: 0) {
-                ForEach(Array(thoughts.reversed().enumerated()), id: \.offset) { item in
-                    let (idx, thought) = item
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: thoughtIcon(thought.category.rawValue))
-                            .font(.system(size: 9))
-                            .foregroundStyle(thoughtColor(thought.category.rawValue))
-                            .frame(width: 18, height: 18)
-                            .background(Circle().fill(thoughtColor(thought.category.rawValue).opacity(0.12)))
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(thought.category.rawValue.uppercased())
-                                .font(.system(size: 8, weight: .black, design: .monospaced))
-                                .foregroundStyle(thoughtColor(thought.category.rawValue).opacity(0.7))
-                            Text(thought.content)
-                                .font(.system(size: 11, design: .rounded))
-                                .foregroundStyle(idx == 0 ? .white.opacity(0.9) : .white.opacity(max(0.2, 0.55 - Double(idx) * 0.08)))
-                                .lineLimit(2)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Spacer()
-                    }
-                    .padding(.horizontal, 14).padding(.vertical, 7)
-                }
-            }
-            .padding(.bottom, 6)
-
-            // Senast läst artikel
-            if !ce.lastReadArticleTitle.isEmpty {
-                HStack(spacing: 8) {
-                    Image(systemName: "book.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(accentColor.opacity(0.6))
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Läser: \(ce.lastReadArticleTitle)")
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
-                            .foregroundStyle(accentColor.opacity(0.8))
-                            .lineLimit(1)
-                        if !ce.lastReadArticleInsight.isEmpty {
-                            Text(ce.lastReadArticleInsight)
-                                .font(.system(size: 9, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.4))
-                                .lineLimit(1)
-                        }
-                    }
-                    Spacer()
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(accentColor.opacity(0.04))
-            }
-        }
-        .background(glassCard(accent: accentColor))
-    }
+    // selfAwarenessPanel removed - only cognition panel remains
 
     // MARK: - Helpers
 
@@ -798,6 +588,9 @@ struct EonPulseHomeView: View {
         withAnimation(.linear(duration: 25).repeatForever(autoreverses: false)) { ring3 = 360 }
         withAnimation(.easeInOut(duration: 2.8).repeatForever(autoreverses: true)) { orbPulse = 1.07 }
     }
+
+    // MARK: - EyeOrbView — removed with self-awareness
+    // EyeOrbView struct has been removed
 }
 
 // MARK: - EyeOrbView — Levande öga för självmedvetenhetsläge
@@ -999,7 +792,6 @@ private func dimShortName(_ d: CognitiveDimension) -> String {
     case .metacognition:        return "Metakognition"
     case .learning:             return "Inlärning"
     case .knowledge:            return "Kunskap"
-    case .selfAwareness:        return "Självkänsla"
     case .language:             return "Språk"
     case .worldModel:           return "Världsbild"
     case .adaptivity:           return "Adaptivitet"

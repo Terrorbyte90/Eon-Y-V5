@@ -223,20 +223,20 @@ actor PersistentMemoryStore {
 
         // ── FAS 2: Language System tables ──
         // Learned words
-        execute("""CREATE TABLE IF NOT EXISTS learned_words (id INTEGER PRIMARY KEY AUTOINCREMENT, word TEXT NOT NULL, pos TEXT DEFAULT 'unknown', context TEXT, source TEXT DEFAULT 'unknown', confidence REAL DEFAULT 0.3, reinforcement_count INTEGER DEFAULT 0, first_seen TEXT DEFAULT (datetime('now')), last_seen TEXT DEFAULT (datetime('now')), embedding BLOB, UNIQUE(word))""")
+        execute("CREATE TABLE IF NOT EXISTS learned_words (id INTEGER PRIMARY KEY AUTOINCREMENT, word TEXT NOT NULL, pos TEXT DEFAULT 'unknown', context TEXT, source TEXT DEFAULT 'unknown', confidence REAL DEFAULT 0.3, reinforcement_count INTEGER DEFAULT 0, first_seen TEXT DEFAULT (datetime('now')), last_seen TEXT DEFAULT (datetime('now')), embedding BLOB, UNIQUE(word))")
         execute("CREATE INDEX IF NOT EXISTS idx_learned_words_word ON learned_words(word)")
 
         // Collocations
-        execute("""CREATE TABLE IF NOT EXISTS collocations (id INTEGER PRIMARY KEY AUTOINCREMENT, phrase TEXT NOT NULL UNIQUE, frequency INTEGER DEFAULT 1, first_seen TEXT DEFAULT (datetime('now')), last_seen TEXT DEFAULT (datetime('now')))""")
+        execute("CREATE TABLE IF NOT EXISTS collocations (id INTEGER PRIMARY KEY AUTOINCREMENT, phrase TEXT NOT NULL UNIQUE, frequency INTEGER DEFAULT 1, first_seen TEXT DEFAULT (datetime('now')), last_seen TEXT DEFAULT (datetime('now')))")
 
         // Grammar patterns
-        execute("""CREATE TABLE IF NOT EXISTS grammar_patterns (id INTEGER PRIMARY KEY AUTOINCREMENT, pattern TEXT NOT NULL UNIQUE, frequency INTEGER DEFAULT 1, first_seen TEXT DEFAULT (datetime('now')))""")
+        execute("CREATE TABLE IF NOT EXISTS grammar_patterns (id INTEGER PRIMARY KEY AUTOINCREMENT, pattern TEXT NOT NULL UNIQUE, frequency INTEGER DEFAULT 1, first_seen TEXT DEFAULT (datetime('now')))")
 
         // Corrections
-        execute("""CREATE TABLE IF NOT EXISTS corrections (id INTEGER PRIMARY KEY AUTOINCREMENT, wrong_form TEXT NOT NULL, correct_form TEXT NOT NULL, context TEXT, created_at TEXT DEFAULT (datetime('now')))""")
+        execute("CREATE TABLE IF NOT EXISTS corrections (id INTEGER PRIMARY KEY AUTOINCREMENT, wrong_form TEXT NOT NULL, correct_form TEXT NOT NULL, context TEXT, created_at TEXT DEFAULT (datetime('now')))")
 
         // Language snapshots
-        execute("""CREATE TABLE IF NOT EXISTS language_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL UNIQUE, vocabulary_size INTEGER, morphology_mastery REAL, syntax_mastery REAL, semantic_mastery REAL, pragmatic_mastery REAL, overall_level REAL, unknown_word_ratio REAL, avg_sentence_complexity REAL)""")
+        execute("CREATE TABLE IF NOT EXISTS language_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL UNIQUE, vocabulary_size INTEGER, morphology_mastery REAL, syntax_mastery REAL, semantic_mastery REAL, pragmatic_mastery REAL, overall_level REAL, unknown_word_ratio REAL, avg_sentence_complexity REAL)")
     }
 
     // MARK: - Conversation operations
@@ -477,11 +477,11 @@ actor PersistentMemoryStore {
     }
 
     @discardableResult
-    func saveEvalResult(correctness: Double, depth: Double, selfKnowledge: Double, adaptivity: Double, loraVersion: Int, config: String) -> Bool {
+    func saveEvalResult(correctness: Double, depth: Double, adaptivity: Double, loraVersion: Int, config: String) -> Bool {
         guard isReady else { return false }
         let sql = """
-            INSERT INTO eval_results (run_date, correctness, depth, self_knowledge, adaptivity, lora_version, config)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO eval_results (run_date, correctness, depth, adaptivity, lora_version, config)
+            VALUES (?, ?, ?, ?, ?, ?)
         """
         var stmt: OpaquePointer?
         var success = false
@@ -489,10 +489,9 @@ actor PersistentMemoryStore {
             sqlite3_bind_double(stmt, 1, Date().timeIntervalSince1970)
             sqlite3_bind_double(stmt, 2, correctness)
             sqlite3_bind_double(stmt, 3, depth)
-            sqlite3_bind_double(stmt, 4, selfKnowledge)
-            sqlite3_bind_double(stmt, 5, adaptivity)
-            sqlite3_bind_int(stmt, 6, Int32(loraVersion))
-            bindText(stmt, 7, config)
+            sqlite3_bind_double(stmt, 4, adaptivity)
+            sqlite3_bind_int(stmt, 5, Int32(loraVersion))
+            bindText(stmt, 6, config)
             success = sqlite3_step(stmt) == SQLITE_DONE
             if !success { print("[Memory] saveEvalResult fel: \(String(cString: sqlite3_errmsg(db)))") }
         } else {
@@ -505,7 +504,7 @@ actor PersistentMemoryStore {
     func recentEvalResults(limit: Int = 14) -> [EvalResult] {
         guard isReady else { return [] }
         var results: [EvalResult] = []
-        let sql = "SELECT run_date, correctness, depth, self_knowledge, adaptivity, lora_version FROM eval_results ORDER BY run_date DESC LIMIT ?"
+        let sql = "SELECT run_date, correctness, depth, adaptivity, lora_version FROM eval_results ORDER BY run_date DESC LIMIT ?"
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
             sqlite3_bind_int(stmt, 1, Int32(limit))
@@ -514,9 +513,8 @@ actor PersistentMemoryStore {
                     date: Date(timeIntervalSince1970: sqlite3_column_double(stmt, 0)),
                     correctness: sqlite3_column_double(stmt, 1),
                     depth: sqlite3_column_double(stmt, 2),
-                    selfKnowledge: sqlite3_column_double(stmt, 3),
-                    adaptivity: sqlite3_column_double(stmt, 4),
-                    loraVersion: Int(sqlite3_column_int(stmt, 5))
+                    adaptivity: sqlite3_column_double(stmt, 3),
+                    loraVersion: Int(sqlite3_column_int(stmt, 4))
                 ))
             }
         }
@@ -758,6 +756,19 @@ actor PersistentMemoryStore {
         return results
     }
 
+    // Compatibility helpers for newer call sites expecting typed fact records.
+    func getAllFacts(limit: Int = 1000) -> [FactRecord] {
+        recentFactsWithConfidence(limit: limit).map {
+            FactRecord(subject: $0.subject, predicate: $0.predicate, object: $0.object, confidence: $0.confidence, date: Date())
+        }
+    }
+
+    func getRecentFacts(limit: Int = 20) -> [FactRecord] {
+        recentFactsWithConfidence(limit: limit).map {
+            FactRecord(subject: $0.subject, predicate: $0.predicate, object: $0.object, confidence: $0.confidence, date: Date())
+        }
+    }
+
     func recentFactsWithConfidence(limit: Int = 50) -> [(subject: String, predicate: String, object: String, confidence: Double)] {
         guard isReady else { return [] }
         var results: [(String, String, String, Double)] = []
@@ -981,6 +992,11 @@ actor PersistentMemoryStore {
         queryInt("SELECT COUNT(*) FROM learned_words WHERE confidence > 0.3") ?? 0
     }
 
+    /// Get total word count (including low-confidence words)
+    func getTotalWordCount() async -> Int {
+        queryInt("SELECT COUNT(*) FROM learned_words") ?? 0
+    }
+
     func getRecentlyLearnedWords(limit: Int = 20) async -> [(word: String, confidence: Double)] {
         let sql = "SELECT word, confidence FROM learned_words ORDER BY last_seen DESC LIMIT ?"
         let rows = query(sql, params: [limit])
@@ -990,8 +1006,19 @@ actor PersistentMemoryStore {
         }
     }
 
+    /// Retrieve stored context for a word from the learned_words table
+    func getContextForWord(_ word: String) async -> String? {
+        let sql = "SELECT context FROM learned_words WHERE word = ? LIMIT 1"
+        let rows = query(sql, params: [word.lowercased()])
+        return rows.first?.first as? String
+    }
+
     func insertLanguageSnapshot(date: String, vocabSize: Int, morphMastery: Double, syntaxMastery: Double, semMastery: Double, pragMastery: Double, overall: Double, unknownRatio: Double, avgComplexity: Double) async {
         execute("INSERT OR REPLACE INTO language_snapshots (date, vocabulary_size, morphology_mastery, syntax_mastery, semantic_mastery, pragmatic_mastery, overall_level, unknown_word_ratio, avg_sentence_complexity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", params: [date, vocabSize, morphMastery, syntaxMastery, semMastery, pragMastery, overall, unknownRatio, avgComplexity])
+    }
+
+    func getLatestLanguageSnapshots(count: Int = 2) async -> [[Any]] {
+        query("SELECT vocabulary_size, morphology_mastery, syntax_mastery, semantic_mastery, pragmatic_mastery, overall_level FROM language_snapshots ORDER BY date DESC LIMIT ?", params: [count])
     }
 
     // MARK: - Helper
@@ -1077,14 +1104,22 @@ struct ConversationRecord: Identifiable {
     var isUser: Bool { role == "user" }
 }
 
+struct FactRecord: Identifiable, Sendable {
+    let id = UUID()
+    let subject: String
+    let predicate: String
+    let object: String
+    let confidence: Double
+    let date: Date
+}
+
 struct EvalResult: Identifiable {
     let id = UUID()
     let date: Date
     let correctness: Double
     let depth: Double
-    let selfKnowledge: Double
     let adaptivity: Double
     let loraVersion: Int
 
-    var average: Double { (correctness + depth + selfKnowledge + adaptivity) / 4.0 }
+    var average: Double { (correctness + depth + adaptivity) / 3.0 }
 }

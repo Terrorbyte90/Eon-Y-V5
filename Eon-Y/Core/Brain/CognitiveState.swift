@@ -228,11 +228,10 @@ final class CognitiveState: ObservableObject {
             CausalInfluence(from: .learning, to: .language, strength: 0.45),   // 300% BOOST: från 0.15
             CausalInfluence(from: .learning, to: .reasoning, strength: 0.12),
         ]
-        // Metakognition → förstärker resonemang, inlärning, självmedvetenhet
+        // Metakognition → förstärker resonemang, inlärning
         causalInfluences += [
             CausalInfluence(from: .metacognition, to: .reasoning, strength: 0.18),
             CausalInfluence(from: .metacognition, to: .learning, strength: 0.20),
-            CausalInfluence(from: .metacognition, to: .selfAwareness, strength: 0.25),
             CausalInfluence(from: .metacognition, to: .adaptivity, strength: 0.15),
         ]
         // Kausalitet → förstärker resonemang, världsmodell
@@ -247,11 +246,6 @@ final class CognitiveState: ObservableObject {
             CausalInfluence(from: .knowledge, to: .language, strength: 0.36),   // 300% BOOST: från 0.12
             CausalInfluence(from: .knowledge, to: .creativity, strength: 0.10),
             CausalInfluence(from: .knowledge, to: .worldModel, strength: 0.18),
-        ]
-        // Självmedvetenhet → förstärker metakognition, adaptivitet
-        causalInfluences += [
-            CausalInfluence(from: .selfAwareness, to: .metacognition, strength: 0.20),
-            CausalInfluence(from: .selfAwareness, to: .adaptivity, strength: 0.18),
         ]
         // Kreativitet → förstärker hypotesgenerering, analogier
         causalInfluences += [
@@ -285,13 +279,6 @@ final class CognitiveState: ObservableObject {
                 type: .positive,
                 strength: 0.35,  // Was 0.6
                 description: "Mer inlärning → bättre resonemang → djupare kunskap → ännu mer inlärning"
-            ),
-            FeedbackLoop(
-                name: "Metakognitiv acceleration",
-                dimensions: [.metacognition, .selfAwareness, .adaptivity],
-                type: .positive,
-                strength: 0.40,  // Was 0.7
-                description: "Bättre självkännedom → bättre metakognition → snabbare adaptation"
             ),
             FeedbackLoop(
                 name: "Kausal djupspiral",
@@ -328,7 +315,6 @@ final class CognitiveState: ObservableObject {
             .causality: 0.10,
             .learning: 0.10,
             .knowledge: 0.08,
-            .selfAwareness: 0.08,
             .language: 0.07,
             .worldModel: 0.07,
             .adaptivity: 0.06,
@@ -573,7 +559,6 @@ enum CognitiveDimension: String, CaseIterable, Hashable {
     case metacognition      = "Metakognition"
     case learning           = "Inlärning"
     case knowledge          = "Kunskap"
-    case selfAwareness      = "Självmedvetenhet"
     case language           = "Språk"
     case worldModel         = "Världsmodell"
     case adaptivity         = "Adaptivitet"
@@ -592,7 +577,6 @@ enum CognitiveDimension: String, CaseIterable, Hashable {
         case .metacognition:       return "brain"
         case .learning:            return "graduationcap"
         case .knowledge:           return "books.vertical"
-        case .selfAwareness:       return "person.crop.circle"
         case .language:            return "text.bubble"
         case .worldModel:          return "globe"
         case .adaptivity:          return "arrow.up.arrow.down.circle"
@@ -613,7 +597,6 @@ enum CognitiveDimension: String, CaseIterable, Hashable {
         case .metacognition:       return "#A78BFA"
         case .learning:            return "#059669"
         case .knowledge:           return "#14B8A6"
-        case .selfAwareness:       return "#F472B6"
         case .language:            return "#34D399"
         case .worldModel:          return "#60A5FA"
         case .adaptivity:          return "#FBBF24"

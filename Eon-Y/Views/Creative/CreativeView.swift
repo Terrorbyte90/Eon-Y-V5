@@ -83,7 +83,7 @@ struct CreativeView: View {
             switch selectedSection {
             case .problemSolver: ProblemSolverSection(engine: engine, brain: brain)
             case .letters:       LetterSection(engine: engine, brain: brain)
-            case .selfAwareness: SelfAwarenessSection(engine: engine, brain: brain)
+            // Removed self-awareness section
             case .emotions:      EmotionSection(engine: engine, brain: brain)
             case .drawing:       DrawingSection(engine: engine)
             case .goals:         GoalSection(engine: engine)
@@ -242,7 +242,7 @@ struct CreativeView: View {
 enum CreativeSection: String, CaseIterable {
     case problemSolver = "problem"
     case letters       = "letters"
-    case selfAwareness = "awareness"
+    // Removed self-awareness case
     case emotions      = "emotions"
     case drawing       = "drawing"
     case goals         = "goals"
@@ -258,7 +258,7 @@ enum CreativeSection: String, CaseIterable {
         switch self {
         case .problemSolver: return "Problemlösning"
         case .letters:       return "Brev"
-        case .selfAwareness: return "Självmedvetande"
+        // Removed self-awareness label
         case .emotions:      return "Känslor"
         case .drawing:       return "Ritning"
         case .goals:         return "Mål"
@@ -276,7 +276,7 @@ enum CreativeSection: String, CaseIterable {
         switch self {
         case .problemSolver: return "lightbulb.max.fill"
         case .letters:       return "envelope.fill"
-        case .selfAwareness: return "eye.fill"
+        // Removed self-awareness icon
         case .emotions:      return "heart.fill"
         case .drawing:       return "paintbrush.fill"
         case .goals:         return "flag.fill"
@@ -294,7 +294,7 @@ enum CreativeSection: String, CaseIterable {
         switch self {
         case .problemSolver: return EonColor.gold
         case .letters:       return EonColor.teal
-        case .selfAwareness: return Color(hex: "#EC4899")
+        // Removed self-awareness color
         case .emotions:      return EonColor.crimson
         case .drawing:       return EonColor.cyan
         case .goals:         return EonColor.violet

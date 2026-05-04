@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 @MainActor
 final class PhenomenalBindingEngine: ObservableObject {
     static let shared = PhenomenalBindingEngine()
@@ -25,10 +26,10 @@ final class PhenomenalBindingEngine: ObservableObject {
         let brain = EonBrain.shared
         let consciousness = ConsciousnessEngine.shared
         return [
-            ConsciousnessStream(modality: .perceptual, content: consciousness.attentionSchemaState.currentFocus, intensity: consciousness.attentionSchemaState.intensity, valence: 0.0),
+            ConsciousnessStream(modality: .perceptual, content: consciousness.attentionSchemaState.focusTarget, intensity: consciousness.attentionSchemaState.intensity, valence: 0.0),
             ConsciousnessStream(modality: .emotional, content: brain.currentEmotion.rawValue, intensity: brain.emotionArousal, valence: brain.emotionValence),
             ConsciousnessStream(modality: .cognitive, content: brain.currentThoughtStream.first?.content ?? "", intensity: brain.cognitiveLoad, valence: brain.curiosityDrive > 0.5 ? 0.3 : -0.1),
-            ConsciousnessStream(modality: .interoceptive, content: consciousness.bodyBudget.summary, intensity: consciousness.bodyBudget.stress, valence: consciousness.bodyBudget.comfort),
+            ConsciousnessStream(modality: .interoceptive, content: consciousness.bodyBudget.thermalState, intensity: consciousness.bodyBudget.arousal, valence: consciousness.bodyBudget.valence),
             ConsciousnessStream(modality: .linguistic, content: consciousness.innerNarrative, intensity: consciousness.innerNarrativeQuality, valence: 0.0),
             ConsciousnessStream(modality: .predictive, content: "Expected free energy: \(ActiveInferenceEngine.shared.freeEnergy)", intensity: ActiveInferenceEngine.shared.epistemicValue, valence: ActiveInferenceEngine.shared.freeEnergy < 0.3 ? 0.2 : -0.2),
         ]

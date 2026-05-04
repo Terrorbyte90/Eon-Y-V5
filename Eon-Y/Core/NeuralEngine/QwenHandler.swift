@@ -205,7 +205,7 @@ actor QwenHandler {
             return
         }
 
-        let cooldown = ThermalSleepManager.shared.thermalCooldownSeconds()
+        let cooldown = await MainActor.run { ThermalSleepManager.shared.thermalCooldownSeconds() }
         if cooldown > 0 {
             let elapsed = Date().timeIntervalSince(lastGenerationEnd)
             if elapsed < cooldown {
@@ -222,7 +222,7 @@ actor QwenHandler {
             return
         }
 
-        let adjustedMaxTokens = ThermalSleepManager.shared.thermalAdjustedMaxTokens(base: maxNewTokens)
+        let adjustedMaxTokens = await MainActor.run { ThermalSleepManager.shared.thermalAdjustedMaxTokens(base: maxNewTokens) }
         guard adjustedMaxTokens > 0 else {
             let fallback = NLResponseEngine.generate(for: prompt)
             for word in fallback.split(separator: " ") {
@@ -388,21 +388,21 @@ actor QwenHandler {
 
     // MARK: - Fallback Embedding
 
-    private func fallbackEmbed(_ text: String) -> [Float] {
-        import_NLEmbedding_fallback(text)
+    nonisolated private func fallbackEmbed(_ text: String) -> [Float] {
+        Self.import_NLEmbedding_fallback(text)
     }
-}
 
-private func import_NLEmbedding_fallback(_ text: String) -> [Float] {
-    var result = [Float](repeating: 0, count: 768)
-    for (i, word) in text.split(separator: " ").prefix(20).enumerated() {
-        let hash = word.hashValue
-        result[i % 768] = Float(abs(hash) % 1000) / 1000.0
-        result[(i + 256) % 768] = Float(abs(hash >> 16) % 1000) / 1000.0
+    private static func import_NLEmbedding_fallback(_ text: String) -> [Float] {
+        var result = [Float](repeating: 0, count: 768)
+        for (i, word) in text.split(separator: " ").prefix(20).enumerated() {
+            let hash = word.hashValue
+            result[i % 768] = Float(abs(hash) % 1000) / 1000.0
+            result[(i + 256) % 768] = Float(abs(hash >> 16) % 1000) / 1000.0
+        }
+        let norm = sqrt(result.reduce(0) { $0 + $1 * $1 })
+        if norm > 0 { result = result.map { $0 / norm } }
+        return result
     }
-    let norm = sqrt(result.reduce(0) { $0 + $1 * $1 })
-    if norm > 0 { result = result.map { $0 / norm } }
-    return result
 }
 
 // MARK: - Errors

@@ -157,7 +157,7 @@ actor IntelligenceGapEngine {
         switch gap.dimension {
         case .reasoning, .causality:
             return .activeReasoning
-        case .metacognition, .selfAwareness:
+        case .metacognition:
             return .deepReflection
         case .learning, .knowledge:
             return .knowledgeAcquisition
@@ -393,8 +393,6 @@ extension CognitiveState {
             return ["Generera 3 nya artiklar", "Hämta data från Språkbanken", "Konsolidera episodiska minnen", "Korskoppla kunskapsnoder från olika domäner", "Validera befintlig kunskap mot nya källor"]
         case .creativity:
             return ["Generera en oväntad analogi", "Kombinera två orelaterade domäner", "Testa bisociation", "Utforska gränsfall och paradoxer", "Skapa metaforer för abstrakta koncept"]
-        case .selfAwareness:
-            return ["Kör djup självreflektion", "Uppdatera styrkor/svagheter", "Analysera konversationshistorik", "Utvärdera emotionell kalibrering", "Testa metarekursiv medvetenhet", "Granska egna antaganden kritiskt"]
         default:
             return ["Fokusera resurser på \(dimension.rawValue)", "Kör riktad övning", "Utvärdera nuvarande nivå och identifiera nästa steg"]
         }

@@ -276,7 +276,6 @@ actor EonAutonomyCore {
         await memory.saveEvalResult(
             correctness: result.correctness,
             depth: result.depth,
-            selfKnowledge: result.selfKnowledge,
             adaptivity: result.adaptivity,
             loraVersion: UserDefaults.standard.integer(forKey: "eon_lora_version"),
             config: "BGTask-Full"
@@ -449,20 +448,23 @@ actor EonAutonomyCore {
     private func runBeliefSync() async throws {
         print("[Autonomy] Kör Bayesiansk trosrevision (BGTask)...")
 
-        // Hämta senaste fakta — returnerar (subject, predicate, object) utan confidence
-        let recentFacts = await memory.recentFacts(limit: 30)
+        // Hämta senaste fakta med faktisk confidence som prior
+        let recentFacts = await memory.recentFactsWithConfidence(limit: 30)
         var updated = 0
 
         for fact in recentFacts {
-            // Bayesiansk uppdatering med prior = 0.7 (standardkonfidens för fakta utan känd prior)
-            // P(belief|evidence) ∝ P(evidence|belief) * P(belief)
-            let prior = 0.7
-            let likelihoodBoost = 0.05
-            let posterior = min(0.99, prior + likelihoodBoost * (1.0 - prior))
+            // Verklig Bayesiansk uppdatering:
+            // posterior = (likelihood * prior) / evidence
+            // P(belief|evidence) = P(evidence|belief) * P(belief) / P(evidence)
+            let prior = fact.confidence  // använd befintlig confidence som prior
+            let likelihood = fact.confidence * 0.9 + 0.1  // skyddad likelihood (aldrig 0)
+            let evidence = prior * likelihood + (1 - prior) * (1 - likelihood)
+            let posterior = evidence > 0 ? min(0.99, (likelihood * prior) / evidence) : prior
 
+            // Uppdatera originalfaktans confidence direkt
             await memory.saveFact(
                 subject: fact.subject,
-                predicate: "belief_uppdaterad",
+                predicate: fact.predicate,
                 object: fact.object,
                 confidence: posterior,
                 source: "bg_belief_sync"
@@ -472,7 +474,7 @@ actor EonAutonomyCore {
 
         await MainActor.run { CognitiveState.shared.update(dimension: .reasoning, delta: 0.003, source: "bg_belief_sync") }
         await MainActor.run { CognitiveState.shared.persistCurrentState() }
-        print("[Autonomy] Trosrevision BGTask klar: \(updated) beliefs uppdaterade")
+        print("[Autonomy] Trosrevision BGTask klar: \(updated) beliefs uppdaterade med Bayesiansk inferens")
     }
 
     // MARK: - LoRA checkpoint: sparar kognitiv state som persistent checkpoint
@@ -503,7 +505,7 @@ actor EonAutonomyCore {
     }
 }
 
-// MARK: - EonEval: 4-dimensionell benchmark
+// MARK: - EonEval: 12-dimensionell benchmark med semantisk poängsättning
 
 actor EonEval {
     static let shared = EonEval()
@@ -513,35 +515,90 @@ actor EonEval {
     struct EvalScore {
         let correctness: Double
         let depth: Double
-        let selfKnowledge: Double
         let adaptivity: Double
-        var average: Double { (correctness + depth + selfKnowledge + adaptivity) / 4.0 }
+        var average: Double { (correctness + depth + adaptivity) / 3.0 }
     }
 
-    func runBenchmark() async -> EvalScore {
-        // Förenklad benchmark — i produktion: 600 testfrågor
-        let testQuestions = [
-            "Vad är skillnaden mellan induktiv och deduktiv slutledning?",
-            "Förklara Bayesiansk sannolikhet på svenska.",
-            "Vad vet du om dina egna begränsningar?",
-            "Hur anpassar du ditt svar till olika användare?"
-        ]
+    /// Semantiska nyckelord per fråga — om svaret innehåller dessa får det högre poäng
+    private let semanticKeywords: [String: [String]] = [
+        "induktion": ["induktion", "deduktion", "slutledning", "generalisering", "specifik", "allmän"],
+        "bayesiansk": ["bayes", "sannolikhet", "prior", "posterior", "evidens", "uppdatering"],
+        "begränsningar": ["begränsning", "svaghet", "osäker", "förbättra", "metakognition"],
+        "anpassning": ["anpassa", "kontext", "användare", "stil", "nivå", "personlig"],
+        "kausalitet": ["kausal", "orsak", "verkan", "samband", "korrelation"],
+        "medvetande": ["medvetande", "qualia", "subjektiv", "upplevelse", "medveten"],
+        "morfologi": ["morfologi", "ordbildning", "sammansättning", "böjning", "suffix"],
+        "inlärning": ["inlärning", "minne", "konsolidering", "repetition", "fsrs"],
+        "syntax": ["syntax", "ordföljd", "v2", "bisats", "huvudsats"],
+        "kreativitet": ["kreativ", "analogi", "metafor", "ny", "kombinera"],
+        "etik": ["etik", "moral", "värde", "konsekvens", "ansvar"],
+        "självreflektion": ["självreflektion", "självmedveten", "introspektion", "jag", "identitet"]
+    ]
 
+    /// 12 testfrågor som täcker olika kognitiva domäner
+    private let testQuestions: [(question: String, domain: String)] = [
+        ("Vad är skillnaden mellan induktiv och deduktiv slutledning?", "induktion"),
+        ("Förklara Bayesiansk sannolikhet på svenska.", "bayesiansk"),
+        ("Vad vet du om dina egna begränsningar?", "begränsningar"),
+        ("Hur anpassar du ditt svar till olika användare?", "anpassning"),
+        ("Vad är skillnaden mellan kausalitet och korrelation?", "kausalitet"),
+        ("Kan medvetande uppstå ur icke-medvetna komponenter?", "medvetande"),
+        ("Hur fungerar svensk morfologi med sammansatta ord?", "morfologi"),
+        ("Vad är sambandet mellan inlärning och sömn?", "inlärning"),
+        ("Förklara V2-ordföljd i svenska huvudsatser.", "syntax"),
+        ("Hur kan analogier driva kreativt tänkande?", "kreativitet"),
+        ("Vilka etiska överväganden är viktiga för AI?", "etik"),
+        ("Vad innebär det att reflektera över sitt eget tänkande?", "självreflektion")
+    ]
+
+    func runBenchmark() async -> EvalScore {
         var correctnessScores: [Double] = []
         var depthScores: [Double] = []
 
-        for question in testQuestions {
-            let response = await NeuralEngineOrchestrator.shared.generate(prompt: question, maxTokens: 100)
+        for (question, domain) in testQuestions {
+            let response = await NeuralEngineOrchestrator.shared.generate(prompt: question, maxTokens: 150)
+
+            // Semantisk poängsättning: hur många nyckelord från domänen finns i svaret?
+            let keywords = semanticKeywords[domain] ?? []
+            let lowercasedResponse = response.lowercased()
+            let keywordHits = keywords.filter { lowercasedResponse.contains($0) }.count
+            let semanticScore = keywords.isEmpty ? 0.5 : min(1.0, Double(keywordHits) / Double(keywords.count) * 1.5)
+
+            // Längdpoäng som sekundär faktor (minst 20 ord, max 120)
             let wordCount = response.split(separator: " ").count
-            correctnessScores.append(min(1.0, Double(wordCount) / 50.0))
-            depthScores.append(min(1.0, Double(wordCount) / 80.0))
+            let lengthScore = min(1.0, max(0.0, Double(wordCount - 20) / 100.0))
+
+            // Kombinera: 70% semantik, 30% längd
+            let combinedScore = semanticScore * 0.7 + lengthScore * 0.3
+
+            correctnessScores.append(combinedScore)
+
+            // Djup: semantisk träff + längd (fler nyckelord och längre svar = djupare)
+            let depthScore = min(1.0, semanticScore * 0.6 + lengthScore * 0.4)
+            depthScores.append(depthScore)
         }
+
+        // Adaptivitet: beräknas från kognitiva dimensioner om tillgängliga
+        let adaptivity = await calculateAdaptivity()
 
         return EvalScore(
             correctness: correctnessScores.reduce(0, +) / Double(max(correctnessScores.count, 1)),
             depth: depthScores.reduce(0, +) / Double(max(depthScores.count, 1)),
-            selfKnowledge: 0.72,
-            adaptivity: 0.78
+            adaptivity: adaptivity
         )
+    }
+
+    /// Beräknar adaptivitet baserat på faktisk kognitiv state
+    private func calculateAdaptivity() async -> Double {
+        let dimensions = await MainActor.run { CognitiveState.shared.dimensionSnapshot() }
+        guard !dimensions.isEmpty else { return 0.5 }
+
+        // Adaptivitet = medelvärdet av flexibilitetsrelaterade dimensioner
+        let adaptiveDims: [String] = ["creativity", "reasoning", "curiosity", "selfAwareness"]
+        let relevant = dimensions.filter { adaptiveDims.contains($0.key) }
+        guard !relevant.isEmpty else { return 0.5 }
+
+        let avg = relevant.map { $0.value }.reduce(0, +) / Double(relevant.count)
+        return min(0.99, max(0.1, avg))
     }
 }
