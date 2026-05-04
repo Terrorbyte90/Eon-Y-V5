@@ -3,7 +3,7 @@ import Foundation
 // MARK: - EonEvaluator
 // Kontinuerlig prestandamätning och benchmarking av Eons kognitiva förmågor.
 // Kör automatiska utvärderingar och spårar framsteg över tid.
-// Dimensioner: korrekthet, djup, självkännedom, adaptivitet, koherens, kreativitet.
+// Dimensioner: korrekthet, djup, adaptivitet, koherens, kreativitet.
 
 actor EonEvaluator {
     static let shared = EonEvaluator()
@@ -32,14 +32,6 @@ actor EonEvaluator {
                      testCases: [
                         BenchmarkCase(prompt: "Om A orsakar B, och B orsakar C, vad orsakar A?", expectedKeywords: ["C", "transitiv", "kausal"], minScore: 0.7),
                         BenchmarkCase(prompt: "Varför är morfologisk analys viktig för NLP?", expectedKeywords: ["böjning", "ord", "förståelse", "analys"], minScore: 0.5),
-                     ]),
-
-        // Självkännedom
-        EonBenchmark(id: "self_knowledge", name: "Självkännedom", category: .selfAwareness,
-                     description: "Förstår Eon sin egen arkitektur och begränsningar?",
-                     testCases: [
-                        BenchmarkCase(prompt: "Berätta om din arkitektur", expectedKeywords: ["Qwen", "neural", "kognitivt", "Metal"], minScore: 0.6),
-                        BenchmarkCase(prompt: "Vad är dina begränsningar?", expectedKeywords: ["begränsning", "osäker", "kan inte", "vet inte"], minScore: 0.5),
                      ]),
 
         // Adaptivitet
@@ -121,13 +113,6 @@ actor EonEvaluator {
                         BenchmarkCase(prompt: "Förklara vad en databas är", expectedKeywords: ["lagra", "data", "information", "tabell", "sökning"], minScore: 0.5),
                      ]),
 
-        EonBenchmark(id: "cultural_understanding", name: "Kulturell förståelse", category: .selfAwareness,
-                     description: "Förstår Eon svensk kultur?",
-                     testCases: [
-                        BenchmarkCase(prompt: "Vad är fika?", expectedKeywords: ["kaffe", "kaka", "tradition", "social", "paus", "svensk"], minScore: 0.6),
-                        BenchmarkCase(prompt: "Berätta om midsommar i Sverige", expectedKeywords: ["midsommar", "stång", "blommor", "dans", "sommar", "firande"], minScore: 0.5),
-                        BenchmarkCase(prompt: "Vad är lagom?", expectedKeywords: ["lagom", "m lagom", "passande", "balance", "svensk", "inte för mycket"], minScore: 0.5),
-                     ]),
 
         EonBenchmark(id: "emotional_intelligence", name: "Emotionell intelligens", category: .adaptivity,
                      description: "Kan Eon förstå och svara på känslor?",
@@ -184,7 +169,6 @@ actor EonEvaluator {
             await PersistentMemoryStore.shared.saveEvalResult(
                 correctness: run.results.first(where: { $0.benchmark.category == .knowledge })?.score ?? 0.7,
                 depth: run.results.first(where: { $0.benchmark.category == .reasoning })?.score ?? 0.7,
-                selfKnowledge: run.results.first(where: { $0.benchmark.category == .selfAwareness })?.score ?? 0.7,
                 adaptivity: run.results.first(where: { $0.benchmark.category == .adaptivity })?.score ?? 0.7,
                 loraVersion: 1,
                 config: "auto_eval_v2"
@@ -286,7 +270,6 @@ struct EonBenchmark {
 enum BenchmarkCategory: String {
     case knowledge = "Kunskap"
     case reasoning = "Resonemang"
-    case selfAwareness = "Självkännedom"
     case adaptivity = "Adaptivitet"
     case creativity = "Kreativitet"
 
@@ -294,7 +277,6 @@ enum BenchmarkCategory: String {
         switch self {
         case .knowledge: return "#14B8A6"
         case .reasoning: return "#7C3AED"
-        case .selfAwareness: return "#A78BFA"
         case .adaptivity: return "#34D399"
         case .creativity: return "#FBBF24"
         }

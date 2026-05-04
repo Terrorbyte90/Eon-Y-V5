@@ -519,37 +519,37 @@ actor ReasoningEngine {
         return "Generell regel baserad på \(observations.count) observationer: \(pattern) verkar vara ett konsistent mönster"
     }
 
-    private func generateHypotheses(for observation: String, count: Int) -> [Hypothesis] {
+    private func generateHypotheses(for observation: String, count: Int) -> [ReasoningHypothesis] {
         let concept = extractMainConcept(observation)
         let causes = causalGraph.findCauses(of: concept)
         let effects = causalGraph.findEffects(of: concept)
 
-        var hypotheses: [Hypothesis] = []
+        var hypotheses: [ReasoningHypothesis] = []
 
         // Evidence-based hypothesis from causal graph
         if !causes.isEmpty {
             let causeStr = causes.prefix(2).joined(separator: " och ")
-            hypotheses.append(Hypothesis(statement: "\(concept) orsakas primärt av \(causeStr)", plausibility: 0.80))
+            hypotheses.append(ReasoningHypothesis(statement: "\(concept) orsakas primärt av \(causeStr)", plausibility: 0.80))
         }
         if !effects.isEmpty {
             let effectStr = effects.prefix(2).joined(separator: " och ")
-            hypotheses.append(Hypothesis(statement: "\(concept) leder till \(effectStr) via kausala mekanismer", plausibility: 0.75))
+            hypotheses.append(ReasoningHypothesis(statement: "\(concept) leder till \(effectStr) via kausala mekanismer", plausibility: 0.75))
         }
 
         // Structural hypothesis
-        hypotheses.append(Hypothesis(statement: "\(concept) är ett emergent fenomen som uppstår ur komplexa interaktioner", plausibility: 0.60))
+        hypotheses.append(ReasoningHypothesis(statement: "\(concept) är ett emergent fenomen som uppstår ur komplexa interaktioner", plausibility: 0.60))
 
         // Contextual hypothesis
-        hypotheses.append(Hypothesis(statement: "\(concept) beror på kontextuella variabler som varierar mellan domäner", plausibility: 0.55))
+        hypotheses.append(ReasoningHypothesis(statement: "\(concept) beror på kontextuella variabler som varierar mellan domäner", plausibility: 0.55))
 
         // Analogical hypothesis — check if analogies suggest cross-domain links
         let analogies = findAnalogies(for: concept)
         if let first = analogies.first {
-            hypotheses.append(Hypothesis(statement: "\(concept) uppvisar liknande mönster som \(first.target) (\(first.inference))", plausibility: first.strength))
+            hypotheses.append(ReasoningHypothesis(statement: "\(concept) uppvisar liknande mönster som \(first.target) (\(first.inference))", plausibility: first.strength))
         }
 
         // Null hypothesis
-        hypotheses.append(Hypothesis(statement: "Observerade mönster i \(concept) kan förklaras av slumpmässig variation", plausibility: 0.20))
+        hypotheses.append(ReasoningHypothesis(statement: "Observerade mönster i \(concept) kan förklaras av slumpmässig variation", plausibility: 0.20))
 
         return Array(hypotheses.sorted { $0.plausibility > $1.plausibility }.prefix(count))
     }
@@ -729,7 +729,7 @@ actor ReasoningEngine {
 // CausalGraph är en class (referenstyp) skyddad av NSLock för trådsäkerhet.
 // Alla mutationer och läsningar av relations sker under lock.
 final class CausalGraph: @unchecked Sendable {
-    private var relations: [CausalRelation] = []
+    nonisolated(unsafe) private var relations: [CausalRelation] = []
     private let lock = NSLock()
 
     nonisolated init() {}
@@ -822,7 +822,7 @@ enum ReasoningStrategy: String {
     case adaptive = "Adaptiv"
 }
 
-struct Hypothesis {
+struct ReasoningHypothesis {
     let statement: String
     let plausibility: Double
 }

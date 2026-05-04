@@ -70,7 +70,8 @@ struct LanguageView: View {
     private func loadCompetencies() {
         Task {
             let snapshot = await LearningEngine.shared.competencySnapshot()
-            await MainActor.run { competencies = snapshot }
+            let sorted = snapshot.values.sorted { $0.level > $1.level }
+            await MainActor.run { competencies = sorted }
         }
     }
 
@@ -1282,7 +1283,7 @@ extension LearningEngine {
                 let compounds = await LearningEngine.shared.compoundWordCount()
                 let patterns = await LearningEngine.shared.grammarPatternSummary()
                 await MainActor.run {
-                    self.competencies = snapshot
+                    self.competencies = snapshot.values.sorted { $0.level > $1.level }
                     self.overallLevel = level
                     self.conversationsToday = metrics.conversationsToday
                     self.wordsLearnedToday = metrics.wordsLearnedToday

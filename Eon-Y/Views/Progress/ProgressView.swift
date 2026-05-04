@@ -81,7 +81,6 @@ struct EonEvalPanel: View {
                     let dims: [(String, Double, Color)] = [
                         ("Korrekthet",   r.correctness,   Color(hex: "#34D399")),
                         ("Djup",         r.depth,         Color(hex: "#A78BFA")),
-                        ("Självkännedom",r.selfKnowledge, Color(hex: "#FBBF24")),
                         ("Adaptivitet",  r.adaptivity,    Color(hex: "#06B6D4"))
                     ]
                     ForEach(dims, id: \.0) { label, value, color in
@@ -91,7 +90,6 @@ struct EonEvalPanel: View {
                                 switch label {
                                 case "Korrekthet":    return $0.correctness
                                 case "Djup":          return $0.depth
-                                case "Självkännedom": return $0.selfKnowledge
                                 default:              return $0.adaptivity
                                 }
                             }

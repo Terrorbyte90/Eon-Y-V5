@@ -357,7 +357,7 @@ final class IntegratedCognitiveArchitecture: ObservableObject {
             (.hypothesis,      .hypothesisGeneration,  { await self.runHypothesisWork() }),
             (.analogy,         .analogyBuilding,   { await self.runAnalogyWork() }),
             (.worldModel,      .worldModel,            { await self.runWorldModelWork() }),
-            (.selfDevelopment, .selfAwareness,         { await self.runSelfDevelopmentWork() }),
+            (.selfDevelopment, .metacognition,         { await self.runSelfDevelopmentWork() }),
             (.language,        .language,              { await self.runLanguageWork() }),
             (.globalWorkspace, .reasoning,             { await self.runGlobalWorkspaceWork() }),
             (.prediction,      .prediction,            { await self.runPredictionWork() }),
@@ -667,7 +667,7 @@ final class IntegratedCognitiveArchitecture: ObservableObject {
         // v7: Self-awareness gain modulated by meta-attention level (genuine self-observation)
         let ast = AttentionSchemaEngine.shared
         let metaBonus = ast.metaAttentionLevel > 0.5 ? 1.5 : 1.0
-        await state.update(dimension: .selfAwareness, delta: 0.004 * metaBonus, source: "self_development")
+        await state.update(dimension: .metacognition, delta: 0.004 * metaBonus, source: "self_development")
         await state.update(dimension: .metacognition, delta: 0.002 * metaBonus, source: "self_development")
 
         // v7: If consciousness Q-index is improving, log the trajectory
@@ -845,7 +845,7 @@ enum CognitivePillar: String, CaseIterable, Hashable {
         case .hypothesis:      return .hypothesisGeneration
         case .analogy:         return .analogyBuilding
         case .worldModel:      return .worldModel
-        case .selfDevelopment: return .selfAwareness
+        case .selfDevelopment: return .metacognition
         case .language:        return .language
         case .globalWorkspace: return .comprehension
         case .prediction:      return .prediction
@@ -909,7 +909,7 @@ extension CognitiveDimension {
         case .hypothesisGeneration: return .hypothesis
         case .analogyBuilding:      return .analogy
         case .worldModel:           return .worldModel
-        case .selfAwareness:        return .selfDevelopment
+        case .metacognition:        return .selfDevelopment
         case .language, .communication, .comprehension: return .language
         case .prediction:           return .prediction
         case .reasoning:            return .reasoning

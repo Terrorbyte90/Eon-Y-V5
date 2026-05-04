@@ -52,7 +52,7 @@ actor MetacognitionCore {
         let insightText = insights.first?.content ?? ""
         await MainActor.run { state.metacognitiveInsight = insightText }
         await state.update(dimension: .metacognition, delta: 0.004, source: "metacognition_core") // Reduced from 0.008
-        await state.update(dimension: .selfAwareness, delta: 0.003, source: "metacognition_core") // Reduced from 0.005
+        await state.update(dimension: .metacognition, delta: 0.003, source: "metacognition_core") // Reduced from 0.005
 
         // v27: Enhanced stagnation intervention — genuine strategy switching
         // When many dimensions are stagnating, don't just nudge numbers — switch strategies.

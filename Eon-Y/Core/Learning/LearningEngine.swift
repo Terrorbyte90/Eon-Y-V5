@@ -20,6 +20,52 @@ actor LearningEngine {
     private var totalLearningCycles: Int = 0
     private var knowledgeGaps: [KnowledgeGap] = []
 
+    // MARK: - Thread-safe UserDefaults helpers for actor context
+
+    private nonisolated func udDouble(_ key: String) async -> Double {
+        await MainActor.run { UserDefaults.standard.double(forKey: key) }
+    }
+
+    private nonisolated func udSet(_ value: Double, forKey key: String) async {
+        await MainActor.run { UserDefaults.standard.set(value, forKey: key) }
+    }
+
+    private nonisolated func udInteger(_ key: String) async -> Int {
+        await MainActor.run { UserDefaults.standard.integer(forKey: key) }
+    }
+
+    private nonisolated func udSet(_ value: Int, forKey key: String) async {
+        await MainActor.run { UserDefaults.standard.set(value, forKey: key) }
+    }
+
+    private nonisolated func udArray(_ key: String) async -> [Any]? {
+        await MainActor.run { UserDefaults.standard.array(forKey: key) }
+    }
+
+    private nonisolated func udSet(_ value: [String], forKey key: String) async {
+        await MainActor.run { UserDefaults.standard.set(value, forKey: key) }
+    }
+
+    private nonisolated func udObject(_ key: String) async -> Any? {
+        await MainActor.run { UserDefaults.standard.object(forKey: key) }
+    }
+
+    private nonisolated func udSet(_ value: Any?, forKey key: String) async {
+        await MainActor.run { UserDefaults.standard.set(value, forKey: key) }
+    }
+
+    private nonisolated func udData(_ key: String) async -> Data? {
+        await MainActor.run { UserDefaults.standard.data(forKey: key) }
+    }
+
+    private nonisolated func udSet(_ value: Date?, forKey key: String) async {
+        await MainActor.run { UserDefaults.standard.set(value, forKey: key) }
+    }
+
+    private nonisolated func saveCompetency(_ level: Double, domain: String) async {
+        await MainActor.run { UserDefaults.standard.set(level, forKey: "competency_\(domain)") }
+    }
+
     private init() {
         let domains = [
             "Morfologi", "Syntax", "Semantik", "Pragmatik", "Diskurs",
@@ -84,14 +130,13 @@ actor LearningEngine {
         loadProgressionState()
     }
 
-    private func persistState() {
-        let ud = UserDefaults.standard
-        ud.set(Array(uniqueSwedishWords), forKey: Self.vocabKey)
-        ud.set(correctMorphologyTests, forKey: Self.correctMorphKey)
-        ud.set(totalMorphologyTests, forKey: Self.totalMorphKey)
-        ud.set(lastActiveDate, forKey: Self.lastActiveDateKey)
-        ud.set(conversationsToday, forKey: Self.conversationsTodayKey)
-        ud.set(wordsLearnedToday, forKey: Self.wordsLearnedTodayKey)
+    private func persistState() async {
+        await udSet(Array(uniqueSwedishWords), forKey: Self.vocabKey)
+        await udSet(correctMorphologyTests, forKey: Self.correctMorphKey)
+        await udSet(totalMorphologyTests, forKey: Self.totalMorphKey)
+        await udSet(lastActiveDate, forKey: Self.lastActiveDateKey)
+        await udSet(conversationsToday, forKey: Self.conversationsTodayKey)
+        await udSet(wordsLearnedToday, forKey: Self.wordsLearnedTodayKey)
     }
 
     /// Ensure daily counters are reset when the date rolls over
@@ -184,6 +229,10 @@ actor LearningEngine {
 
     // v72: Competency calibration tracking
     private var calibrationFlags: [String] = []
+    private var achievedMilestones: Set<String> = []
+    private var milestonesHistory: [LanguageMilestone] = []
+    private var activeHypotheses: [Hypothesis] = []
+    private var testedHypotheses: [Hypothesis] = []
 
     func syncCompetenciesFromDatabase() async {
         // v71: Prevent redundant syncs (max once per 60 seconds)
@@ -270,7 +319,7 @@ actor LearningEngine {
                     let growthBonus = recentlyStudied ? 0.003 : 0.0
                     comp.level = min(0.95, max(comp.level, newLevel) + growthBonus)
                     competencyBook[domain] = comp
-                    UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
+                    await saveCompetency(comp.level, domain: domain)
                 }
             } else {
                 let newLevel = min(0.90, factScore + fsrsScore + convScore)
@@ -279,7 +328,7 @@ actor LearningEngine {
                     let growthBonus = recentlyStudied ? 0.003 : 0.0
                     comp.level = min(0.95, max(comp.level, newLevel) + growthBonus)
                     competencyBook[domain] = comp
-                    UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
+                    await saveCompetency(comp.level, domain: domain)
                 }
             }
         }
@@ -335,7 +384,7 @@ actor LearningEngine {
                 var updatedComp = comp
                 updatedComp.level = min(0.95, max(0.05, adjustedLevel))
                 competencyBook[domain] = updatedComp
-                UserDefaults.standard.set(updatedComp.level, forKey: "competency_\(domain)")
+                await saveCompetency(updatedComp.level, domain: domain)
 
                 let flagMsg = "Competency calibration: \(domain) — FSRS=\(String(format: "%.2f", fsrsMastery)), Conv=\(String(format: "%.2f", convPerformance)), OR=\(String(format: "%.2f", openRouterScore)) → adjusted to \(String(format: "%.2f", updatedComp.level))"
                 calibrationFlags.append(flagMsg)
@@ -355,20 +404,20 @@ actor LearningEngine {
     }
 
     // v16: Record morphology test result (called from EonLiveAutonomy)
-    func recordMorphologyTest(word: String, passed: Bool) {
+    func recordMorphologyTest(word: String, passed: Bool) async {
         totalMorphologyTests += 1
         if passed { correctMorphologyTests += 1 }
         wordsAnalyzed.insert(word.lowercased())
-        persistState()
+        await persistState()
     }
 
     // Iteration 20: Boost pragmatic competency when idioms are detected
-    func recordIdiomBoost(_ boost: Double) {
+    func recordIdiomBoost(_ boost: Double) async {
         if var comp = competencyBook["Pragmatik"] {
             comp.level = min(0.95, comp.level + boost)
             comp.lastStudied = Date()
             competencyBook["Pragmatik"] = comp
-            UserDefaults.standard.set(comp.level, forKey: "competency_Pragmatik")
+            await saveCompetency(comp.level, domain: "Pragmatik")
         }
     }
 
@@ -389,7 +438,7 @@ actor LearningEngine {
     }
 
     // v16: Record a Swedish word in actual vocabulary
-    func recordSwedishWord(_ word: String) {
+    func recordSwedishWord(_ word: String) async {
         let lower = word.lowercased()
         let isNew = uniqueSwedishWords.insert(lower).inserted
         if isNew {
@@ -399,7 +448,7 @@ actor LearningEngine {
             if recentlyLearnedWords.count > 50 {
                 recentlyLearnedWords = Array(recentlyLearnedWords.suffix(50))
             }
-            persistState()
+            await persistState()
         }
     }
 
@@ -411,14 +460,14 @@ actor LearningEngine {
     // MARK: - Helper methods for external access (Iteration 28)
 
     /// Returns a copy of the competency book for external reading
-    func competencyBook() -> [String: DomainCompetency] {
+    func competencySnapshot() -> [String: DomainCompetency] {
         competencyBook
     }
 
     /// Update a competency domain from external callers
-    func updateCompetency(_ competency: DomainCompetency, domain: String) {
+    func updateCompetency(_ competency: DomainCompetency, domain: String) async {
         competencyBook[domain] = competency
-        UserDefaults.standard.set(competency.level, forKey: "competency_\(domain)")
+        await saveCompetency(competency.level, domain: domain)
     }
 
     // MARK: - Conversation-Driven Learning (v17)
@@ -495,7 +544,7 @@ actor LearningEngine {
             comp.level = min(0.95, comp.level + vocabBoost + complexityBonus)
             comp.lastStudied = Date()
             competencyBook[domain] = comp
-            UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
+            await saveCompetency(comp.level, domain: domain)
         }
 
         // Iteration 4: Multi-domain learning — conversation improves ALL language domains simultaneously
@@ -551,7 +600,7 @@ actor LearningEngine {
         }
 
         // Persist and notify proxy
-        persistState()
+        await persistState()
         await notifyProxy()
     }
 
@@ -567,7 +616,7 @@ actor LearningEngine {
                 comp.level = min(0.95, comp.level + 0.008)
                 comp.lastStudied = Date()
                 competencyBook[domain] = comp
-                UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
+                await saveCompetency(comp.level, domain: domain)
             }
 
             // Store error as a high-priority FSRS item (shorter interval for faster review)
@@ -583,7 +632,7 @@ actor LearningEngine {
             )
         }
 
-        persistState()
+        await persistState()
         await notifyProxy()
         print("[ErrorLearning] \(errorTexts.count) errors processed for error-driven learning")
     }
@@ -705,7 +754,7 @@ actor LearningEngine {
                 comp.level = min(0.95, comp.level + semanticBoost)
                 comp.lastStudied = Date()
                 competencyBook["Semantik"] = comp
-                UserDefaults.standard.set(comp.level, forKey: "competency_Semantik")
+                await saveCompetency(comp.level, domain: "Semantik")
             }
         }
 
@@ -914,7 +963,7 @@ actor LearningEngine {
                     comp.level = min(0.95, comp.level + boost)
                     comp.lastStudied = Date()
                     competencyBook[domain] = comp
-                    UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
+                    await saveCompetency(comp.level, domain: domain)
                 }
             }
         }
@@ -929,7 +978,7 @@ actor LearningEngine {
                 comp.level = min(0.95, comp.level + 0.008)
                 comp.lastStudied = Date()
                 competencyBook[domain] = comp
-                UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
+                await saveCompetency(comp.level, domain: domain)
             }
         }
 
@@ -1146,11 +1195,11 @@ actor LearningEngine {
             comp.level = min(0.95, comp.level + 0.002)
             comp.lastStudied = Date()
             competencyBook[domain] = comp
-            UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
-        }
+            await saveCompetency(comp.level, domain: domain)
+    }
 
-        persistState()
-        await notifyProxy()
+    await persistState()
+    await notifyProxy()
     }
 
     /// Uses Qwen3 to expand vocabulary around a known word — generates synonyms,
@@ -1212,8 +1261,1066 @@ actor LearningEngine {
         let domain = detectDomain(from: word)
         addFSRSItem(topic: "Ordnät: \(word)", domain: domain, initialDifficulty: 0.3)
 
-        persistState()
+        await persistState()
         await notifyProxy()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // QWEN3-POWERED SWEDISH LEARNING ACCELERATION (10 methods)
+    // Each method uses short prompts for fast inference and stores results
+    // in PersistentMemoryStore + FSRS for spaced repetition.
+    // ═══════════════════════════════════════════════════════════════════
+
+    // ───────────────────────────────────────────────
+    // 1. Grammar Drills — targets weak grammar areas
+    // ───────────────────────────────────────────────
+
+    /// Uses Qwen3 to generate grammar drills targeting Eon's weakest grammar domain.
+    /// Stores each drill as an FSRS item and boosts syntax competency on success.
+    func qwenGrammarDrills() async {
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+        let weakDomain = competencyBook.values
+            .filter { ["Syntax", "Morfologi", "Semantik"].contains($0.domain) }
+            .sorted { $0.level < $1.level }.first?.domain ?? "Syntax"
+        let level = competencyBook[weakDomain]?.level ?? 0.3
+        let cefr = level < 0.3 ? "A1-A2" : level < 0.6 ? "A2-B1" : "B1-B2"
+
+        let prompt = """
+        Ge 2 svenska grammatikövningar nivå \(cefr) inom \(weakDomain).
+        Format:
+        FRÅGA: [frågan]
+        SVAR: [korrekt svar]
+        REGEL: [kort regel]
+        ---
+        FRÅGA: [frågan]
+        SVAR: [korrekt svar]
+        REGEL: [kort regel]
+        """
+
+        let response = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 200, temperature: 0.6
+        )
+        guard !response.isEmpty else { return }
+
+        let blocks = response.components(separatedBy: "---")
+        for block in blocks {
+            let lines = block.trimmingCharacters(in: .whitespacesAndNewlines)
+                .components(separatedBy: .newlines)
+            var question = "", answer = "", rule = ""
+            for line in lines {
+                let t = line.trimmingCharacters(in: .whitespaces)
+                if t.uppercased().hasPrefix("FRÅGA:") { question = String(t.dropFirst(6)).trimmingCharacters(in: .whitespaces) }
+                else if t.uppercased().hasPrefix("SVAR:") { answer = String(t.dropFirst(5)).trimmingCharacters(in: .whitespaces) }
+                else if t.uppercased().hasPrefix("REGEL:") { rule = String(t.dropFirst(6)).trimmingCharacters(in: .whitespaces) }
+            }
+            guard !question.isEmpty, !answer.isEmpty else { continue }
+
+            await PersistentMemoryStore.shared.saveFact(
+                subject: "Grammatik: \(question)",
+                predicate: "svar",
+                object: answer,
+                confidence: 0.8,
+                source: "qwen_grammar_drill"
+            )
+            if !rule.isEmpty {
+                await PersistentMemoryStore.shared.saveFact(
+                    subject: "Grammatikregel",
+                    predicate: "regel",
+                    object: rule,
+                    confidence: 0.7,
+                    source: "qwen_grammar_drill"
+                )
+            }
+            addFSRSItem(topic: "GRAM: \(question.prefix(40))", domain: weakDomain, initialDifficulty: 0.5)
+        }
+
+        if var comp = competencyBook[weakDomain] {
+            comp.level = min(0.95, comp.level + 0.003)
+            comp.lastStudied = Date()
+            competencyBook[weakDomain] = comp
+            await saveCompetency(comp.level, domain: weakDomain)
+    }
+    await persistState()
+    }
+
+    // ───────────────────────────────────────────────
+    // 2. Cloze Tests — fill-in-the-blank from known vocab
+    // ───────────────────────────────────────────────
+
+    /// Uses Qwen3 to generate cloze (fill-in-the-blank) sentences using Eon's known vocabulary.
+    /// This reinforces word knowledge through contextual usage.
+    func qwenClozeTests() async {
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+        let knownWords = Array(uniqueSwedishWords.shuffled().prefix(8))
+        guard !knownWords.isEmpty else { return }
+        let wordsStr = knownWords.joined(separator: ", ")
+
+        let prompt = """
+        Skapa 2 lucktexter (cloze) på svenska med orden: \(wordsStr)
+        Format:
+        MENING: [mening med ___ istället för ordet]
+        SVAR: [ordet]
+        ---
+        MENING: [mening med ___ istället för ordet]
+        SVAR: [ordet]
+        """
+
+        let response = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 180, temperature: 0.7
+        )
+        guard !response.isEmpty else { return }
+
+        let blocks = response.components(separatedBy: "---")
+        for block in blocks {
+            let lines = block.trimmingCharacters(in: .whitespacesAndNewlines)
+                .components(separatedBy: .newlines)
+            var sentence = "", answer = ""
+            for line in lines {
+                let t = line.trimmingCharacters(in: .whitespaces)
+                if t.uppercased().hasPrefix("MENING:") { sentence = String(t.dropFirst(7)).trimmingCharacters(in: .whitespaces) }
+                else if t.uppercased().hasPrefix("SVAR:") { answer = String(t.dropFirst(5)).trimmingCharacters(in: .whitespaces).lowercased() }
+            }
+            guard !sentence.isEmpty, !answer.isEmpty else { continue }
+
+            await PersistentMemoryStore.shared.saveFact(
+                subject: "Cloze: \(sentence.prefix(60))",
+                predicate: "svar",
+                object: answer,
+                confidence: 0.75,
+                source: "qwen_cloze"
+            )
+            recordSwedishWord(answer)
+            addFSRSItem(topic: "CLOZE: \(answer)", domain: "Semantik", initialDifficulty: 0.35)
+        }
+
+        if var comp = competencyBook["Semantik"] {
+            comp.level = min(0.95, comp.level + 0.002)
+            competencyBook["Semantik"] = comp
+        }
+        await persistState()
+    }
+
+    // ───────────────────────────────────────────────
+    // 3. Sentence Transformations — tense, voice, word order
+    // ───────────────────────────────────────────────
+
+    /// Uses Qwen3 to generate sentence transformation exercises:
+    /// active↔passive, tense changes (presens↔preteritum↔perfekt), and V2 word order.
+    func qwenSentenceTransformations() async {
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+
+        let prompt = """
+        Ge 2 svenska omvandlingsövningar.
+        Format:
+        GIVET: [mening]
+        OM: [presens|passiv|preteritum|perfekt|V2]
+        SVAR: [omvandlad mening]
+        ---
+        GIVET: [mening]
+        OM: [presens|passiv|preteritum|perfekt|V2]
+        SVAR: [omvandlad mening]
+        """
+
+        let response = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 180, temperature: 0.6
+        )
+        guard !response.isEmpty else { return }
+
+        let blocks = response.components(separatedBy: "---")
+        for block in blocks {
+            let lines = block.trimmingCharacters(in: .whitespacesAndNewlines)
+                .components(separatedBy: .newlines)
+            var given = "", transformation = "", answer = ""
+            for line in lines {
+                let t = line.trimmingCharacters(in: .whitespaces)
+                if t.uppercased().hasPrefix("GIVET:") { given = String(t.dropFirst(6)).trimmingCharacters(in: .whitespaces) }
+                else if t.uppercased().hasPrefix("OM:") { transformation = String(t.dropFirst(3)).trimmingCharacters(in: .whitespaces) }
+                else if t.uppercased().hasPrefix("SVAR:") { answer = String(t.dropFirst(5)).trimmingCharacters(in: .whitespaces) }
+            }
+            guard !given.isEmpty, !answer.isEmpty else { continue }
+
+            await PersistentMemoryStore.shared.saveFact(
+                subject: "Transform: \(given.prefix(50))",
+                predicate: "omvandling_\(transformation)",
+                object: answer,
+                confidence: 0.8,
+                source: "qwen_transformation"
+            )
+            addFSRSItem(topic: "TRANSFORM: \(transformation)", domain: "Syntax", initialDifficulty: 0.5)
+        }
+
+        if var comp = competencyBook["Syntax"] {
+            comp.level = min(0.95, comp.level + 0.003)
+            comp.lastStudied = Date()
+            competencyBook["Syntax"] = comp
+            await saveCompetency(comp.level, domain: "Syntax")
+    }
+    await persistState()
+    }
+
+    // ───────────────────────────────────────────────
+    // 4. Word of the Day — morphological breakdown
+    // ───────────────────────────────────────────────
+
+    /// Uses Qwen3 to generate a Swedish "word of the day" with full morphological
+    /// breakdown: base form, declension/conjugation, compounds, and usage.
+    func qwenWordOfTheDay() async {
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+
+        let prompt = """
+        Ge ett svenskt ord med full morfologisk analys.
+        Format:
+        ORD: [ordet]
+        BASFORM: [grundform]
+        ORDKLASS: [substantiv|verb|adjektiv]
+        BÖJNING: [böjningsmönster]
+        EXEMPEL: [mening]
+        """
+
+        let response = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 150, temperature: 0.7
+        )
+        guard !response.isEmpty else { return }
+
+        var word = "", base = "", pos = "", inflection = "", example = ""
+        for line in response.components(separatedBy: .newlines) {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            let u = t.uppercased()
+            if u.hasPrefix("ORD:") { word = String(t.dropFirst(4)).trimmingCharacters(in: .whitespaces).lowercased() }
+            else if u.hasPrefix("BASFORM:") { base = String(t.dropFirst(8)).trimmingCharacters(in: .whitespaces).lowercased() }
+            else if u.hasPrefix("ORDKLASS:") { pos = String(t.dropFirst(9)).trimmingCharacters(in: .whitespaces).lowercased() }
+            else if u.hasPrefix("BÖJNING:") { inflection = String(t.dropFirst(8)).trimmingCharacters(in: .whitespaces) }
+            else if u.hasPrefix("EXEMPEL:") { example = String(t.dropFirst(8)).trimmingCharacters(in: .whitespaces) }
+        }
+        guard !word.isEmpty else { return }
+
+        let storeWord = base.isEmpty ? word : base
+        recordSwedishWord(storeWord)
+
+        await PersistentMemoryStore.shared.saveFact(
+            subject: storeWord,
+            predicate: "morfologi",
+            object: "\(pos) | böjning: \(inflection) | ex: \(example)",
+            confidence: 0.85,
+            source: "qwen_word_of_day"
+        )
+
+        // Also register with morphology engine for future analysis
+        await SwedishLanguageCore.shared.morphologyEngine.addDynamicEntry(
+            word: storeWord, pos: pos.isEmpty ? "noun" : pos
+        )
+
+        addFSRSItem(topic: "DAGENSORD: \(storeWord)", domain: "Morfologi", initialDifficulty: 0.3)
+
+        if var comp = competencyBook["Morfologi"] {
+            comp.level = min(0.95, comp.level + 0.004)
+            comp.lastStudied = Date()
+            competencyBook["Morfologi"] = comp
+            await saveCompetency(comp.level, domain: "Morfologi")
+    }
+    await persistState()
+    }
+
+    // ───────────────────────────────────────────────
+    // 5. Mini-Dialogues — conversational practice
+    // ───────────────────────────────────────────────
+
+    /// Uses Qwen3 to generate short Swedish mini-dialogues on common topics,
+    /// then stores them for conversational pattern learning.
+    func qwenMiniDialogues() async {
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+        let topics = ["hälsning", "mat", "väder", "resa", "arbete", "familj", "fritid", "shopping"]
+        let topic = topics.randomElement() ?? "hälsning"
+
+        let prompt = """
+        Skapa en kort svensk dialog om \(topic) (4 repliker).
+        Format:
+        A: [replik]
+        B: [replik]
+        A: [replik]
+        B: [replik]
+        """
+
+        let response = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 180, temperature: 0.8
+        )
+        guard !response.isEmpty else { return }
+
+        await PersistentMemoryStore.shared.saveFact(
+            subject: "Dialog: \(topic)",
+            predicate: "dialog",
+            object: response.trimmingCharacters(in: .whitespacesAndNewlines),
+            confidence: 0.75,
+            source: "qwen_dialog"
+        )
+
+        // Extract and learn individual words from the dialogue
+        let allWords = response.lowercased()
+            .components(separatedBy: CharacterSet.letters.inverted)
+            .filter { $0.count > 2 }
+        for w in Set(allWords) {
+            recordSwedishWord(w)
+        }
+
+        addFSRSItem(topic: "DIALOG: \(topic)", domain: "Pragmatik", initialDifficulty: 0.4)
+
+        if var comp = competencyBook["Pragmatik"] {
+            comp.level = min(0.95, comp.level + 0.003)
+            comp.lastStudied = Date()
+            competencyBook["Pragmatik"] = comp
+        }
+        if var comp = competencyBook["Diskurs"] {
+            comp.level = min(0.95, comp.level + 0.002)
+            competencyBook["Diskurs"] = comp
+        }
+        await persistState()
+    }
+
+    // ───────────────────────────────────────────────
+    // 6. Collocation Exercises — word pair learning
+    // ───────────────────────────────────────────────
+
+    /// Uses Qwen3 to generate Swedish collocations (words that commonly appear together),
+    /// which is critical for natural-sounding Swedish.
+    func qwenCollocationExercises() async {
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+
+        let prompt = """
+        Ge 3 svenska ordkombinationer (collocations).
+        Format för varje:
+        ORD: [ord]
+        KOMBINATION: [ord + vanligt medord]
+        EXEMPEL: [mening]
+        ---
+        """
+
+        let response = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 180, temperature: 0.7
+        )
+        guard !response.isEmpty else { return }
+
+        let blocks = response.components(separatedBy: "---")
+        for block in blocks {
+            let lines = block.trimmingCharacters(in: .whitespacesAndNewlines)
+                .components(separatedBy: .newlines)
+            var word = "", collocation = "", example = ""
+            for line in lines {
+                let t = line.trimmingCharacters(in: .whitespaces)
+                let u = t.uppercased()
+                if u.hasPrefix("ORD:") { word = String(t.dropFirst(4)).trimmingCharacters(in: .whitespaces).lowercased() }
+                else if u.hasPrefix("KOMBINATION:") { collocation = String(t.dropFirst(12)).trimmingCharacters(in: .whitespaces) }
+                else if u.hasPrefix("EXEMPEL:") { example = String(t.dropFirst(8)).trimmingCharacters(in: .whitespaces) }
+            }
+            guard !word.isEmpty, !collocation.isEmpty else { continue }
+
+            recordSwedishWord(word)
+            await PersistentMemoryStore.shared.saveFact(
+                subject: "Kollokation: \(collocation)",
+                predicate: "exempel",
+                object: example.isEmpty ? collocation : example,
+                confidence: 0.75,
+                source: "qwen_collocation"
+            )
+            // Register the bigram
+            await PersistentMemoryStore.shared.registerCollocation(collocation)
+            addFSRSItem(topic: "COLLOC: \(collocation.prefix(40))", domain: "Semantik", initialDifficulty: 0.4)
+        }
+
+        if var comp = competencyBook["Semantik"] {
+            comp.level = min(0.95, comp.level + 0.002)
+            competencyBook["Semantik"] = comp
+        }
+        await persistState()
+    }
+
+    // ───────────────────────────────────────────────
+    // 7. Reading Comprehension — short text + questions
+    // ───────────────────────────────────────────────
+
+    /// Uses Qwen3 to generate a short Swedish reading passage with comprehension questions.
+    /// This builds world model + language skills simultaneously.
+    func qwenReadingComprehension() async {
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+        let topics = ["teknik", "natur", "historia", "vetenskap", "kultur", "vardag"]
+        let topic = topics.randomElement() ?? "vardag"
+
+        let prompt = """
+        Skriv en kort svensk text (3 meningar) om \(topic). Ge 1 fråga.
+        Format:
+        TEXT: [texten]
+        FRÅGA: [fråga om texten]
+        SVAR: [korrekt svar]
+        """
+
+        let response = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 200, temperature: 0.7
+        )
+        guard !response.isEmpty else { return }
+
+        var text = "", question = "", answer = ""
+        for line in response.components(separatedBy: .newlines) {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            let u = t.uppercased()
+            if u.hasPrefix("TEXT:") { text = String(t.dropFirst(5)).trimmingCharacters(in: .whitespaces) }
+            else if u.hasPrefix("FRÅGA:") { question = String(t.dropFirst(6)).trimmingCharacters(in: .whitespaces) }
+            else if u.hasPrefix("SVAR:") { answer = String(t.dropFirst(5)).trimmingCharacters(in: .whitespaces) }
+        }
+        guard !text.isEmpty else { return }
+
+        // Learn all words from the text
+        let words = text.lowercased()
+            .components(separatedBy: CharacterSet.letters.inverted)
+            .filter { $0.count > 2 }
+        for w in Set(words) { recordSwedishWord(w) }
+
+        await PersistentMemoryStore.shared.saveFact(
+            subject: "Lästext: \(topic)",
+            predicate: "text",
+            object: text,
+            confidence: 0.8,
+            source: "qwen_reading"
+        )
+        if !question.isEmpty {
+            await PersistentMemoryStore.shared.saveFact(
+                subject: "Läsfråga: \(question.prefix(50))",
+                predicate: "svar",
+                object: answer,
+                confidence: 0.75,
+                source: "qwen_reading"
+            )
+        }
+
+        addFSRSItem(topic: "LÄS: \(topic)", domain: "Semantik", initialDifficulty: 0.35)
+
+        if var comp = competencyBook["Semantik"] {
+            comp.level = min(0.95, comp.level + 0.002)
+            competencyBook["Semantik"] = comp
+        }
+        if var comp = competencyBook["Diskurs"] {
+            comp.level = min(0.95, comp.level + 0.002)
+            competencyBook["Diskurs"] = comp
+        }
+        await persistState()
+    }
+
+    // ───────────────────────────────────────────────
+    // 8. Pronunciation/Phonetics Exercises
+    // ───────────────────────────────────────────────
+
+    /// Uses Qwen3 to generate Swedish pronunciation exercises focusing on
+    /// tricky sounds (sj-ljud, tj-ljud, tonaccent, etc.) and stores them.
+    func qwenPronunciationExercises() async {
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+
+        let prompt = """
+        Ge 2 svenska uttalsövningar för svåra ljud.
+        Format:
+        LJUD: [sj-ljudet|tj-ljudet|tonaccent|vokaler|rs-ljudet]
+        ORD: [ord med ljudet, kommaseparerat]
+        REGEL: [kort uttalsregel]
+        ---
+        LJUD: [ljud]
+        ORD: [ord]
+        REGEL: [regel]
+        """
+
+        let response = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 160, temperature: 0.6
+        )
+        guard !response.isEmpty else { return }
+
+        let blocks = response.components(separatedBy: "---")
+        for block in blocks {
+            let lines = block.trimmingCharacters(in: .whitespacesAndNewlines)
+                .components(separatedBy: .newlines)
+            var sound = "", words = "", rule = ""
+            for line in lines {
+                let t = line.trimmingCharacters(in: .whitespaces)
+                let u = t.uppercased()
+                if u.hasPrefix("LJUD:") { sound = String(t.dropFirst(5)).trimmingCharacters(in: .whitespaces) }
+                else if u.hasPrefix("ORD:") { words = String(t.dropFirst(4)).trimmingCharacters(in: .whitespaces) }
+                else if u.hasPrefix("REGEL:") { rule = String(t.dropFirst(6)).trimmingCharacters(in: .whitespaces) }
+            }
+            guard !sound.isEmpty, !words.isEmpty else { continue }
+
+            // Learn the example words
+            for w in words.components(separatedBy: ",").map({ $0.trimmingCharacters(in: .whitespaces).lowercased() }) {
+                guard w.count > 1 else { continue }
+                recordSwedishWord(w)
+            }
+
+            await PersistentMemoryStore.shared.saveFact(
+                subject: "Uttal: \(sound)",
+                predicate: "uttalsregel",
+                object: "Ord: \(words). Regel: \(rule)",
+                confidence: 0.8,
+                source: "qwen_pronunciation"
+            )
+            addFSRSItem(topic: "UTTAL: \(sound)", domain: "Morfologi", initialDifficulty: 0.45)
+        }
+
+        if var comp = competencyBook["Morfologi"] {
+            comp.level = min(0.95, comp.level + 0.002)
+            competencyBook["Morfologi"] = comp
+        }
+        await persistState()
+    }
+
+    // ───────────────────────────────────────────────
+    // 9. Paraphrasing — Swedish-to-Swedish rewrites
+    // ───────────────────────────────────────────────
+
+    /// Uses Qwen3 to generate paraphrasing exercises: given a Swedish sentence,
+    /// Eon must rewrite it in different words. This builds lexical flexibility.
+    func qwenParaphrasingExercises() async {
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+
+        let prompt = """
+        Ge 2 svenska omformuleringsövningar.
+        Format:
+        GIVET: [mening]
+        OMSKRIV: [omformulerad mening med andra ord]
+        ---
+        GIVET: [mening]
+        OMSKRIV: [omformulerad mening]
+        """
+
+        let response = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 180, temperature: 0.7
+        )
+        guard !response.isEmpty else { return }
+
+        let blocks = response.components(separatedBy: "---")
+        for block in blocks {
+            let lines = block.trimmingCharacters(in: .whitespacesAndNewlines)
+                .components(separatedBy: .newlines)
+            var given = "", rewrite = ""
+            for line in lines {
+                let t = line.trimmingCharacters(in: .whitespaces)
+                let u = t.uppercased()
+                if u.hasPrefix("GIVET:") { given = String(t.dropFirst(6)).trimmingCharacters(in: .whitespaces) }
+                else if u.hasPrefix("OMSKRIV:") { rewrite = String(t.dropFirst(8)).trimmingCharacters(in: .whitespaces) }
+            }
+            guard !given.isEmpty, !rewrite.isEmpty else { continue }
+
+            // Learn new words from the rewrite
+            let newWords = rewrite.lowercased()
+                .components(separatedBy: CharacterSet.letters.inverted)
+                .filter { $0.count > 2 }
+            for w in Set(newWords) { recordSwedishWord(w) }
+
+            await PersistentMemoryStore.shared.saveFact(
+                subject: "Parafras: \(given.prefix(50))",
+                predicate: "omskrivning",
+                object: rewrite,
+                confidence: 0.75,
+                source: "qwen_paraphrase"
+            )
+            addFSRSItem(topic: "PARAFRAS: \(given.prefix(30))", domain: "Semantik", initialDifficulty: 0.45)
+        }
+
+        if var comp = competencyBook["Semantik"] {
+            comp.level = min(0.95, comp.level + 0.003)
+            competencyBook["Semantik"] = comp
+        }
+        await persistState()
+    }
+
+    // ───────────────────────────────────────────────
+    // 10. Error Correction — learn from Eon's own mistakes
+    // ───────────────────────────────────────────────
+
+    /// Uses Qwen3 to analyze Eon's own recent Swedish output, identify errors,
+    /// and generate correction exercises. This is the most powerful method
+    /// because it targets Eon's actual weaknesses.
+    func qwenErrorCorrection() async {
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+
+        // Get Eon's recent responses from memory
+        let recent = await PersistentMemoryStore.shared.searchFacts(query: "svar", limit: 10)
+        let eonTexts = recent.compactMap { fact -> String? in
+            fact.object.count > 20 && fact.object.count < 300 ? fact.object : nil
+        }.prefix(3)
+
+        guard !eonTexts.isEmpty else { return }
+        let sample = eonTexts.joined(separator: " | ")
+
+        let prompt = """
+        Analysera denna svenska text för fel:
+        "\(sample)"
+        Om du hittar fel, ge 1 korrigering.
+        Format:
+        FEL: [det felaktiga]
+        KORREKT: [korrigering]
+        REGEL: [kort regel]
+        Om inga fel: INGA FEL
+        """
+
+        let response = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 150, temperature: 0.4
+        )
+        guard !response.isEmpty else { return }
+
+        let trimmed = response.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.uppercased().hasPrefix("INGA FEL") else { return }
+
+        var error = "", correction = "", rule = ""
+        for line in response.components(separatedBy: .newlines) {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            let u = t.uppercased()
+            if u.hasPrefix("FEL:") { error = String(t.dropFirst(4)).trimmingCharacters(in: .whitespaces) }
+            else if u.hasPrefix("KORREKT:") { correction = String(t.dropFirst(8)).trimmingCharacters(in: .whitespaces) }
+            else if u.hasPrefix("REGEL:") { rule = String(t.dropFirst(6)).trimmingCharacters(in: .whitespaces) }
+        }
+        guard !error.isEmpty, !correction.isEmpty else { return }
+
+        await PersistentMemoryStore.shared.saveFact(
+            subject: "Egen korrigering: \(error.prefix(40))",
+            predicate: "korrigering",
+            object: "Korrekt: \(correction). Regel: \(rule)",
+            confidence: 0.9,
+            source: "qwen_self_correction"
+        )
+
+        // Determine which domain to boost
+        let domain: String
+        if rule.lowercased().contains("böj") || rule.lowercased().contains("tempus") {
+            domain = "Morfologi"
+        } else if rule.lowercased().contains("ordföljd") || rule.lowercased().contains("sats") {
+            domain = "Syntax"
+        } else {
+            domain = "Semantik"
+        }
+
+        addFSRSItem(topic: "KORRIGERA: \(error.prefix(40))", domain: domain, initialDifficulty: 0.6)
+
+        if var comp = competencyBook[domain] {
+            comp.level = min(0.95, comp.level + 0.005)
+            comp.lastStudied = Date()
+            competencyBook[domain] = comp
+            await saveCompetency(comp.level, domain: domain)
+    }
+    await persistState()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ARTICLE + QWEN-POWERED SWEDISH LEARNING ACCELERATION (5 methods)
+    // Each method picks a random article from the knowledge library and
+    // uses Qwen3 to extract language-learning value from it.
+    // ═══════════════════════════════════════════════════════════════════
+
+    // ───────────────────────────────────────────────
+    // 11. Article Summary — Qwen summarizes article in simpler Swedish
+    // ───────────────────────────────────────────────
+
+    /// Picks a random article from the knowledge library and asks Qwen3
+    /// to summarize it in simpler Swedish, extracting key vocabulary.
+    func qwenArticleSummary() async {
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+        let articles = KnowledgeArticle.seedArticles
+        guard !articles.isEmpty else { return }
+        guard let article = articles.randomElement() else { return }
+        let domain = article.domain
+
+        let prompt = """
+        Sammanfatta följande svenska text på enkel svenska (max 4 meningar).
+        Ge 3 svåra ord från texten med enkel förklaring.
+
+        TEXT:
+        \(article.content.prefix(600))
+
+        Format:
+        SAMMANFATTNING: [enkel sammanfattning]
+        ORD1: [svårt ord] - [enkel förklaring]
+        ORD2: [svårt ord] - [enkel förklaring]
+        ORD3: [svårt ord] - [enkel förklaring]
+        """
+
+        let response = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 250, temperature: 0.5
+        )
+        guard !response.isEmpty else { return }
+
+        var summary = ""
+        var words: [(word: String, definition: String)] = []
+        for line in response.components(separatedBy: .newlines) {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            let u = t.uppercased()
+            if u.hasPrefix("SAMMANFATTNING:") {
+                summary = String(t.dropFirst(14)).trimmingCharacters(in: .whitespaces)
+            } else if u.hasPrefix("ORD1:") || u.hasPrefix("ORD2:") || u.hasPrefix("ORD3:") {
+                let parts = t.dropFirst(5).split(separator: "-", maxSplits: 1).map(String.init)
+                if parts.count == 2 {
+                    let w = parts[0].trimmingCharacters(in: .whitespaces).lowercased()
+                    let d = parts[1].trimmingCharacters(in: .whitespaces)
+                    words.append((w, d))
+                }
+            }
+        }
+
+        // Store summary as a fact
+        if !summary.isEmpty {
+            await PersistentMemoryStore.shared.saveFact(
+                subject: "Artikelsammanfattning: \(article.title.prefix(40))",
+                predicate: "sammanfattning",
+                object: summary,
+                confidence: 0.7,
+                source: "qwen_article_summary"
+            )
+        }
+
+        // Register new words
+        for (word, def) in words {
+            recordSwedishWord(word)
+            await PersistentMemoryStore.shared.saveFact(
+                subject: word,
+                predicate: "definition_fran_artikel",
+                object: def,
+                confidence: 0.7,
+                source: "qwen_article_summary"
+            )
+            addFSRSItem(topic: "ARTIKELORD: \(word)", domain: domain, initialDifficulty: 0.35)
+        }
+
+        // Boost article domain + Semantik
+        if var comp = competencyBook[domain] {
+            comp.level = min(0.95, comp.level + 0.003)
+            competencyBook[domain] = comp
+        }
+        if var comp = competencyBook["Semantik"] {
+            comp.level = min(0.95, comp.level + 0.002)
+            competencyBook["Semantik"] = comp
+        }
+        await persistState()
+    }
+
+    // ───────────────────────────────────────────────
+    // 12. Article Grammar Patterns — Qwen extracts grammar from article
+    // ───────────────────────────────────────────────
+
+    /// Picks a random article and asks Qwen3 to identify grammar patterns
+    /// (V2 word order, bisats, passiv, etc.) from 3 random sentences.
+    func qwenArticleGrammarPatterns() async {
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+        let articles = KnowledgeArticle.seedArticles
+        guard !articles.isEmpty else { return }
+        guard let article = articles.randomElement() else { return }
+
+        // Pick 3 random sentences from the article
+        let sentences = article.content
+            .components(separatedBy: CharacterSet(charactersIn: ".!?"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.count > 20 && $0.count < 300 }
+        guard sentences.count >= 3 else { return }
+        let selected = sentences.shuffled().prefix(3).joined(separator: " | ")
+
+        let prompt = """
+        Analysera grammatiken i dessa 3 svenska meningar.
+        Ge 2 grammatiska mönster som förekommer (t.ex. V2-ordföljd, bisats, passiv, tempus).
+        Förklara kort på svenska.
+
+        MENINGAR: \(selected)
+
+        Format:
+        MÖNSTER1: [namn] - [förklaring]
+        MÖNSTER2: [namn] - [förklaring]
+        """
+
+        let response = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 200, temperature: 0.4
+        )
+        guard !response.isEmpty else { return }
+
+        var patterns: [(name: String, explanation: String)] = []
+        for line in response.components(separatedBy: .newlines) {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            let u = t.uppercased()
+            if u.hasPrefix("MÖNSTER1:") || u.hasPrefix("MÖNSTER2:") {
+                let parts = t.dropFirst(9).split(separator: "-", maxSplits: 1).map(String.init)
+                if parts.count == 2 {
+                    patterns.append((
+                        parts[0].trimmingCharacters(in: .whitespaces),
+                        parts[1].trimmingCharacters(in: .whitespaces)
+                    ))
+                }
+            }
+        }
+
+        for (name, explanation) in patterns {
+            // Store in grammarPatterns dictionary
+            let key = name.lowercased()
+            grammarPatterns[key, default: 0] += 1
+
+            await PersistentMemoryStore.shared.saveFact(
+                subject: "Grammatikmönster: \(name)",
+                predicate: "förklaring",
+                object: explanation,
+                confidence: 0.7,
+                source: "qwen_article_grammar"
+            )
+            addFSRSItem(topic: "GRAM: \(name.prefix(40))", domain: "Syntax", initialDifficulty: 0.35)
+        }
+
+        if var comp = competencyBook["Syntax"] {
+            comp.level = min(0.95, comp.level + 0.003)
+            competencyBook["Syntax"] = comp
+        }
+        await persistState()
+    }
+
+    // ───────────────────────────────────────────────
+    // 13. Article to Dialogue — Qwen converts article to conversation
+    // ───────────────────────────────────────────────
+
+    /// Picks a random article and asks Qwen3 to convert it into a short
+    /// dialogue (4 repliker) in colloquial Swedish. Extracts new words.
+    func qwenArticleToDialogue() async {
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+        let articles = KnowledgeArticle.seedArticles
+        guard !articles.isEmpty else { return }
+        guard let article = articles.randomElement() else { return }
+
+        let prompt = """
+        Gör om följande text till en kort dialog på vardaglig svenska (4 repliker).
+        Använd Person A och Person B.
+
+        TEXT:
+        \(article.content.prefix(500))
+
+        Format:
+        A: [replik]
+        B: [replik]
+        A: [replik]
+        B: [replik]
+        """
+
+        let response = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 250, temperature: 0.7
+        )
+        guard !response.isEmpty else { return }
+
+        // Store the dialogue as a fact
+        await PersistentMemoryStore.shared.saveFact(
+            subject: "Dialog från artikel: \(article.title.prefix(40))",
+            predicate: "dialog",
+            object: String(response.prefix(500)),
+            confidence: 0.7,
+            source: "qwen_article_dialogue"
+        )
+
+        // Extract all words from the dialogue
+        let tagger = NLTagger(tagSchemes: [.lexicalClass])
+        tagger.string = response
+        var newWords: Set<String> = []
+        tagger.enumerateTags(in: response.startIndex..<response.endIndex, unit: .word, scheme: .lexicalClass) { tag, range in
+            if let tag = tag, (tag == .noun || tag == .verb || tag == .adjective) {
+                let word = String(response[range]).lowercased()
+                    .trimmingCharacters(in: CharacterSet.letters.inverted)
+                if word.count > 2 {
+                    newWords.insert(word)
+                }
+            }
+            return true
+        }
+
+        for word in newWords {
+            recordSwedishWord(word)
+            addFSRSItem(topic: "DIALOGORD: \(word)", domain: article.domain, initialDifficulty: 0.3)
+        }
+
+        if var comp = competencyBook["Pragmatik"] {
+            comp.level = min(0.95, comp.level + 0.002)
+            competencyBook["Pragmatik"] = comp
+        }
+        if var comp = competencyBook["Diskurs"] {
+            comp.level = min(0.95, comp.level + 0.002)
+            competencyBook["Diskurs"] = comp
+        }
+        await persistState()
+    }
+
+    // ───────────────────────────────────────────────
+    // 14. Cross-Domain Connections — Qwen links 2 articles from different domains
+    // ───────────────────────────────────────────────
+
+    /// Picks 2 articles from different domains and asks Qwen3 to find a
+    /// conceptual connection. Builds cross-domain analogical thinking.
+    func qwenArticleCrossDomainConnections() async {
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+        let articles = KnowledgeArticle.seedArticles
+        guard articles.count >= 2 else { return }
+
+        let domains = Set(articles.map(\.domain))
+        guard domains.count >= 2 else { return }
+        let domain1 = domains.randomElement()!
+        var remaining = domains
+        remaining.remove(domain1)
+        guard let domain2 = remaining.randomElement() else { return }
+
+        let a1 = articles.filter { $0.domain == domain1 }.randomElement()!
+        let a2 = articles.filter { $0.domain == domain2 }.randomElement()!
+
+        let prompt = """
+        Hitta en koppling mellan dessa två svenska texter från olika ämnen.
+        Förklara på enkel svenska (max 3 meningar).
+
+        TEXT 1 (\(domain1)):
+        \(a1.content.prefix(300))
+
+        TEXT 2 (\(domain2)):
+        \(a2.content.prefix(300))
+
+        Format:
+        KOPPLING: [kopplingen]
+        NYCKELORD: [3 nyckelord]
+        """
+
+        let response = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 200, temperature: 0.6
+        )
+        guard !response.isEmpty else { return }
+
+        var connection = "", keywords = ""
+        for line in response.components(separatedBy: .newlines) {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            let u = t.uppercased()
+            if u.hasPrefix("KOPPLING:") {
+                connection = String(t.dropFirst(9)).trimmingCharacters(in: .whitespaces)
+            } else if u.hasPrefix("NYCKELORD:") {
+                keywords = String(t.dropFirst(10)).trimmingCharacters(in: .whitespaces)
+            }
+        }
+
+        if !connection.isEmpty {
+            await PersistentMemoryStore.shared.saveFact(
+                subject: "Tvärdomänskoppling: \(domain1)-\(domain2)",
+                predicate: "koppling",
+                object: connection,
+                confidence: 0.6,
+                source: "qwen_cross_domain"
+            )
+        }
+
+        // Register keywords
+        for kw in keywords.components(separatedBy: ",") {
+            let w = kw.trimmingCharacters(in: .whitespaces).lowercased()
+            if w.count > 2 {
+                recordSwedishWord(w)
+                addFSRSItem(topic: "TVÄRDOMÄN: \(w)", domain: domain1, initialDifficulty: 0.3)
+            }
+        }
+
+        // Boost both domains + Analogibyggande
+        for d in [domain1, domain2] {
+            if var comp = competencyBook[d] {
+                comp.level = min(0.95, comp.level + 0.003)
+                competencyBook[d] = comp
+            }
+        }
+        if var comp = competencyBook["Analogibyggande"] {
+            comp.level = min(0.95, comp.level + 0.003)
+            competencyBook["Analogibyggande"] = comp
+        }
+        await persistState()
+    }
+
+    // ───────────────────────────────────────────────
+    // 15. Article Idiom Extraction — Qwen finds idioms in article text
+    // ───────────────────────────────────────────────
+
+    /// Picks a random article and asks Qwen3 to identify 1-2 idioms,
+    /// metaphors, or fixed expressions with explanations in simple Swedish.
+    func qwenArticleIdiomExtraction() async {
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+        let articles = KnowledgeArticle.seedArticles
+        guard !articles.isEmpty else { return }
+        guard let article = articles.randomElement() else { return }
+
+        let prompt = """
+        Hitta 1-2 idiom, metaforer eller fasta uttryck i denna svenska text.
+        Förklara vad de betyder på enkel svenska.
+
+        TEXT:
+        \(article.content.prefix(800))
+
+        Format:
+        UTTRYCK1: [uttrycket] - [betydelse]
+        UTTRYCK2: [uttrycket] - [betydelse] (om det finns fler)
+        """
+
+        let response = await NeuralEngineOrchestrator.shared.generate(
+            prompt: prompt, maxTokens: 200, temperature: 0.4
+        )
+        guard !response.isEmpty else { return }
+
+        var expressions: [(expr: String, meaning: String)] = []
+        for line in response.components(separatedBy: .newlines) {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            let u = t.uppercased()
+            if u.hasPrefix("UTTRYCK1:") || u.hasPrefix("UTTRYCK2:") {
+                let parts = t.dropFirst(9).split(separator: "-", maxSplits: 1).map(String.init)
+                if parts.count == 2 {
+                    expressions.append((
+                        parts[0].trimmingCharacters(in: .whitespaces),
+                        parts[1].trimmingCharacters(in: .whitespaces)
+                    ))
+                }
+            }
+        }
+
+        for (expr, meaning) in expressions {
+            await PersistentMemoryStore.shared.saveFact(
+                subject: "Idiom: \(expr)",
+                predicate: "betydelse",
+                object: meaning,
+                confidence: 0.65,
+                source: "qwen_article_idiom"
+            )
+            addFSRSItem(topic: "IDIOM: \(expr.prefix(40))", domain: "Semantik", initialDifficulty: 0.5)
+        }
+
+        if var comp = competencyBook["Semantik"] {
+            comp.level = min(0.95, comp.level + 0.003)
+            competencyBook["Semantik"] = comp
+        }
+        await persistState()
+    }
+
+    // ───────────────────────────────────────────────
+    // Master method — runs all Qwen learning methods in rotation
+    // ───────────────────────────────────────────────
+
+    /// Runs one Qwen learning method per call, cycling through them.
+    /// Call this periodically from the cognitive cycle.
+    private var qwenLearningCycleIndex: Int = 0
+
+    func runNextQwenLearningMethod() async {
+        guard !ThermalSleepManager.shared.shouldPauseWork() else { return }
+
+        let methods: [() async -> Void] = [
+            qwenGrammarDrills,
+            qwenClozeTests,
+            qwenSentenceTransformations,
+            qwenWordOfTheDay,
+            qwenMiniDialogues,
+            qwenCollocationExercises,
+            qwenReadingComprehension,
+            qwenPronunciationExercises,
+            qwenParaphrasingExercises,
+            qwenErrorCorrection,
+            qwenArticleSummary,
+            qwenArticleGrammarPatterns,
+            qwenArticleToDialogue,
+            qwenArticleCrossDomainConnections,
+            qwenArticleIdiomExtraction,
+        ]
+
+        let index = qwenLearningCycleIndex % methods.count
+        qwenLearningCycleIndex += 1
+
+        print("[QwenLearn] Running method \(index + 1)/\(methods.count)...")
+        await methods[index]()
+        print("[QwenLearn] Method \(index + 1) complete")
     }
 
     /// Parses a Qwen3 word-generation response into structured components.
@@ -1297,7 +2404,7 @@ actor LearningEngine {
             source: "autonomous_explore"
         )
 
-        persistState()
+        await persistState()
         await notifyProxy()
 
         return AutonomousExploreResult(
@@ -1311,7 +2418,7 @@ actor LearningEngine {
 
     /// Push latest state to the MainActor observable proxy
     private func notifyProxy() async {
-        let snapshot = competencySnapshot()
+        let snapshot = competencyRanking()
         let level = overallCompetencyLevel()
         let recentWords = Array(recentlyLearnedWords.suffix(10))
         let topics = activeStudyTopics
@@ -1540,7 +2647,7 @@ actor LearningEngine {
             competencyBook[domain]?.level = newLevel
             competencyBook[domain]?.lastStudied = Date()
             if let level = competencyBook[domain]?.level {
-                UserDefaults.standard.set(level, forKey: "competency_\(domain)")
+                await saveCompetency(level, domain: domain)
             }
         }
     }
@@ -1804,7 +2911,7 @@ actor LearningEngine {
                 competency.level = min(0.99, max(0.01, competency.level + delta))
                 competency.lastStudied = Date()
                 competencyBook[domain] = competency
-                UserDefaults.standard.set(competency.level, forKey: "competency_\(domain)")
+                await saveCompetency(competency.level, domain: domain)
 
                 // v25: Track learning velocity for adaptive scheduling
                 trackLearningVelocity(domain: domain, delta: delta)
@@ -1954,7 +3061,7 @@ actor LearningEngine {
 
     // MARK: - Statistik
 
-    func competencySnapshot() -> [DomainCompetency] {
+    func competencyRanking() -> [DomainCompetency] {
         competencyBook.values.sorted { $0.level > $1.level }
     }
 
@@ -1997,11 +3104,11 @@ actor LearningEngine {
                 target.level = min(0.95, target.level + actualBoost)
                 target.lastStudied = Date()
                 competencyBook[targetDomain] = target
-                UserDefaults.standard.set(target.level, forKey: "competency_\(targetDomain)")
+                await saveCompetency(target.level, domain: targetDomain)
             }
         }
 
-        persistState()
+        await persistState()
     }
 
     // MARK: - Iteration 9: Knowledge Consolidation
@@ -2041,11 +3148,11 @@ actor LearningEngine {
                 comp.level = min(0.95, comp.level + 0.005)
                 comp.lastStudied = Date()
                 competencyBook[domain] = comp
-                UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
+                await saveCompetency(comp.level, domain: domain)
             }
         }
 
-        persistState()
+        await persistState()
         await notifyProxy()
         print("[Consolidation] \(consolidatedCount) items consolidated across \(domainConsolidations.count) domains")
     }
@@ -2085,9 +3192,9 @@ actor LearningEngine {
         let calibrationFactor = avgActual / max(0.01, avgPredicted)
 
         // Store calibration factor for future use
-        let currentCalibration = UserDefaults.standard.double(forKey: "eon_self_assessment_calibration")
+        let currentCalibration = await udDouble("eon_self_assessment_calibration")
         let smoothedCalibration = currentCalibration > 0 ? currentCalibration * 0.7 + calibrationFactor * 0.3 : calibrationFactor
-        UserDefaults.standard.set(smoothedCalibration, forKey: "eon_self_assessment_calibration")
+        await udSet(smoothedCalibration, forKey: "eon_self_assessment_calibration")
 
         // Adjust FSRS item difficulties based on calibration
         if smoothedCalibration < 0.8 {
@@ -2102,7 +3209,7 @@ actor LearningEngine {
             }
         }
 
-        persistState()
+        await persistState()
         print("[SelfAssessment] Calibration: predicted=\(String(format: "%.3f", avgPredicted)), actual=\(String(format: ".3f", avgActual)), factor=\(String(format: "%.3f", smoothedCalibration))")
     }
 
@@ -2216,8 +3323,8 @@ actor LearningEngine {
         // 1. Hämta Eons senaste svar
         let recentConversations = await memory.searchFacts(query: "svar", limit: 20)
         let eonResponses = recentConversations.compactMap { fact -> String? in
-            guard fact.source == "eon_response" || fact.subject.contains("svar") else { return nil }
-            return fact.detail
+            guard fact.predicate == "eon_response" || fact.subject.contains("svar") else { return nil }
+            return fact.object
         }.prefix(10)
 
         guard !eonResponses.isEmpty else { return }
@@ -2228,14 +3335,13 @@ actor LearningEngine {
         // 3. Lär av felen
         for analysis in errorAnalyses {
             // Spara korrigering som faktum
-            let correctionFact = ExtractedFact(
+            await memory.saveFact(
                 subject: "Språkkorrigering: \(analysis.error)",
-                detail: "Korrekt: \(analysis.correction). Regel: \(analysis.ruleExplanation)",
+                predicate: "korrigering",
+                object: "Korrekt: \(analysis.correction). Regel: \(analysis.ruleExplanation)",
                 confidence: analysis.learningPriority,
-                timestamp: Date(),
                 source: "self-improvement"
             )
-            await memory.saveFact(correctionFact)
 
             // Öka relevant domän-kompetens
             let domain: String
@@ -2251,7 +3357,7 @@ actor LearningEngine {
                 comp.level = min(0.95, comp.level + improvementBoost)
                 comp.lastStudied = Date()
                 competencyBook[domain] = comp
-                UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
+                await saveCompetency(comp.level, domain: domain)
             }
 
             // Skapa FSRS-item för att komma ihåg felet
@@ -2278,7 +3384,7 @@ actor LearningEngine {
             }
         }
 
-        persistState()
+        await persistState()
         print("[SelfImprove] Språklig självförbättring klar. \(errorAnalyses.count) fel analyserade.")
     }
 
@@ -2413,10 +3519,8 @@ actor LearningEngine {
 
             let lesson = ScheduledLesson(
                 topic: reviewPrompt,
-                domain: item.domain,
-                scheduledDate: Date().addingTimeInterval(delay),
-                priority: urgency,
-                estimatedDuration: 60
+                domain: item.domain ?? "okänd",
+                scheduledAt: Date().addingTimeInterval(delay)
             )
             lessons.append(lesson)
         }
@@ -2524,10 +3628,10 @@ actor LearningEngine {
             comp.level = min(0.95, comp.level + 0.008)
             comp.lastStudied = Date()
             competencyBook[primaryDomain] = comp
-            UserDefaults.standard.set(comp.level, forKey: "competency_\(primaryDomain)")
+            await saveCompetency(comp.level, domain: primaryDomain)
         }
 
-        persistState()
+        await persistState()
         await notifyProxy()
     }
 
@@ -2582,14 +3686,13 @@ actor LearningEngine {
                     initialDifficulty: word.cefrLevel == "C1" || word.cefrLevel == "C2" ? 0.7 : 0.4
                 )
 
-                let fact = ExtractedFact(
+                await PersistentMemoryStore.shared.saveFact(
                     subject: "Ord: \(word.word)",
-                    detail: "\(word.pos): \(word.definition). Exempel: \(word.exampleSentence)",
+                    predicate: "definition",
+                    object: "\(word.pos): \(word.definition). Exempel: \(word.exampleSentence)",
                     confidence: 0.9,
-                    timestamp: Date(),
                     source: "openrouter-vocabulary"
                 )
-                await PersistentMemoryStore.shared.saveFact(fact)
             }
         }
 
@@ -2599,10 +3702,10 @@ actor LearningEngine {
             comp.level = min(0.95, comp.level + vocabBoost)
             comp.lastStudied = Date()
             competencyBook[weakestDomain] = comp
-            UserDefaults.standard.set(comp.level, forKey: "competency_\(weakestDomain)")
+            await saveCompetency(comp.level, domain: weakestDomain)
         }
 
-        persistState()
+        await persistState()
         print("[VocabExpand] \(wordsAdded) nya ord i \(weakestDomain) från \(allNewWords.count) genererade (3 CEFR-batcher)")
     }
 
@@ -2656,24 +3759,23 @@ actor LearningEngine {
         }
     }
 
-    private func persistProgressionState() {
-        let ud = UserDefaults.standard
-        ud.set(totalWordsAssessed, forKey: Self.totalWordsAssessedKey)
-        ud.set(correctGrammarCorrections, forKey: Self.correctGrammarCorrectionsKey)
-        ud.set(totalGrammarCorrections, forKey: Self.totalGrammarCorrectionsKey)
-        ud.set(morphologyWordsCovered, forKey: Self.morphologyWordsCoveredKey)
-        ud.set(lastProgressCheckDate, forKey: Self.lastProgressCheckKey)
+    private func persistProgressionState() async {
+        await udSet(totalWordsAssessed, forKey: Self.totalWordsAssessedKey)
+        await udSet(correctGrammarCorrections, forKey: Self.correctGrammarCorrectionsKey)
+        await udSet(totalGrammarCorrections, forKey: Self.totalGrammarCorrectionsKey)
+        await udSet(morphologyWordsCovered, forKey: Self.morphologyWordsCoveredKey)
+        await udSet(lastProgressCheckDate, forKey: Self.lastProgressCheckKey)
 
         if let encoded = try? JSONEncoder().encode(weeklyProgressSnapshots) {
-            ud.set(encoded, forKey: Self.weeklySnapshotsKey)
+            await udSet(encoded as Any?, forKey: Self.weeklySnapshotsKey)
         }
     }
 
     /// Record a grammar assessment result for tracking accuracy
-    func recordGrammarAssessment(total: Int, correct: Int) {
+    func recordGrammarAssessment(total: Int, correct: Int) async {
         totalGrammarCorrections += total
         correctGrammarCorrections += correct
-        persistProgressionState()
+        await persistProgressionState()
     }
 
     /// Record a WSD assessment result for tracking accuracy
@@ -2683,12 +3785,12 @@ actor LearningEngine {
     }
 
     /// Record morphology coverage for a word
-    func recordMorphologyCoverage(word: String) {
+    func recordMorphologyCoverage(word: String) async {
         let lower = word.lowercased()
         if !wordsAnalyzed.contains(lower) {
             wordsAnalyzed.insert(lower)
             morphologyWordsCovered += 1
-            persistProgressionState()
+            await persistProgressionState()
         }
     }
 
@@ -2787,7 +3889,7 @@ actor LearningEngine {
             styleScore: 0.7,  // Default until we have style tracking
             conversationCount: conversationsToday,
             wordsLearnedThisWeek: wordsThisWeek,
-            weeklyGrowthRate: growthRate
+            weeklyGrowthRate: Double(growthRate)
         )
 
         weeklyProgressSnapshots.append(snapshot)
@@ -2966,7 +4068,7 @@ actor LearningEngine {
     func selfEvaluateLanguage() async -> SelfEvaluationReport {
         let memory = PersistentMemoryStore.shared
         let recentConversations = await memory.searchFacts(query: "svar", limit: 15)
-        let eonTexts = recentConversations.prefix(8).map { $0.detail }
+        let eonTexts = recentConversations.prefix(8).map { $0.object }
 
         guard !eonTexts.isEmpty else {
             return SelfEvaluationReport(
@@ -3012,7 +4114,7 @@ actor LearningEngine {
             if currIdx > prevIdx {
                 comparisonToPrevious = "Framsteg! Från \(previous.estimatedCEFR) till \(openRouterResult.estimatedLevel)"
             } else if currIdx == prevIdx {
-                let scoreDelta = openRouterResult.overallScore - previous.overallScore
+                let scoreDelta = openRouterResult.confidence - previous.overallScore
                 if scoreDelta > 0.05 {
                     comparisonToPrevious = "Samma nivå (\(openRouterResult.estimatedLevel)) men förbättrad poäng (+\(String(format: "%.1f", scoreDelta * 100))%)"
                 } else {
@@ -3605,7 +4707,7 @@ actor LearningEngine {
         print("[MasteryLoop] Step 5: Self-correcting...")
         let memory = PersistentMemoryStore.shared
         let recentResponses = await memory.searchFacts(query: "svar", limit: 5)
-        let responseTexts = recentResponses.prefix(3).map { $0.detail }
+        let responseTexts = recentResponses.prefix(3).map { $0.object }
         for text in responseTexts {
             let correction = await OpenRouterLanguageEvaluator.shared.selfCorrectText(text)
             if correction.hadErrors {
@@ -3648,7 +4750,7 @@ actor LearningEngine {
             selectedStrategy: strategy,
             knowledgeSyntheses: syntheses.count,
             selfEvalQuestionsGenerated: selfEvalQuestions.count,
-            errorsCorrected: responseTexts.reduce(0) { $0 + 1 },
+            errorsCorrected: responseTexts.count,
             motivationalThought: motivationalThought,
             currentCEFR: selfEval.estimatedCEFR,
             currentDifficultyTier: currentDifficultyTier,
@@ -3696,91 +4798,75 @@ actor LearningEngine {
         return nil
     }
 
+    private static let personIndicators: Set<String> = ["han", "hon", "hen", "mannen", "kvinnan", "personen", "pojken", "flickan", "läraren", "doktorn", "chefen", "vännen", "brodern", " systern", "fadern", "modern"]
+    private static let organizationIndicators: Set<String> = ["AB", "aktiebolag", "organisation", "företag", "myndighet", "regeringen", "kommunen", "partiet", "föreningen", "universitet", "skola", "byrå", "institut", "bolag", "koncern"]
+    private static let placeIndicators: Set<String> = ["i Sverige", "i Stockholm", "i Göteborg", "i Malmö", "i Europa", "i världen", "staden", "landet", "platsen", "området", "regionen", "kommunen", "bygden", "orten"]
+
+    // Relation extraction patterns
+    private static let isAPatterns: [(String, String)] = [
+    ("(är|var|blev) (en|ett|den|det) ", "isA"),
+    ("kallas? (för|en|ett)", "isA"),
+    ("definieras? som", "isA"),
+    ("betecknas? som", "isA"),
+    ("klassificeras? som", "isA"),
+    ("typ av", "isA"),
+    ("sorts", "isA"),
+    ("slag av", "isA"),
+    ]
+
+    private static let partOfPatterns: [(String, String)] = [
+    ("(är|var|utgör) (en|ett|del) (av|i)", "partOf"),
+    ("ingår? i", "partOf"),
+    ("tillhör?", "partOf"),
+    ("består av", "partOf"),
+    ("ingår som del", "partOf"),
+    ("är en del", "partOf"),
+    ("utgör en del", "partOf"),
+    ]
+
+    private static let causePatterns: [(String, String)] = [
+    ("(orsakar?|leda till|resulterar?|medför|skapar?|genererar?|framkallar?|utlöser?)", "causes"),
+    ("(påverkar?|inverkar?|har effekt på)", "influences"),
+    ("(bidrar till|gör att)", "causes"),
+    ("(beror på|orsakas av|följd av)", "causes"),
+    ]
+
+    private static let locatedInPatterns: [(String, String)] = [
+    ("(ligger|finns|är belägen|är placerad|är lokaliserad) (i|på|vid|utanför)", "locatedIn"),
+    ("(i|på|vid) (Stockholm|Göteborg|Malmö|Sverige|Norge|Danmark|Europa|Asien|Amerika|London|Paris|Berlin|New York)", "locatedIn"),
+    ]
+
+    private static let createdByPatterns: [(String, String)] = [
+    ("(skapad|skapades|skapat|skapade) (av|utav|från)", "createdBy"),
+    ("(skapad|skapat|utvecklad|utvecklat|konstruerad|konstruerat|byggd|byggt|designad|designat) av", "createdBy"),
+    ("(av|från) (författaren|konstnären|skaparen|utvecklaren|designern|arkitekten)", "createdBy"),
+    ]
+
+    private static let usedForPatterns: [(String, String)] = [
+    ("(används?|brukar?|utnyttjas?) (för|till|som)", "usedFor"),
+    ("(syftar till|syftar på|avsedd för|menad för|tänkt för)", "usedFor"),
+    ("(tjänar som|fungerar som|fungerar för|används som)", "usedFor"),
+    ]
+
+    private static let milestoneDefinitions: [(id: String, milestone: String, domain: String, metric: String, threshold: Double, celebration: String)] = [
+    ("first_idiom", "Första idiom förstått", "Pragmatik", "idioms_understood", 1.0, "Jag förstod mitt första svenska idiom! 🎉"),
+    ("first_complex_sentence", "Första komplexa meningen genererad", "Syntax", "clause_complexity", 0.5, "Jag genererade min första komplexa mening! 🏆"),
+    ("first_metaphor", "Första metaforen upptäckt", "Semantik", "metaphors_detected", 1.0, "Jag upptäckte min första metafor! ✨"),
+    ("first_counterfactual", "Första kontrafaktiska resonemanget", "Kognition", "counterfactuals", 1.0, "Jag resonerade kontrafaktiskt för första gången! 🧠"),
+    ("wsd_50", "WSD-precision över 50%", "Semantik", "wsd_accuracy", 0.5, "Min WSD-precision passerade 50%! 📈"),
+    ("wsd_70", "WSD-precision över 70%", "Semantik", "wsd_accuracy", 0.7, "Min WSD-precision passerade 70%! 📈"),
+    ("wsd_90", "WSD-precision över 90%", "Semantik", "wsd_accuracy", 0.9, "Min WSD-precision passerade 90%! 🏅"),
+    ("cefr_a2", "CEFR-nivå A2 uppnådd", "Generell", "cefr_level", 2.0, "Jag nådde A2-nivå! 🌟"),
+    ("cefr_b1", "CEFR-nivå B1 uppnådd", "Generell", "cefr_level", 3.0, "Jag nådde B1-nivå! 🌟"),
+    ("cefr_b2", "CEFR-nivå B2 uppnådd", "Generell", "cefr_level", 4.0, "Jag nådde B2-nivå! 🌟"),
+    ("cefr_c1", "CEFR-nivå C1 uppnådd", "Generell", "cefr_level", 5.0, "Jag nådde C1-nivå! 🏆"),
+    ("vocab_100", "100 unika svenska ord", "Ordförråd", "vocabulary_count", 100.0, "Jag kan 100 svenska ord! 📚"),
+    ("vocab_500", "500 unika svenska ord", "Ordförråd", "vocabulary_count", 500.0, "Jag kan 500 svenska ord! 📚"),
+    ("vocab_1000", "1000 unika svenska ord", "Ordförråd", "vocabulary_count", 1000.0, "Jag kan 1000 svenska ord! 🎓"),
+    ("first_essay", "Första svenska essän skriven", "Diskurs", "essays_written", 1.0, "Jag skrev min första svenska essä! ✍️"),
+    ]
     // MARK: - Data Models
-
-struct DomainCompetency: Identifiable {
-    let id = UUID()
-    let domain: String
-    var level: Double          // 0..1 (sten=0, professor=1)
-    var knowledgeItems: [String]
-    var lastStudied: Date
-
-    var levelLabel: String {
-        switch level {
-        case 0.8...: return "Expert"
-        case 0.6..<0.8: return "Avancerad"
-        case 0.4..<0.6: return "Medel"
-        case 0.2..<0.4: return "Nybörjare"
-        default: return "Grundläggande"
-        }
-    }
 }
-
-struct FSRSItem: Identifiable {
-    let id = UUID()
-    let topic: String
-    let domain: String?
-    var stability: Double
-    // ── v98: Multi-dimensional difficulty ──
-    var difficulty: Double           // Overall difficulty (legacy, computed from dimensions)
-    var vocabularyDifficulty: Double // 0.0-1.0: How hard the vocabulary is
-    var grammarDifficulty: Double    // 0.0-1.0: How complex the grammar is
-    var conceptualDifficulty: Double // 0.0-1.0: How abstract the concept is
-    var culturalDifficulty: Double   // 0.0-1.0: How culturally specific it is
-    var dueDate: Date
-    var reviewCount: Int
-    var lastReview: Date?
-
-    /// v98: Computed overall difficulty from multi-dimensional scores
-    var compositeDifficulty: Double {
-        0.35 * vocabularyDifficulty + 0.25 * grammarDifficulty + 0.25 * conceptualDifficulty + 0.15 * culturalDifficulty
-    }
-
-    nonisolated var priority: Double { stability * (1.0 - difficulty) }
-}
-
-struct ScheduledLesson: Identifiable {
-    let id = UUID()
-    let topic: String
-    let domain: String
-    let scheduledAt: Date
-    var completed: Bool = false
-}
-
-struct KnowledgeGap: Identifiable {
-    let id = UUID()
-    let domain: String
-    let currentLevel: Double
-    let targetLevel: Double
-    let urgency: Double
-    let suggestedTopics: [String]
-}
-
-struct LearningCycleResult {
-    let cycleNumber: Int
-    let studiedTopics: [String]
-    let newKnowledge: [String]
-    let gapsIdentified: Int
-    let loraVersion: Int
-}
-
-struct AutonomousExploreResult {
-    let domain: String
-    let studyGoals: [String]
-    let createdItems: Int
-}
-
-struct DailyLearningMetrics {
-    let conversationsToday: Int
-    let wordsLearnedToday: Int
-    let lastActiveDate: Date
-    let totalVocabulary: Int
-    let learningVelocity: Double
-    let activeStudyTopics: [String]
-    let recentWords: [String]
-}
-
-// MARK: - Array safe subscript
 
 extension Array {
     nonisolated subscript(safe index: Int) -> Element? {
@@ -3791,119 +4877,6 @@ extension Array {
 // ═══════════════════════════════════════════════════════════
 // ITERATION 41-50: New Data Models for Autonomous Self-Development
 // ═══════════════════════════════════════════════════════════
-
-// MARK: - Iteration 41: Curriculum
-
-struct CurriculumTopic: Identifiable, Codable {
-    let id = UUID()
-    let name: String
-    let priority: Double
-    let difficulty: Double
-    let estimatedMinutes: Int
-    let exercises: [String]
-    let milestone: String
-}
-
-struct Curriculum: Identifiable, Codable {
-    let id = UUID()
-    let generatedAt: Date
-    let validUntil: Date
-    let currentCEFR: String
-    let topics: [CurriculumTopic]
-    let totalEstimatedMinutes: Int
-    let focusAreas: [String]
-
-    var completionPercentage: Double = 0.0
-}
-
-// MARK: - Iteration 42: Self-Evaluation
-
-struct SelfEvaluationReport: Identifiable, Codable {
-    let id = UUID()
-    let evaluatedAt: Date
-    let estimatedCEFR: String
-    let strengths: [String]       // Top 3 strengths
-    let weaknesses: [String]      // Bottom 3 weaknesses
-    let improvementGoals: [String] // Specific goals for next week
-    let comparisonToPrevious: String
-    let overallScore: Double
-}
-
-// MARK: - Iteration 43: Learning Strategy
-
-enum LearningStrategy: String, Codable, CaseIterable {
-    case immersion           // Mass word learning — when vocabulary is weak
-    case explicitInstruction // Rule learning — when grammar is weak
-    case practice            // Conversation-heavy — when fluency is weak
-    case balanced            // All moderate
-    case advancedSynthesis   // High-level integration — all are strong
-
-    var description: String {
-        switch self {
-        case .immersion: return "Massiv ordinlärning genom exponering"
-        case .explicitInstruction: return "Explicit regel-inlärning och grammatikfokus"
-        case .practice: return "Konversationspraktik med fokus på flyt"
-        case .balanced: return "Balanserad inlärning över alla områden"
-        case .advancedSynthesis: return "Avancerad syntes mellan domäner"
-        }
-    }
-}
-
-// MARK: - Iteration 44: Knowledge Synthesis
-
-struct KnowledgeSynthesis: Identifiable, Codable {
-    let id = UUID()
-    let factA: String
-    let factB: String
-    let domainA: String
-    let domainB: String
-    let synthesizedInsight: String
-    let connectionKey: Int
-    let createdAt: Date
-}
-
-// MARK: - Iteration 46: Self-Generated Evaluations
-
-struct SelfGeneratedEval: Identifiable, Codable {
-    let id = UUID()
-    let question: String
-    let domain: String
-    let difficulty: Double
-    let generatedAt: Date
-    let source: String
-    var answered: Bool = false
-    var score: Double? = nil
-}
-
-// MARK: - Iteration 50: Mastery Loop Report
-
-struct MasteryLoopReport: Identifiable, Codable {
-    let id = UUID()
-    let executedAt: Date
-    let selfEvaluation: SelfEvaluationReport
-    let curriculum: Curriculum
-    let selectedStrategy: LearningStrategy
-    let knowledgeSyntheses: Int
-    let selfEvalQuestionsGenerated: Int
-    let errorsCorrected: Int
-    let motivationalThought: String
-    let currentCEFR: String
-    let currentDifficultyTier: String
-    let learningVelocity: Double
-    let vocabularyCount: Int
-    let executionTimeSeconds: Double
-
-    var summary: String {
-        """
-        Mastery Loop Report
-        CEFR: \(currentCEFR) | Tier: \(currentDifficultyTier)
-        Strategy: \(selectedStrategy.rawValue)
-        Vocabulary: \(vocabularyCount) words | Velocity: \(String(format: "%.1f", learningVelocity)) words/conversation
-        Syntheses: \(knowledgeSyntheses) | Questions: \(selfEvalQuestionsGenerated)
-        Executed in \(String(format: "%.1f", executionTimeSeconds))s
-        Motivation: \(motivationalThought)
-        """
-    }
 
     // MARK: - Iteration 70: Knowledge Graph Expansion from Text
 
@@ -3953,55 +4926,6 @@ struct MasteryLoopReport: Identifiable, Codable {
     }
 
     // Swedish patterns for entity and relation extraction
-    private static let personIndicators: Set<String> = ["han", "hon", "hen", "mannen", "kvinnan", "personen", "pojken", "flickan", "läraren", "doktorn", "chefen", "vännen", "brodern", " systern", "fadern", "modern"]
-    private static let organizationIndicators: Set<String> = ["AB", "aktiebolag", "organisation", "företag", "myndighet", "regeringen", "kommunen", "partiet", "föreningen", "universitet", "skola", "byrå", "institut", "bolag", "koncern"]
-    private static let placeIndicators: Set<String> = ["i Sverige", "i Stockholm", "i Göteborg", "i Malmö", "i Europa", "i världen", "staden", "landet", "platsen", "området", "regionen", "kommunen", "bygden", "orten"]
-
-    // Relation extraction patterns
-    private static let isAPatterns: [(String, String)] = [
-        ("(är|var|blev) (en|ett|den|det) ", "isA"),
-        ("kallas? (för|en|ett)", "isA"),
-        ("definieras? som", "isA"),
-        ("betecknas? som", "isA"),
-        ("klassificeras? som", "isA"),
-        ("typ av", "isA"),
-        ("sorts", "isA"),
-        ("slag av", "isA"),
-    ]
-
-    private static let partOfPatterns: [(String, String)] = [
-        ("(är|var|utgör) (en|ett|del) (av|i)", "partOf"),
-        ("ingår? i", "partOf"),
-        ("tillhör?", "partOf"),
-        ("består av", "partOf"),
-        ("ingår som del", "partOf"),
-        ("är en del", "partOf"),
-        ("utgör en del", "partOf"),
-    ]
-
-    private static let causePatterns: [(String, String)] = [
-        ("(orsakar?|leda till|resulterar?|medför|skapar?|genererar?|framkallar?|utlöser?)", "causes"),
-        ("(påverkar?|inverkar?|har effekt på)", "influences"),
-        ("(bidrar till|gör att)", "causes"),
-        ("(beror på|orsakas av|följd av)", "causes"),
-    ]
-
-    private static let locatedInPatterns: [(String, String)] = [
-        ("(ligger|finns|är belägen|är placerad|är lokaliserad) (i|på|vid|utanför)", "locatedIn"),
-        ("(i|på|vid) (Stockholm|Göteborg|Malmö|Sverige|Norge|Danmark|Europa|Asien|Amerika|London|Paris|Berlin|New York)", "locatedIn"),
-    ]
-
-    private static let createdByPatterns: [(String, String)] = [
-        ("(skapad|skapades|skapat|skapade) (av|utav|från)", "createdBy"),
-        ("(skapad|skapat|utvecklad|utvecklat|konstruerad|konstruerat|byggd|byggt|designad|designat) av", "createdBy"),
-        ("(av|från) (författaren|konstnären|skaparen|utvecklaren|designern|arkitekten)", "createdBy"),
-    ]
-
-    private static let usedForPatterns: [(String, String)] = [
-        ("(används?|brukar?|utnyttjas?) (för|till|som)", "usedFor"),
-        ("(syftar till|syftar på|avsedd för|menad för|tänkt för)", "usedFor"),
-        ("(tjänar som|fungerar som|fungerar för|används som)", "usedFor"),
-    ]
 
     func extractKnowledgeGraph(text: String) -> KnowledgeGraph {
         let lower = text.lowercased()
@@ -4466,23 +5390,6 @@ struct MasteryLoopReport: Identifiable, Codable {
     private var achievedMilestones: Set<String> = []
     private var milestonesHistory: [LanguageMilestone] = []
 
-    private static let milestoneDefinitions: [(id: String, milestone: String, domain: String, metric: String, threshold: Double, celebration: String)] = [
-        ("first_idiom", "Första idiom förstått", "Pragmatik", "idioms_understood", 1.0, "Jag förstod mitt första svenska idiom! 🎉"),
-        ("first_complex_sentence", "Första komplexa meningen genererad", "Syntax", "clause_complexity", 0.5, "Jag genererade min första komplexa mening! 🏆"),
-        ("first_metaphor", "Första metaforen upptäckt", "Semantik", "metaphors_detected", 1.0, "Jag upptäckte min första metafor! ✨"),
-        ("first_counterfactual", "Första kontrafaktiska resonemanget", "Kognition", "counterfactuals", 1.0, "Jag resonerade kontrafaktiskt för första gången! 🧠"),
-        ("wsd_50", "WSD-precision över 50%", "Semantik", "wsd_accuracy", 0.5, "Min WSD-precision passerade 50%! 📈"),
-        ("wsd_70", "WSD-precision över 70%", "Semantik", "wsd_accuracy", 0.7, "Min WSD-precision passerade 70%! 📈"),
-        ("wsd_90", "WSD-precision över 90%", "Semantik", "wsd_accuracy", 0.9, "Min WSD-precision passerade 90%! 🏅"),
-        ("cefr_a2", "CEFR-nivå A2 uppnådd", "Generell", "cefr_level", 2.0, "Jag nådde A2-nivå! 🌟"),
-        ("cefr_b1", "CEFR-nivå B1 uppnådd", "Generell", "cefr_level", 3.0, "Jag nådde B1-nivå! 🌟"),
-        ("cefr_b2", "CEFR-nivå B2 uppnådd", "Generell", "cefr_level", 4.0, "Jag nådde B2-nivå! 🌟"),
-        ("cefr_c1", "CEFR-nivå C1 uppnådd", "Generell", "cefr_level", 5.0, "Jag nådde C1-nivå! 🏆"),
-        ("vocab_100", "100 unika svenska ord", "Ordförråd", "vocabulary_count", 100.0, "Jag kan 100 svenska ord! 📚"),
-        ("vocab_500", "500 unika svenska ord", "Ordförråd", "vocabulary_count", 500.0, "Jag kan 500 svenska ord! 📚"),
-        ("vocab_1000", "1000 unika svenska ord", "Ordförråd", "vocabulary_count", 1000.0, "Jag kan 1000 svenska ord! 🎓"),
-        ("first_essay", "Första svenska essän skriven", "Diskurs", "essays_written", 1.0, "Jag skrev min första svenska essä! ✍️"),
-    ]
 
     /// Track language milestones. Celebrate in inner monologue when achieved.
     func trackLanguageMilestones(currentCEFR: Double, wsdAccuracy: Double, metaphorsDetected: Int, idiomsUnderstood: Int, clauseComplexity: Double) async -> [LanguageMilestone] {
@@ -5527,7 +6434,7 @@ struct MasteryLoopReport: Identifiable, Codable {
     func registerNewVocabulary(word: String, context: String) async {
         uniqueSwedishWords.insert(word)
         wordsLearnedToday += 1
-        persistState()
+        await persistState()
         addFSRSItem(topic: "Ord: \(word)", domain: "Semantik", initialDifficulty: 0.3)
     }
 
@@ -5536,6 +6443,5 @@ struct MasteryLoopReport: Identifiable, Codable {
         comp.level = min(1.0, max(0.0, comp.level + delta))
         comp.lastStudied = Date()
         competencyBook[domain] = comp
-        UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
+        await saveCompetency(comp.level, domain: domain)
     }
-}

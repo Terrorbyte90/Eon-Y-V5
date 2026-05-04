@@ -361,8 +361,8 @@ actor OpenRouterLanguageEvaluator {
         Analysera dessa ord i sin kontext:
         """
 
-        let userPrompt = wordContextPairs.enumerated().map {
-            "\($0 + 1). \"\($0.word)\" i meningen: \"\($1.context)\""
+        let userPrompt = wordContextPairs.enumerated().map { index, pair in
+            "\(index + 1). \"\(pair.word)\" i meningen: \"\(pair.context)\""
         }.joined(separator: "\n")
 
         do {
@@ -883,14 +883,15 @@ actor OpenRouterLanguageEvaluator {
 
     private func parseGrammarResponse(_ response: String, originalTexts: [String]) throws -> [GrammarAnalysisResult] {
         let jsonStr = extractJSONBlock(from: response)
-        guard let data = jsonStr.data(using: .utf8),
-              let rawResults = try? JSONDecoder().decode([[String: Any]].self, from: data) else {
-            // Försök med Codable
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            if let results = try? decoder.decode([GrammarAnalysisResult].self, from: jsonStr.data(using: .utf8)!) {
-                return results
-            }
+        guard let data = jsonStr.data(using: .utf8) else {
+            throw NSError(domain: "OpenRouter", code: 10, userInfo: [NSLocalizedDescriptionKey: "Failed to parse grammar response"])
+        }
+        // Try direct Codable decoding first
+        if let results = try? JSONDecoder().decode([GrammarAnalysisResult].self, from: data) {
+            return results
+        }
+        // Fallback: verify it's valid JSON array, then create default results
+        guard let _ = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
             throw NSError(domain: "OpenRouter", code: 10, userInfo: [NSLocalizedDescriptionKey: "Failed to parse grammar response"])
         }
 
@@ -1249,8 +1250,9 @@ actor OpenRouterLanguageEvaluator {
         guard apiKey != nil else { return 0.5 }
 
         // Retrieve recent texts related to the domain
-        let recentTexts = await PersistentMemoryStore.shared.searchFacts(query: domain, limit: 5)
-            .map { $0.detail }
+        let recentFacts: [(subject: String, predicate: String, object: String)] = await PersistentMemoryStore.shared.searchFacts(query: domain, limit: 5)
+        let recentTexts: [String] = recentFacts
+            .map { "\($0.subject) \($0.predicate) \($0.object)" }
             .filter { !$0.isEmpty }
 
         guard !recentTexts.isEmpty else { return 0.5 }

@@ -21,7 +21,7 @@ enum EonTab: Int, CaseIterable {
     case chat
     case language
     case project
-    case selfAwareness
+    // Removed self-awareness case
     case knowledge
     case profile
 
@@ -31,7 +31,7 @@ enum EonTab: Int, CaseIterable {
         case .chat:           return "Chatt"
         case .language:       return "Språk"
         case .project:        return "Projekt"
-        case .selfAwareness:  return "Medvetande"
+        // Removed self-awareness label
         case .knowledge:      return "Kunskap"
         case .profile:        return "Profil"
         }
@@ -43,7 +43,7 @@ enum EonTab: Int, CaseIterable {
         case .chat:           return "bubble.left.and.bubble.right.fill"
         case .language:       return "textformat.abc"
         case .project:        return "folder.fill"
-        case .selfAwareness:  return "eye.trianglebadge.exclamationmark"
+        // Removed self-awareness icon
         case .knowledge:      return "books.vertical.fill"
         case .profile:        return "person.crop.circle.fill"
         }
@@ -55,7 +55,7 @@ enum EonTab: Int, CaseIterable {
         case .chat:           return Color(hex: "#34D399")
         case .language:       return Color(hex: "#14B8A6")
         case .project:        return Color(hex: "#F59E0B")
-        case .selfAwareness:  return Color(hex: "#F472B6")
+        // Removed self-awareness color
         case .knowledge:      return Color(hex: "#FBBF24")
         case .profile:        return Color(hex: "#F472B6")
         }
@@ -140,12 +140,7 @@ struct TabContentView: View {
                     .allowsHitTesting(selectedTab == .project)
             }
 
-            if visitedTabs.contains(.selfAwareness) {
-                SelfAwarenessView()
-                    .environment(\.tabBarVisible, $tabBarVisible)
-                    .opacity(selectedTab == .selfAwareness ? 1 : 0)
-                    .allowsHitTesting(selectedTab == .selfAwareness)
-            }
+            // SelfAwareness view removed
 
             if visitedTabs.contains(.knowledge) {
                 KnowledgeView()
@@ -275,7 +270,7 @@ struct EonTabBar: View {
             tabActivity[.project]        = activity["cognitive"] ?? 0
             tabActivity[.chat]           = activity["language"] ?? 0
             tabActivity[.language]       = activity["language"] ?? 0
-            tabActivity[.selfAwareness]  = activity["autonomy"] ?? 0
+            // Removed self-awareness activity tracking
             tabActivity[.knowledge]      = activity["memory"] ?? 0
         }
     }
