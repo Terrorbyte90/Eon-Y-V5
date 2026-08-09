@@ -32,6 +32,7 @@ struct SettingsView: View {
     @AppStorage("eon_gpt_auto_unload")   private var gptAutoUnload = true
     @AppStorage("eon_rest_extra_pct")    private var restExtraPct = 50
     @AppStorage("eon_verbose_logging")   private var verboseLogging = false
+    @AppStorage("eon_local_model_mode")  private var localModelMode = LocalModelMode.onDemand.rawValue
 
     @State private var showResetAlert = false
     @State private var showClearLogsAlert = false
@@ -288,6 +289,41 @@ struct SettingsView: View {
                 settingToggle("Auto-avlasta Embed efter 5 min", icon: "memorychip", binding: $bertAutoUnload, color: Color(hex: "#38BDF8"))
                 Divider().background(Color.white.opacity(0.06))
                 settingToggle("Auto-avlasta LLM efter 10 min", icon: "cpu", binding: $gptAutoUnload, color: Color(hex: "#38BDF8"))
+                Divider().background(Color.white.opacity(0.06))
+                settingRow {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Label("Lokal modell", systemImage: "slider.horizontal.3")
+                            .font(.system(size: 14, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text((LocalModelMode(rawValue: localModelMode) ?? .onDemand).description)
+                            .font(.system(size: 11, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.4))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    Picker("Lokal modell", selection: $localModelMode) {
+                        ForEach(LocalModelMode.allCases) { mode in
+                            Text(mode.title).tag(mode.rawValue)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(Color(hex: "#38BDF8"))
+                    .onChange(of: localModelMode) { _, value in
+                        Task {
+                            await NeuralEngineOrchestrator.shared.setModelMode(
+                                LocalModelMode(rawValue: value) ?? .onDemand
+                            )
+                        }
+                    }
+                }
+                Divider().background(Color.white.opacity(0.06))
+                Button {
+                    Task { await NeuralEngineOrchestrator.shared.unloadNow() }
+                } label: {
+                    Label("Avlasta modellen nu", systemImage: "eject.fill")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color(hex: "#38BDF8"))
+                }
             }
 
             // Vila-inställningar
