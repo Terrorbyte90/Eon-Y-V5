@@ -956,6 +956,9 @@ final class EonLiveAutonomy: ObservableObject {
 
     // Guard som alla loopar anropar — returnerar sant om loopen ska hoppa över detta varv
     private func shouldSkipAutonomousWork() -> Bool {
+        let runtime = RuntimeThermalCoordinator.shared
+        runtime.refresh()
+        guard runtime.allows(.learning) else { return true }
         let mode = CyclingModeEngine.shared.effectiveMode(base: performanceMode)
         return mode.autonomyPaused
     }
@@ -3451,4 +3454,3 @@ struct AutonomousThought {
 enum AutonomousThoughtCategory {
     case insight, reflection, learning, uncertainty, satisfaction
 }
-

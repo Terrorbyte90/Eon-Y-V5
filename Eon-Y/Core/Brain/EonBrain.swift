@@ -192,6 +192,7 @@ final class EonBrain: ObservableObject {
         autonomousProcessLabel = "Startar kognitivt system..."
         // Starta resursdiagnostik-loggning
         ResourceDiagnosticsLogger.shared.start()
+        RuntimeThermalCoordinator.shared.start()
         // Starta termisk sömn-hantering
         ThermalSleepManager.shared.start(brain: self)
         // Starta ny körningssession — crash-säker logg till disk
@@ -260,13 +261,14 @@ final class EonBrain: ObservableObject {
         Task { @MainActor in
             while !Task.isCancelled {
                 // v7: Thermal-aware master tick — 15s nominal, 30s fair, pause at serious/critical
-                let thermalState = ProcessInfo.processInfo.thermalState
-                if thermalState == .serious || thermalState == .critical {
-                    try? await Task.sleep(nanoseconds: 30_000_000_000) // 30s vila
+                let runtime = RuntimeThermalCoordinator.shared
+                runtime.refresh()
+                if !runtime.allows(.workspace) {
+                    try? await Task.sleep(nanoseconds: 30_000_000_000)
                     await Task.yield()
                     continue
                 }
-                let tickInterval: UInt64 = thermalState == .fair ? 20_000_000_000 : 15_000_000_000
+                let tickInterval = UInt64(runtime.intervalSeconds(for: .workspace, base: 15) * 1_000_000_000)
                 try? await Task.sleep(nanoseconds: tickInterval) // 15s (was 10s)
                 await Task.yield()
                 masterTickCount += 1
