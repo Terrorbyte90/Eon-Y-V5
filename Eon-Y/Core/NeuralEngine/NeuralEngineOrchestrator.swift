@@ -162,7 +162,7 @@ actor NeuralEngineOrchestrator {
     // MARK: - Generation
 
     func generate(prompt: String, maxTokens: Int = 200, temperature: Float = 0.7, enableThinking: Bool = false) async -> String {
-        guard modelMode != .disabled else { return fallbackGenerate(prompt: prompt) }
+        guard modelMode != .disabled else { return await fallbackGenerate(prompt) }
         // Thermal circuit breaker: skip Qwen entirely when thermal is critical
         if ThermalSleepManager.shared.shouldSkipQwenInference() {
             return await fallbackGenerate(prompt)
