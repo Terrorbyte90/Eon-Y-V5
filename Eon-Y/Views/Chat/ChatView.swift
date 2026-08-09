@@ -191,6 +191,14 @@ struct ChatView: View {
                                 .font(.system(size: 9, weight: .semibold))
                                 .foregroundStyle(.white.opacity(0.35))
                         }
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(brain.bertLoaded ? Color(hex: "#34D399") : Color(hex: "#FBBF24"))
+                                .frame(width: 4, height: 4)
+                            Text(brain.bertLoaded ? "Lokal modell" : "Fallback tills modell är tillgänglig")
+                                .font(.system(size: 8, weight: .medium, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.38))
+                        }
                     }
                 }
 
@@ -619,7 +627,7 @@ class ChatViewModel: ObservableObject {
     init() {
         messages.append(ChatMessage(
             role: .eon,
-            content: "Hej! Jag är Eon — ett kognitivt AI-system som körs helt on-device. Jag tänker, resonerar och lär mig autonomt dygnet runt. Vad vill du utforska?",
+            content: "Hej! Jag är Eon — ett lokalt kognitivt AI-system. Jag visar när den lokala modellen är aktiv och när jag använder en fallback. Vad vill du utforska?",
             confidence: 0.95,
             emotion: .neutral
         ))
@@ -659,8 +667,7 @@ class ChatViewModel: ObservableObject {
         messages[idx].confidence = brain.confidence
         messages[idx].emotion = brain.currentEmotion
         messages[idx].retrievedMemoryCount = brain.thinkingSteps
-            .filter { $0.step == .memoryRetrieval && $0.state == .completed }.count > 0
-            ? Int.random(in: 1...4) : 0
+            .filter { $0.step == .memoryRetrieval && $0.state == .completed }.count
 
         // v6: Capture consciousness snapshot at response completion
         messages[idx].consciousnessLevel = brain.consciousnessLevel

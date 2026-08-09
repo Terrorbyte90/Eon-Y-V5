@@ -12,6 +12,11 @@ Xcode does not compile article text as Swift string literals and app startup doe
 not parse the full corpus. Use `Scripts/export_knowledge.py` to validate and
 export normalized records.
 
+The local Qwen model is not committed to Git. On macOS, place the approved
+`Qwen3-1.7B-Q4_K_M.gguf` at `~/Library/Application Support/Eon/Models/` or
+include it in the app bundle. `Scripts/install_qwen_model.sh` checks the path;
+the app reports a truthful fallback state when the file is missing.
+
 eon Y är en egen app men den kommer ha delar av detta nedan
 
 EON VERSION X — MASTER IMPLEMENTATION

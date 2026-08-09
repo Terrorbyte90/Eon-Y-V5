@@ -46,10 +46,11 @@ actor QwenHandler {
         guard !isLoaded else { return }
         llama_backend_init()
 
-        guard let modelPath = Bundle.main.path(forResource: modelFileName, ofType: "gguf") else {
-            print("[QWEN] Model file not found in bundle: \(modelFileName).gguf")
+        guard let modelURL = ModelLocator(fileName: modelFileName).locate() else {
+            print("[QWEN] Model saknas. \(ModelLocator(fileName: modelFileName).installationHint)")
             throw QwenError.modelNotFound
         }
+        let modelPath = modelURL.path
 
         var modelParams = llama_model_default_params()
         modelParams.n_gpu_layers = 99
@@ -421,7 +422,7 @@ enum QwenError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .modelNotFound: return "Qwen3 GGUF model not found in bundle"
+        case .modelNotFound: return ModelLocator(fileName: "Qwen3-1.7B-Q4_K_M").installationHint
         case .modelLoadFailed: return "Failed to load Qwen3 model"
         case .contextCreationFailed: return "Failed to create llama context"
         }
