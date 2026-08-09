@@ -83,6 +83,9 @@ struct Eon_YApp: App {
         ud.set(ce.freeEnergy, forKey: "eon_saved_free_energy")
         ud.set(ce.curiosityDrive, forKey: "eon_saved_curiosity")
         ud.set(ce.butlin14Score, forKey: "eon_saved_butlin14")
+        if let unifiedData = try? JSONEncoder().encode(ce.unifiedConsciousState) {
+            ud.set(unifiedData, forKey: "eon_saved_unified_conscious_state")
+        }
 
         // 3. Emotional state
         ud.set(brain.emotionValence, forKey: "eon_saved_emotion_valence")
@@ -143,6 +146,11 @@ struct Eon_YApp: App {
 
         let savedButlin = ud.integer(forKey: "eon_saved_butlin14")
         if savedButlin > 0 { ce.butlin14Score = savedButlin }
+
+        if let unifiedData = ud.data(forKey: "eon_saved_unified_conscious_state"),
+           let savedUnified = try? JSONDecoder().decode(UnifiedConsciousState.self, from: unifiedData) {
+            ce.restoreUnifiedConsciousState(savedUnified)
+        }
 
         // Emotional state
         let savedValence = ud.double(forKey: "eon_saved_emotion_valence")
