@@ -10,6 +10,15 @@ struct KnowledgeRecord: Codable, Equatable, Identifiable, Sendable {
 
     enum CodingKeys: String, CodingKey { case id, language, domain, title, text, content, source }
 
+    init(id: String, language: String, domain: String, title: String, text: String, source: String?) {
+        self.id = id
+        self.language = language
+        self.domain = domain
+        self.title = title
+        self.text = text
+        self.source = source
+    }
+
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(String.self, forKey: .id)
