@@ -115,6 +115,10 @@ final class ConsciousnessEngine: ObservableObject {
         initializeGoals()
     }
 
+    func restoreUnifiedConsciousState(_ state: UnifiedConsciousState) {
+        unifiedConsciousState = state
+    }
+
     // MARK: - Start
 
     // Senast lästa artikel — exponeras till SelfAwarenessView
