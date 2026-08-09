@@ -257,7 +257,14 @@ actor QwenHandler {
         var decodeResult = llama_decode(ctx, batch)
         guard decodeResult == 0 else { return }
 
-        let sampler = createSampler(temperature: temperature, mdl: mdl)
+        guard let sampler = createSampler(temperature: temperature, mdl: mdl) else {
+            let fallback = NLResponseEngine.generate(for: prompt)
+            for word in fallback.split(separator: " ") {
+                await onToken(String(word) + " ")
+            }
+            lastGenerationEnd = Date()
+            return
+        }
         defer { llama_sampler_free(sampler) }
 
         var generatedTokens: [llama_token] = []
@@ -346,11 +353,11 @@ actor QwenHandler {
 
     // MARK: - Sampler
 
-    private func createSampler(temperature: Float, mdl: OpaquePointer) -> UnsafeMutablePointer<llama_sampler> {
+    private func createSampler(temperature: Float, mdl: OpaquePointer) -> UnsafeMutablePointer<llama_sampler>? {
         let sparams = llama_sampler_chain_default_params()
-        let chain = llama_sampler_chain_init(sparams)!
+        guard let chain = llama_sampler_chain_init(sparams) else { return nil }
 
-        llama_sampler_chain_add(chain, llama_sampler_init_penalties(
+        guard let penalties = llama_sampler_init_penalties(
             llama_n_vocab(mdl),
             llama_token_eos(mdl),
             llama_token_nl(mdl),
@@ -360,16 +367,36 @@ actor QwenHandler {
             0.0,
             false,
             false
-        ))
+        ) else {
+            llama_sampler_free(chain)
+            return nil
+        }
+        llama_sampler_chain_add(chain, penalties)
 
         let topK: Int32 = temperature < 0.5 ? 30 : (temperature < 0.7 ? 50 : 80)
-        llama_sampler_chain_add(chain, llama_sampler_init_top_k(topK))
+        guard let topKSampler = llama_sampler_init_top_k(topK) else {
+            llama_sampler_free(chain)
+            return nil
+        }
+        llama_sampler_chain_add(chain, topKSampler)
 
-        llama_sampler_chain_add(chain, llama_sampler_init_top_p(0.90, 1))
+        guard let topPSampler = llama_sampler_init_top_p(0.90, 1) else {
+            llama_sampler_free(chain)
+            return nil
+        }
+        llama_sampler_chain_add(chain, topPSampler)
 
-        llama_sampler_chain_add(chain, llama_sampler_init_temp(max(temperature, 0.01)))
+        guard let temperatureSampler = llama_sampler_init_temp(max(temperature, 0.01)) else {
+            llama_sampler_free(chain)
+            return nil
+        }
+        llama_sampler_chain_add(chain, temperatureSampler)
 
-        llama_sampler_chain_add(chain, llama_sampler_init_dist(UInt32.random(in: 0...UInt32.max)))
+        guard let distributionSampler = llama_sampler_init_dist(UInt32.random(in: 0...UInt32.max)) else {
+            llama_sampler_free(chain)
+            return nil
+        }
+        llama_sampler_chain_add(chain, distributionSampler)
 
         return chain
     }
