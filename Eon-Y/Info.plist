@@ -105,6 +105,8 @@
 	<string>http://100.111.80.92:8791/v1/eon/data</string>
 	<key>EON_BACKGROUND_KEY_ID</key>
 	<string>hermes-primary-2026</string>
+	<key>EON_BACKGROUND_SIGNING_PUBLIC_KEY</key>
+	<string>uwReYR3zHuMnDTHrppM54dZOtZnKVPKnYbvqQUEmaE0=</string>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>Eon använder inte spårning. All data stannar på din enhet.</string>
 	<key>NSMicrophoneUsageDescription</key>
