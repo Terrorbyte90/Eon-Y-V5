@@ -45,9 +45,13 @@ struct UnifiedConsciousState: Codable, Equatable, Sendable {
 
 struct SelfModelSnapshot: Codable, Equatable, Sendable {
     var identity: String = "Eon"
+    var currentPerspective: String = " här och nu"
     var agency: Double = 0
     var uncertainty: Double = 1
     var bodyBudget: Double = 1
+    var autobiographicalContinuity: Double = 0
+    var interoceptiveCoupling: Double = 0
+    var counterfactualDepth: Double = 0
 }
 
 struct AffectiveSnapshot: Codable, Equatable, Sendable {
