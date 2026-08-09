@@ -321,7 +321,9 @@ struct GeminiSettings {
     static func load() -> GeminiSettings {
         GeminiSettings(
             isEnabled: UserDefaults.standard.bool(forKey: "gemini_enabled"),
-            apiKey: UserDefaults.standard.string(forKey: "gemini_api_key") ?? "AIzaSyBiRmcU186MnnGS6jPAO1dUs8cUAmSQmUw",
+            // Credentials must be provisioned by the user and stored securely;
+            // never ship an API key as a source-code fallback.
+            apiKey: UserDefaults.standard.string(forKey: "gemini_api_key") ?? "",
             intervalMinutes: {
                 let v = UserDefaults.standard.integer(forKey: "gemini_interval_minutes")
                 return v > 0 ? v : defaultInterval
