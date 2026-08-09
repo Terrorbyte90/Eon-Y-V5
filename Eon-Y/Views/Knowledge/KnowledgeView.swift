@@ -942,18 +942,45 @@ class KnowledgeViewModel: ObservableObject {
 
     func loadArticles() async {
         let stored = await PersistentMemoryStore.shared.loadAllArticles(limit: 500)
+        let resourceSeeds = await loadResourceSeeds()
         if !stored.isEmpty {
             // Slå ihop sparade artiklar med seed-artiklar (seed visas ej om de redan finns sparade)
             let storedTitles = Set(stored.map { $0.title })
-            let newSeeds = KnowledgeArticle.seedArticles.filter { !storedTitles.contains($0.title) }
+            let newSeeds = resourceSeeds.filter { !storedTitles.contains($0.title) }
             articles = stored + newSeeds
         } else {
             // Första körningen — spara seed-artiklarna i databasen
-            articles = KnowledgeArticle.seedArticles
+            articles = resourceSeeds
             for article in articles {
                 await PersistentMemoryStore.shared.saveArticle(article)
             }
         }
+    }
+
+    private func loadResourceSeeds() async -> [KnowledgeArticle] {
+        let resourceURL = Bundle.main.url(forResource: "knowledge.v1", withExtension: "jsonl", subdirectory: "Knowledge")
+            ?? Bundle.main.url(forResource: "knowledge.v1", withExtension: "jsonl")
+        guard let resourceURL else { return [] }
+        let loader = KnowledgeResourceLoader()
+        var articles: [KnowledgeArticle] = []
+        do {
+            for try await batch in loader.stream(from: resourceURL, batchSize: 64) {
+                articles.append(contentsOf: batch.map { record in
+                    KnowledgeArticle(
+                        title: record.title,
+                        content: record.text,
+                        summary: String(record.text.prefix(180)) + "…",
+                        domain: record.domain,
+                        source: record.source ?? "",
+                        date: Date(),
+                        isAutonomous: false
+                    )
+                })
+            }
+        } catch {
+            print("[Knowledge] Resource load failed: \(error.localizedDescription)")
+        }
+        return articles
     }
 
     func addArticle(title: String, content: String, source: String) async {

@@ -592,6 +592,10 @@ final class ConsciousnessEngine: ObservableObject {
                 state: unifiedConsciousState,
                 input: cycleInput
             ).state
+            let telemetrySnapshot = unifiedConsciousState
+            Task.detached(priority: .utility) {
+                await BackgroundTelemetryBridge.shared.enqueue(snapshot: telemetrySnapshot)
+            }
 
             // Butlin-14 score
             butlin14Score = calculateButlin14()
