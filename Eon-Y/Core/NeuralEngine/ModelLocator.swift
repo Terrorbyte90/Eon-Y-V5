@@ -3,7 +3,7 @@ import Foundation
 struct ModelLocator {
     let fileName: String
 
-    func locate() -> URL? {
+    nonisolated func locate() -> URL? {
         let bundleName = URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
         if let url = Bundle.main.url(forResource: bundleName, withExtension: "gguf") { return url }
 
@@ -16,7 +16,7 @@ struct ModelLocator {
         return candidates.first { FileManager.default.fileExists(atPath: $0.path) }
     }
 
-    var installationHint: String {
+    nonisolated var installationHint: String {
         "Lägg \(fileName).gguf i ~/Library/Application Support/Eon/Models/ på Mac, eller inkludera den i appens modellbundle."
     }
 }
