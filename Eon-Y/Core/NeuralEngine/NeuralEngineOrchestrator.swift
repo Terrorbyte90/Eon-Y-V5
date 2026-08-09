@@ -21,8 +21,27 @@ actor NeuralEngineOrchestrator {
     // Inaktivitetstimers för lazy unload
     private var lastUse: Date = .distantPast
     private var idleCheckTask: Task<Void, Never>?
+    private let modelModeKey = "eon_local_model_mode"
 
     private init() {}
+
+    var modelMode: LocalModelMode {
+        LocalModelMode(rawValue: UserDefaults.standard.string(forKey: modelModeKey) ?? "onDemand") ?? .onDemand
+    }
+
+    func setModelMode(_ mode: LocalModelMode) async {
+        UserDefaults.standard.set(mode.rawValue, forKey: modelModeKey)
+        if mode == .disabled {
+            await unloadNow()
+        }
+    }
+
+    func unloadNow() async {
+        idleCheckTask?.cancel()
+        await qwenHandler?.unload()
+        qwenHandler = nil
+        isLoaded = false
+    }
 
     // MARK: - Compatibility aliases (for code that references bert/gpt)
     var bertLoaded: Bool { qwenHandler != nil }
@@ -33,6 +52,7 @@ actor NeuralEngineOrchestrator {
     // MARK: - Loading
 
     func loadModels() async {
+        guard modelMode != .disabled else { return }
         guard !isLoaded else { return }
         print("[QWEN] Loading Qwen3-1.7B...")
 
@@ -75,6 +95,7 @@ actor NeuralEngineOrchestrator {
     }
 
     private func ensureLoaded() async {
+        guard modelMode != .disabled else { return }
         guard qwenHandler == nil else { return }
         print("[QWEN] Reloading Qwen3...")
         RunSessionLogger.shared.log("Qwen3 reloading (lazy)")
@@ -88,6 +109,7 @@ actor NeuralEngineOrchestrator {
     // MARK: - Embedding
 
     func embed(_ text: String) async -> [Float] {
+        guard modelMode != .disabled else { return fallbackEmbed(text) }
         // Thermal gate: skip GPU inference at critical thermal state
         let thermal = ProcessInfo.processInfo.thermalState
         if thermal == .critical {
@@ -140,6 +162,7 @@ actor NeuralEngineOrchestrator {
     // MARK: - Generation
 
     func generate(prompt: String, maxTokens: Int = 200, temperature: Float = 0.7, enableThinking: Bool = false) async -> String {
+        guard modelMode != .disabled else { return fallbackGenerate(prompt: prompt) }
         // Thermal circuit breaker: skip Qwen entirely when thermal is critical
         if ThermalSleepManager.shared.shouldSkipQwenInference() {
             return await fallbackGenerate(prompt)

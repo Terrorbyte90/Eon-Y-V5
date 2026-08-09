@@ -958,24 +958,25 @@ class KnowledgeViewModel: ObservableObject {
     }
 
     private func loadResourceSeeds() async -> [KnowledgeArticle] {
-        let resourceURL = Bundle.main.url(forResource: "knowledge.v1", withExtension: "jsonl", subdirectory: "Knowledge")
-            ?? Bundle.main.url(forResource: "knowledge.v1", withExtension: "jsonl")
-        guard let resourceURL else { return [] }
         let loader = KnowledgeResourceLoader()
         var articles: [KnowledgeArticle] = []
         do {
-            for try await batch in loader.stream(from: resourceURL, batchSize: 64) {
-                articles.append(contentsOf: batch.map { record in
-                    KnowledgeArticle(
-                        title: record.title,
-                        content: record.text,
-                        summary: String(record.text.prefix(180)) + "…",
-                        domain: record.domain,
-                        source: record.source ?? "",
-                        date: Date(),
-                        isAutonomous: false
-                    )
-                })
+            for resourceName in ["knowledge.v1", "swedish_language_bootstrap.v1"] {
+                guard let resourceURL = Bundle.main.url(forResource: resourceName, withExtension: "jsonl", subdirectory: "Knowledge")
+                    ?? Bundle.main.url(forResource: resourceName, withExtension: "jsonl") else { continue }
+                for try await batch in loader.stream(from: resourceURL, batchSize: 64) {
+                    articles.append(contentsOf: batch.map { record in
+                        KnowledgeArticle(
+                            title: record.title,
+                            content: record.text,
+                            summary: String(record.text.prefix(180)) + "…",
+                            domain: record.domain,
+                            source: record.source ?? "",
+                            date: Date(),
+                            isAutonomous: false
+                        )
+                    })
+                }
             }
         } catch {
             print("[Knowledge] Resource load failed: \(error.localizedDescription)")
