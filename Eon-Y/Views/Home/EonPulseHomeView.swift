@@ -281,10 +281,10 @@ struct EonPulseHomeView: View {
             }
             .shadow(color: dominant.opacity(0.5), radius: 24)
             .fullScreenCover(isPresented: $showSmartDash) {
-                SmartDashView().environmentObject(brain)
+                RuntimeDashboardView().environmentObject(brain)
             }
             .fullScreenCover(isPresented: $showSuperView) {
-                SuperView().environmentObject(brain)
+                RuntimeDashboardView().environmentObject(brain)
             }
 
             HStack(spacing: 10) {
