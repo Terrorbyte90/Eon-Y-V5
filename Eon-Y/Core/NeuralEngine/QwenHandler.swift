@@ -213,7 +213,7 @@ actor QwenHandler {
             return
         }
 
-        let cooldown = ThermalSleepManager.shared.thermalCooldownSeconds()
+        let cooldown = await ThermalSleepManager.shared.thermalCooldownSeconds()
         if cooldown > 0 {
             let elapsed = Date().timeIntervalSince(lastGenerationEnd)
             if elapsed < cooldown {
@@ -230,7 +230,7 @@ actor QwenHandler {
             return
         }
 
-        let adjustedMaxTokens = ThermalSleepManager.shared.thermalAdjustedMaxTokens(base: maxNewTokens)
+        let adjustedMaxTokens = await ThermalSleepManager.shared.thermalAdjustedMaxTokens(base: maxNewTokens)
         guard adjustedMaxTokens > 0 else {
             let fallback = NLResponseEngine.generate(for: prompt)
             for word in fallback.split(separator: " ") {
@@ -397,11 +397,11 @@ actor QwenHandler {
     // MARK: - Fallback Embedding
 
     private func fallbackEmbed(_ text: String) -> [Float] {
-        import_NLEmbedding_fallback(text)
+        nonisolatedFallbackEmbed(text)
     }
 }
 
-private func import_NLEmbedding_fallback(_ text: String) -> [Float] {
+private nonisolated func nonisolatedFallbackEmbed(_ text: String) -> [Float] {
     var result = [Float](repeating: 0, count: 768)
     for (i, word) in text.split(separator: " ").prefix(20).enumerated() {
         let hash = word.hashValue

@@ -90,7 +90,7 @@ actor NeuralEngineOrchestrator {
             qwenHandler = nil
             isLoaded = false
             print("[QWEN] Unloaded — idle >10 min")
-            RunSessionLogger.shared.log("Qwen3 unloaded (idle >10 min)")
+            await RunSessionLogger.shared.log("Qwen3 unloaded (idle >10 min)")
         }
     }
 
@@ -98,7 +98,7 @@ actor NeuralEngineOrchestrator {
         guard modelMode != .disabled else { return }
         guard qwenHandler == nil else { return }
         print("[QWEN] Reloading Qwen3...")
-        RunSessionLogger.shared.log("Qwen3 reloading (lazy)")
+        await RunSessionLogger.shared.log("Qwen3 reloading (lazy)")
         let handler = QwenHandler()
         try? await handler.load()
         qwenHandler = handler
@@ -164,7 +164,7 @@ actor NeuralEngineOrchestrator {
     func generate(prompt: String, maxTokens: Int = 200, temperature: Float = 0.7, enableThinking: Bool = false) async -> String {
         guard modelMode != .disabled else { return await fallbackGenerate(prompt) }
         // Thermal circuit breaker: skip Qwen entirely when thermal is critical
-        if ThermalSleepManager.shared.shouldSkipQwenInference() {
+        if await ThermalSleepManager.shared.shouldSkipQwenInference() {
             return await fallbackGenerate(prompt)
         }
 
@@ -183,7 +183,7 @@ actor NeuralEngineOrchestrator {
         AsyncStream { continuation in
             Task {
                 // Thermal circuit breaker at orchestrator level
-                if ThermalSleepManager.shared.shouldSkipQwenInference() {
+                if await ThermalSleepManager.shared.shouldSkipQwenInference() {
                     let fallback = await self.fallbackGenerate(prompt)
                     for word in fallback.split(separator: " ") {
                         continuation.yield(String(word) + " ")
@@ -194,7 +194,7 @@ actor NeuralEngineOrchestrator {
 
                 await self.ensureLoaded()
                 self.lastUse = Date()
-                guard let handler = await self.qwenHandler else {
+                guard let handler = self.qwenHandler else {
                     let fallback = await self.fallbackGenerate(prompt)
                     for word in fallback.split(separator: " ") {
                         continuation.yield(String(word) + " ")
@@ -250,7 +250,7 @@ actor NeuralEngineOrchestrator {
     // MARK: - PLL
 
     func bertPLL(sentence: String) async -> Double {
-        if ThermalSleepManager.shared.shouldSkipQwenInference() { return 0.5 }
+        if await ThermalSleepManager.shared.shouldSkipQwenInference() { return 0.5 }
         await ensureLoaded()
         lastUse = Date()
         guard let handler = qwenHandler else { return 0.5 }

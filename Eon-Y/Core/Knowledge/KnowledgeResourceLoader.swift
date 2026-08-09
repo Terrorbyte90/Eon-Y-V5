@@ -3,7 +3,7 @@ import Foundation
 struct KnowledgeResourceLoader: Sendable {
     enum LoaderError: Error { case invalidUTF8, invalidRecord }
 
-    func stream(from url: URL, batchSize: Int = 64) -> AsyncThrowingStream<[KnowledgeRecord], Error> {
+    nonisolated func stream(from url: URL, batchSize: Int = 64) -> AsyncThrowingStream<[KnowledgeRecord], Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {

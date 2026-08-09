@@ -10,7 +10,7 @@ struct KnowledgeRecord: Codable, Equatable, Identifiable, Sendable {
 
     enum CodingKeys: String, CodingKey { case id, language, domain, title, text, content, source }
 
-    init(id: String, language: String, domain: String, title: String, text: String, source: String?) {
+    nonisolated init(id: String, language: String, domain: String, title: String, text: String, source: String?) {
         self.id = id
         self.language = language
         self.domain = domain
@@ -19,7 +19,7 @@ struct KnowledgeRecord: Codable, Equatable, Identifiable, Sendable {
         self.source = source
     }
 
-    init(from decoder: Decoder) throws {
+    nonisolated init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(String.self, forKey: .id)
         language = try values.decode(String.self, forKey: .language)
@@ -33,7 +33,7 @@ struct KnowledgeRecord: Codable, Equatable, Identifiable, Sendable {
         source = try values.decodeIfPresent(String.self, forKey: .source)
     }
 
-    func encode(to encoder: Encoder) throws {
+    nonisolated func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
         try values.encode(id, forKey: .id)
         try values.encode(language, forKey: .language)
