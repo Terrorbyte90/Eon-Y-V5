@@ -19,6 +19,15 @@ actor KnowledgeStore {
         loaded = true
     }
 
+    /// Adds verified, data-only records received from the background channel.
+    /// Callers must perform signature and schema validation before this method.
+    func ingest(_ incoming: [KnowledgeRecord]) {
+        var known = Set(records.map(\.id))
+        for record in incoming where known.insert(record.id).inserted {
+            records.append(record)
+        }
+    }
+
     func search(query: String, language: String? = nil, limit: Int = 20) -> [KnowledgeRecord] {
         let needle = query.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
         return records.lazy.filter { record in
