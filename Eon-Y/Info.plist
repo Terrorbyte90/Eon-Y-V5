@@ -90,8 +90,21 @@
 				<key>NSIncludesSubdomains</key>
 				<true/>
 			</dict>
+			<key>100.111.80.92</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<false/>
+			</dict>
 		</dict>
 	</dict>
+	<key>EON_BACKGROUND_INGEST_URL</key>
+	<string>http://100.111.80.92:8791/v1/eon/telemetry</string>
+	<key>EON_BACKGROUND_DATA_URL</key>
+	<string>http://100.111.80.92:8791/v1/eon/data</string>
+	<key>EON_BACKGROUND_KEY_ID</key>
+	<string>hermes-primary-2026</string>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>Eon använder inte spårning. All data stannar på din enhet.</string>
 	<key>NSMicrophoneUsageDescription</key>
