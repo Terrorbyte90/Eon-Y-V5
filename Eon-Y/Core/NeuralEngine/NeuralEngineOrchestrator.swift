@@ -52,7 +52,9 @@ actor NeuralEngineOrchestrator {
     // MARK: - Loading
 
     func loadModels() async {
-        guard modelMode != .disabled else { return }
+        // Startup must remain lightweight on iPhone. The default `.onDemand`
+        // mode loads only when an actual inference request needs the model.
+        guard modelMode == .automatic else { return }
         guard !isLoaded else { return }
         print("[QWEN] Loading Qwen3-1.7B...")
 
