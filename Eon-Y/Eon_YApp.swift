@@ -201,6 +201,12 @@ struct Eon_YApp: App {
             await LearningEngine.shared.syncCompetenciesFromDatabase()
         }
 
+        // Import only previously verified data packets. This path cannot
+        // execute instructions or alter Hermes/agent behavior.
+        Task.detached(priority: .utility) {
+            await BackgroundDataImporter.shared.importVerifiedKnowledge()
+        }
+
         // 7. Uppdatera knowledgeNodeCount från faktisk DB
         let nodeCount = await PersistentMemoryStore.shared.knowledgeNodeCount()
         brain.knowledgeNodeCount = nodeCount
