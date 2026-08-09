@@ -5,6 +5,7 @@ import UIKit
 
 struct ResourceView: View {
     @StateObject private var monitor = ResourceMonitor()
+    @ObservedObject private var runtime = RuntimeThermalCoordinator.shared
 
     @EnvironmentObject var brain: EonBrain
 
@@ -29,6 +30,7 @@ struct ResourceView: View {
 
             cognitiveEngineSection
             thermalSection
+            runtimePolicySection
             cpuSection
             memorySection
             batterySection
@@ -42,6 +44,28 @@ struct ResourceView: View {
         .padding(.bottom, 110)
         .onAppear { monitor.startMonitoring() }
         .onDisappear { monitor.stopMonitoring() }
+    }
+
+    var runtimePolicySection: some View {
+        GlassCard(tint: Color(hex: "#F59E0B")) {
+            VStack(alignment: .leading, spacing: 9) {
+                resourceHeader("RUNTIME-LÄGE", icon: "gauge.with.dots.needle.67percent", color: Color(hex: "#F59E0B"))
+                HStack {
+                    Text(runtime.mode.displayName)
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                    Spacer()
+                    Text("\(Int(runtime.throttleFactor * 100))% kapacitet")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Color.white.opacity(0.55))
+                }
+                Text(runtime.reason)
+                    .font(.system(size: 11, design: .rounded))
+                    .foregroundStyle(Color.white.opacity(0.58))
+                Text("Självmodell och medvetandemätning prioriteras; inlärning och modellinferens bromsas först.")
+                    .font(.system(size: 10, design: .rounded))
+                    .foregroundStyle(Color.white.opacity(0.4))
+            }
+        }
     }
 
     // MARK: - Cognitive Engine Status

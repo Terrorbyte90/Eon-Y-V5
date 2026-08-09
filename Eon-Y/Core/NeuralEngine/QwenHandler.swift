@@ -138,6 +138,8 @@ actor QwenHandler {
     // MARK: - Embedding (replaces BERT)
 
     func embed(_ text: String) async -> [Float] {
+        let canInfer = await MainActor.run { RuntimeThermalCoordinator.shared.allows(.qwen) }
+        guard canInfer else { return fallbackEmbed(text) }
         let thermalState = ProcessInfo.processInfo.thermalState
         if thermalState == .critical {
             return fallbackEmbed(text)
@@ -194,6 +196,12 @@ actor QwenHandler {
         enableThinking: Bool = false,
         onToken: @escaping (String) async -> Void
     ) async {
+        let canInfer = await MainActor.run { RuntimeThermalCoordinator.shared.allows(.qwen) }
+        guard canInfer else {
+            let fallback = NLResponseEngine.generate(for: prompt)
+            for word in fallback.split(separator: " ") { await onToken(String(word) + " ") }
+            return
+        }
         let thermalState = ProcessInfo.processInfo.thermalState
         if thermalState == .critical {
             print("[QWEN] Thermal critical — skipping inference, using NL fallback")
