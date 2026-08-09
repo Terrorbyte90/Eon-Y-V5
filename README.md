@@ -1,3 +1,17 @@
+## V5 architecture notes
+
+The consciousness subsystem publishes an immutable `UnifiedConsciousState`
+through `ConsciousnessOrchestrator`. Its values are theory proxies for
+integration, workspace availability, recurrence, self-model coupling, temporal
+continuity and metacognitive calibration; none is evidence of phenomenal
+experience.
+
+Large knowledge additions belong in `Eon-Y/Resources/Knowledge/*.jsonl`, one
+UTF-8 JSON record per line. They are streamed in batches by `KnowledgeStore` so
+Xcode does not compile article text as Swift string literals and app startup does
+not parse the full corpus. Use `Scripts/export_knowledge.py` to validate and
+export normalized records.
+
 eon Y är en egen app men den kommer ha delar av detta nedan
 
 EON VERSION X — MASTER IMPLEMENTATION

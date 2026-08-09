@@ -106,6 +106,11 @@ final class ConsciousnessEngine: ObservableObject {
     // MARK: - Hardware sensing (CPU/GPU/ANE awareness)
     @Published var hardwareSense: HardwareSenseState = HardwareSenseState()
 
+    // Unified, theory-neutral snapshot. Individual legacy metrics remain published
+    // for UI compatibility; this is the single hand-off point between subsystems.
+    @Published private(set) var unifiedConsciousState = UnifiedConsciousState()
+    private let consciousnessOrchestrator = ConsciousnessOrchestrator()
+
     private init() {
         initializeGoals()
     }
@@ -569,6 +574,24 @@ final class ConsciousnessEngine: ObservableObject {
             competingThoughts = gws.activeThoughts.count
             workspaceIgnitions = gws.ignitionCount
             broadcastCount = gws.broadcastHistory.count
+
+            // Publish one deterministic cross-theory snapshot after all source
+            // engines have advanced for this tick. These are proxies, not claims
+            // of phenomenal consciousness.
+            let cycleInput = ConsciousnessCycleInput(
+                signals: [
+                    "thermal": bodyBudget.thermalLevel,
+                    "arousal": bodyBudget.arousal,
+                    "predictionError": newError,
+                    "activity": activity
+                ],
+                thermalLoad: bodyBudget.thermalLevel,
+                candidateBroadcasts: [focusTarget]
+            )
+            unifiedConsciousState = consciousnessOrchestrator.advance(
+                state: unifiedConsciousState,
+                input: cycleInput
+            ).state
 
             // Butlin-14 score
             butlin14Score = calculateButlin14()
