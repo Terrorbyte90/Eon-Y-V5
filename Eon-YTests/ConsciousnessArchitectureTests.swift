@@ -32,4 +32,22 @@ struct ConsciousnessArchitectureTests {
         let second = orchestrator.advance(state: UnifiedConsciousState(), input: input).state
         #expect(first == second)
     }
+
+    @Test func selfModelGainsContinuityAndInteroceptiveCoupling() {
+        let result = ConsciousnessOrchestrator().advance(
+            state: UnifiedConsciousState(),
+            input: ConsciousnessCycleInput(signals: ["thermal": 0.2], thermalLoad: 0.2, candidateBroadcasts: ["body"])
+        ).state
+        #expect(result.selfModel.autobiographicalContinuity > 0)
+        #expect(result.selfModel.interoceptiveCoupling > 0)
+        #expect(result.selfModel.currentPerspective == "sensoriskt nu")
+    }
+
+    @MainActor
+    @Test func runtimeCoordinatorPreservesSelfModelInRecovery() {
+        let coordinator = RuntimeThermalCoordinator.shared
+        coordinator.setManualPause(false)
+        #expect(coordinator.allows(.selfModel))
+        #expect(coordinator.allows(.telemetry))
+    }
 }

@@ -42,9 +42,14 @@ struct ConsciousnessOrchestrator {
         case .recurrence:
             delta.continuityDelta = 0.03
         case .selfModel:
-            delta.selfModel = SelfModelSnapshot(agency: state.selfModel.agency + 0.01,
+            let bodilyCoupling = 1 - abs(input.thermalLoad - state.selfModel.bodyBudget)
+            delta.selfModel = SelfModelSnapshot(currentPerspective: input.signals.isEmpty ? state.selfModel.currentPerspective : "sensoriskt nu",
+                                                agency: state.selfModel.agency + 0.01,
                                                 uncertainty: state.selfModel.uncertainty * 0.99,
-                                                bodyBudget: 1 - input.thermalLoad)
+                                                bodyBudget: 1 - input.thermalLoad,
+                                                autobiographicalContinuity: min(1, state.selfModel.autobiographicalContinuity + 0.01),
+                                                interoceptiveCoupling: min(1, max(0, bodilyCoupling)),
+                                                counterfactualDepth: min(1, state.selfModel.counterfactualDepth + (state.predictionError > 0.2 ? 0.01 : 0)))
         case .memory:
             delta.memoryContext = state.memoryContext
         case .action:
@@ -57,7 +62,7 @@ struct ConsciousnessOrchestrator {
                 integrationProxy: min(1, state.continuity * 0.6 + broadcast * 0.4),
                 globalAvailability: broadcast,
                 recurrentDepth: min(1, state.continuity),
-                selfModelCoupling: state.selfModel.agency * (1 - state.selfModel.uncertainty),
+                selfModelCoupling: state.selfModel.agency * (1 - state.selfModel.uncertainty) * state.selfModel.interoceptiveCoupling,
                 temporalContinuity: state.continuity,
                 metacognitiveCalibration: state.metacognitiveState.confidence)
         }
