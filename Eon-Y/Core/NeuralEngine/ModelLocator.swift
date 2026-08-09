@@ -11,7 +11,7 @@ struct ModelLocator {
         let candidates = [
             appSupport.appendingPathComponent("Eon/Models/\(fileName).gguf"),
             appSupport.appendingPathComponent("Eon-Y/Models/\(fileName).gguf"),
-            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Models/\(fileName).gguf")
+            URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Models/\(fileName).gguf")
         ]
         return candidates.first { FileManager.default.fileExists(atPath: $0.path) }
     }

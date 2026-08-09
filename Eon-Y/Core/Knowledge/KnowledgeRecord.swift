@@ -32,6 +32,16 @@ struct KnowledgeRecord: Codable, Equatable, Identifiable, Sendable {
         }
         source = try values.decodeIfPresent(String.self, forKey: .source)
     }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(id, forKey: .id)
+        try values.encode(language, forKey: .language)
+        try values.encode(domain, forKey: .domain)
+        try values.encode(title, forKey: .title)
+        try values.encode(text, forKey: .text)
+        try values.encodeIfPresent(source, forKey: .source)
+    }
 }
 
 struct KnowledgeManifest: Codable, Sendable {
