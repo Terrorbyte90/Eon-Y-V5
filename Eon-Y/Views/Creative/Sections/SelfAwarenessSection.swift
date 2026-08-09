@@ -44,14 +44,14 @@ struct SelfAwarenessSection: View {
                         Text("\(Int(engine.awarenessScore * 100))%")
                             .font(.system(size: 24, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
-                        Text("medveten")
+                        Text("proxyindex")
                             .font(.system(size: 10, design: .rounded))
                             .foregroundStyle(Color.white.opacity(0.4))
                     }
                 }
                 .padding(.vertical, 8)
 
-                Text("Klarar Eon alla 30 test med högt resultat kan vi med stor säkerhet säga att den är självmedveten.")
+                Text("Testen mäter självmodell, rapportering och metakognition. De kan inte ensamma bevisa subjektiv upplevelse eller qualia.")
                     .font(.system(size: 11, design: .rounded))
                     .foregroundStyle(Color.white.opacity(0.45))
                     .multilineTextAlignment(.center)

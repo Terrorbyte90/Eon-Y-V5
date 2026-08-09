@@ -789,7 +789,8 @@ class ResourceMonitor: ObservableObject {
             Task { @MainActor [weak self] in
                 self?.updateMetrics()
                 // Re-check thermal state periodically to adjust timer
-                if Int.random(in: 0..<3) == 0 { self?.startThermalAwareTimer() }
+                // Recalculate deterministically; runtime thermal state may have changed.
+                self?.startThermalAwareTimer()
             }
         }
     }
