@@ -102,6 +102,11 @@ final class ConsciousnessEngine: ObservableObject {
     // MARK: - Consciousness Tests (30 tests, 15-min intervals)
     @Published var consciousnessTests: [ConsciousnessTest] = ConsciousnessTest.allTests
     @Published var lastTestRunTime: Date? = nil
+    @Published private(set) var verifiedConsciousness = ConsciousnessVerificationResult(
+        level: .level0, confidence: 0, passedTests: 0, totalTests: ConsciousnessTest.allTests.count,
+        ceiling: .level4, reasons: ["Tester har ännu inte körts"], evaluatedAt: .distantPast
+    )
+    private var stableVerificationWindows = 0
 
     // MARK: - Hardware sensing (CPU/GPU/ANE awareness)
     @Published var hardwareSense: HardwareSenseState = HardwareSenseState()
@@ -180,6 +185,13 @@ final class ConsciousnessEngine: ObservableObject {
         }
         lastTestRunTime = Date()
         let passed = consciousnessTests.filter { $0.passed }.count
+        stableVerificationWindows = passed > 0 ? stableVerificationWindows + 1 : 0
+        verifiedConsciousness = ConsciousnessVerificationEvaluator.evaluate(
+            state: unifiedConsciousState,
+            passedTests: passed,
+            totalTests: consciousnessTests.count,
+            stableWindows: stableVerificationWindows
+        )
         print("[ConsciousnessTests] \(passed)/\(consciousnessTests.count) godkända")
     }
 

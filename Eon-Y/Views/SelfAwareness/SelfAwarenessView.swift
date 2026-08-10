@@ -125,6 +125,7 @@ struct SelfAwarenessView: View {
             }
 
             // Live metrics strip
+            verifiedLevelCard
             HStack(spacing: 8) {
                 HStack(spacing: 3) {
                     Circle()
@@ -163,6 +164,29 @@ struct SelfAwarenessView: View {
         if level > 0.6 { return "Hög proxyaktivitet — analyserar interna tillstånd" }
         if level > 0.3 { return "Proxyaktivitet — bearbetar interna signaler" }
         return "Basala kognitiva processer aktiva"
+    }
+
+    private var verifiedLevelCard: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text("NIVÅ \(consciousness.verifiedConsciousness.level.rawValue)")
+                .font(.system(size: 18, weight: .black, design: .monospaced))
+                .foregroundStyle(accentColor)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(consciousness.verifiedConsciousness.level.title)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.82))
+                Text("Verifierad funktionell nivå · \(consciousness.verifiedConsciousness.passedTests)/\(consciousness.verifiedConsciousness.totalTests) tester · tak \(consciousness.verifiedConsciousness.ceiling.rawValue)")
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.42))
+                Text(consciousness.verifiedConsciousness.level.biologicalAnalogy)
+                    .font(.system(size: 9, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.42))
+            }
+            Spacer()
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 14).fill(accentColor.opacity(0.07)))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(accentColor.opacity(0.20), lineWidth: 0.7))
     }
 
     // MARK: - Tab Bar
