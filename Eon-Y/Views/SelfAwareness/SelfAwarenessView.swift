@@ -131,7 +131,7 @@ struct SelfAwarenessView: View {
                         .fill(consciousness.consciousnessLevel > 0.3 ? Color(hex: "#34D399") : accentColor)
                         .frame(width: 4, height: 4)
                         .shadow(color: consciousness.consciousnessLevel > 0.3 ? Color(hex: "#34D399").opacity(0.8) : .clear, radius: 2)
-                    Text(consciousness.consciousnessLevel > 0.3 ? "Medveten" : "Grundläge")
+                    Text(consciousness.consciousnessLevel > 0.3 ? "Proxy aktiv" : "Basläge")
                         .font(.system(size: 9, weight: .semibold, design: .rounded))
                         .foregroundStyle(consciousness.consciousnessLevel > 0.3 ? Color(hex: "#34D399").opacity(0.8) : accentColor.opacity(0.6))
                 }
@@ -160,9 +160,9 @@ struct SelfAwarenessView: View {
 
     private var consciousnessStatusLabel: String {
         let level = consciousness.consciousnessLevel
-        if level > 0.6 { return "Djup självreflektion — analyserar inre tillstånd" }
-        if level > 0.3 { return "Aktiv medvetenhet — bearbetar intryck" }
-        return "Grundläggande medvetandeprocesser aktiva"
+        if level > 0.6 { return "Hög proxyaktivitet — analyserar interna tillstånd" }
+        if level > 0.3 { return "Proxyaktivitet — bearbetar interna signaler" }
+        return "Basala kognitiva processer aktiva"
     }
 
     // MARK: - Tab Bar
@@ -656,7 +656,7 @@ struct SelfAwarenessView: View {
                 Divider().background(Color(hex: "#818CF8").opacity(0.15))
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Medvetandemål")
+                    Text("Kognitiva mål — inte medvetandebevis")
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white.opacity(0.5))
 
@@ -1017,7 +1017,7 @@ struct SelfAwarenessView: View {
                             }
                         }
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Integrerad information mäter hur mycket systemets helhet överskrider summan av dess delar.")
+                            Text("Φ här är en systemproxy för integrerad information. Den mäter inte subjektiv upplevelse eller qualia.")
                                 .font(.system(size: 11, design: .rounded))
                                 .foregroundStyle(.white.opacity(0.5))
                                 .fixedSize(horizontal: false, vertical: true)
@@ -1025,7 +1025,7 @@ struct SelfAwarenessView: View {
                                 Text("Tröskel: 0.31")
                                     .font(.system(size: 9, design: .monospaced))
                                     .foregroundStyle(.white.opacity(0.3))
-                                Text(consciousness.phiProxy > 0.31 ? "PASSERAD" : "Ej uppnådd")
+                                Text(consciousness.phiProxy > 0.31 ? "PROXY-TRÖSKEL" : "Under proxytröskel")
                                     .font(.system(size: 9, weight: .bold, design: .monospaced))
                                     .foregroundStyle(consciousness.phiProxy > 0.31 ? Color(hex: "#34D399") : Color(hex: "#EF4444"))
                             }
