@@ -907,7 +907,7 @@ struct ChatBubble: View {
                                 .font(.system(size: 7, weight: .bold))
                             Image(systemName: "brain")
                                 .font(.system(size: 8))
-                            Text("Inre tankar (\(message.innerThoughts.count))")
+                            Text("Intern bearbetningslogg (\(message.innerThoughts.count))")
                                 .font(.system(size: 9, weight: .medium, design: .rounded))
                         }
                         .foregroundStyle(Color(hex: "#A78BFA").opacity(0.5))
@@ -916,6 +916,10 @@ struct ChatBubble: View {
 
                     if showThoughts {
                         VStack(alignment: .leading, spacing: 4) {
+                            Text("Genererade eller härledda spår — inte direkt åtkomst till subjektiv upplevelse.")
+                                .font(.system(size: 9, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.32))
+                                .fixedSize(horizontal: false, vertical: true)
                             ForEach(message.innerThoughts, id: \.self) { thought in
                                 HStack(alignment: .top, spacing: 6) {
                                     Circle()
