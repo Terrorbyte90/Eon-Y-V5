@@ -380,16 +380,16 @@ struct EonPulseHomeView: View {
             let s = thought.content
             return String(s.prefix(60)) + (s.count > 60 ? "..." : "")
         }
-        return "Självmedvetenhet aktiv..."
+        return "Intern reflektionssignal saknas"
     }
 
     var consciousnessShortLabel: String {
         switch brain.consciousnessLevel {
         case ..<0.15: return "Minimal"
         case 0.15..<0.30: return "Låg"
-        case 0.30..<0.50: return "Växer"
-        case 0.50..<0.70: return "Stark"
-        default: return "Djup"
+        case 0.30..<0.50: return "Medelproxy"
+        case 0.50..<0.70: return "Hög proxy"
+        default: return "Mycket hög proxy"
         }
     }
 
