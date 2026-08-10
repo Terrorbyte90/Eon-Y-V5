@@ -31,9 +31,14 @@ actor BackgroundTelemetryBridge {
 
     private init(configuration: Configuration = .bundled) {
         self.configuration = configuration
-        let urlConfiguration = URLSessionConfiguration.background(withIdentifier: "com.eon.background-telemetry")
-        urlConfiguration.isDiscretionary = true
-        urlConfiguration.sessionSendsLaunchEvents = true
+        // Background URLSession configurations only support uploadTask/downloadTask
+        // with file-backed transfers. Calling dataTask on one throws an Objective-C
+        // exception in CFNetwork (and aborts the app), as seen in the crash report.
+        // These small signed JSON messages are scheduled from the live engine, so use
+        // a normal session and let the actor serialize/retry delivery safely.
+        let urlConfiguration = URLSessionConfiguration.default
+        urlConfiguration.waitsForConnectivity = false
+        urlConfiguration.httpShouldUsePipelining = true
         urlConfiguration.timeoutIntervalForResource = 60
         self.session = URLSession(configuration: urlConfiguration)
     }
@@ -102,7 +107,7 @@ actor BackgroundTelemetryBridge {
     }
 }
 
-private enum KeychainTokenStore {
+enum KeychainTokenStore {
     static func value() -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,

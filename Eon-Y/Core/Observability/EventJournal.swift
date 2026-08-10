@@ -19,6 +19,7 @@ struct JournalSegmentInfo: Codable, Sendable, Identifiable {
 }
 
 actor EventJournal {
+    static let shared = EventJournal()
     private let rootDirectory: URL
     private let maxSegmentBytes: Int
     private var sessionID = "unset"
@@ -35,6 +36,7 @@ actor EventJournal {
     }
 
     func startSession(sessionID: String = UUID().uuidString) {
+        if self.sessionID == sessionID, sessionDirectory != nil { return }
         self.sessionID = sessionID
         let day = ISO8601DateFormatter().string(from: Date()).prefix(10)
         let directory = rootDirectory
@@ -89,6 +91,24 @@ actor EventJournal {
         }
     }
 
+    func exportBatch(maxBytes: Int = 24 * 1024) -> [EonObservableEvent] {
+        guard let directory = sessionDirectory,
+              let files = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return [] }
+        var result: [EonObservableEvent] = []
+        var bytes = 0
+        for file in files.filter({ $0.pathExtension == "jsonl" }).sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+            guard let text = try? String(contentsOf: file, encoding: .utf8) else { continue }
+            for line in text.split(separator: "\n") {
+                let lineBytes = line.utf8.count + 1
+                if bytes + lineBytes > maxBytes { return result }
+                guard let data = line.data(using: .utf8), let event = try? JSONDecoder.eon.decode(EonObservableEvent.self, from: data) else { continue }
+                result.append(event)
+                bytes += lineBytes
+            }
+        }
+        return result
+    }
+
     private func rotateSegment() {
         guard let directory = sessionDirectory else { return }
         let index = (manifestValue?.segmentCount ?? 0) + 1
@@ -111,5 +131,13 @@ private extension JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         return encoder
+    }()
+}
+
+private extension JSONDecoder {
+    static let eon: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
     }()
 }
