@@ -76,17 +76,17 @@ struct QwenLabView: View {
             Text("AUDITERADE UPPGIFTER")
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.5))
-            taskButton("Förbättra svenska", icon: "textformat.abc", prompt: "Analysera Eons senaste språkprestanda och föreslå tre testbara svenska språkförbättringar med evidens.")
-            taskButton("Granska mätvärden", icon: "waveform.path.ecg", prompt: "Granska de senaste kognitiva proxy-mätningarna. Separera observationer, härledningar och hypoteser.")
-            taskButton("Föreslå optimering", icon: "slider.horizontal.3", prompt: "Föreslå en termiskt säker optimering av Eons nästa kognitiva cykel. Ändra ingenting direkt.")
+            taskButton("Förbättra svenska", kind: .languageExpansion, icon: "textformat.abc", prompt: "Analysera Eons senaste språkprestanda och föreslå tre testbara svenska språkförbättringar med evidens.")
+            taskButton("Granska mätvärden", kind: .measurementReview, icon: "waveform.path.ecg", prompt: "Granska de senaste kognitiva proxy-mätningarna. Separera observationer, härledningar och hypoteser.")
+            taskButton("Föreslå optimering", kind: .optimizationProposal, icon: "slider.horizontal.3", prompt: "Föreslå en termiskt säker optimering av Eons nästa kognitiva cykel. Ändra ingenting direkt.")
         }
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 18).fill(Color.white.opacity(0.07)))
     }
 
-    private func taskButton(_ title: String, icon: String, prompt: String) -> some View {
+    private func taskButton(_ title: String, kind: QwenTaskKind, icon: String, prompt: String) -> some View {
         Button {
-            run(prompt)
+            run(prompt, kind: kind)
         } label: {
             Label(title, systemImage: icon)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -120,10 +120,11 @@ struct QwenLabView: View {
         isLoaded = await NeuralEngineOrchestrator.shared.isLoaded
     }
 
-    private func run(_ prompt: String) {
+    private func run(_ prompt: String, kind: QwenTaskKind) {
         isRunning = true
         output = "Qwen analyserar…"
         Task {
+            await QwenAutonomyQueue.shared.enqueue(.make(kind: kind, reason: "Manuell auditerad uppgift"))
             let result = await NeuralEngineOrchestrator.shared.generate(prompt: prompt, maxTokens: 180, temperature: 0.4, enableThinking: false)
             await MainActor.run {
                 output = result
