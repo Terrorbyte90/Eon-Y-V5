@@ -850,6 +850,10 @@ struct MonologueLine: Identifiable, Equatable {
     let text: String
     let timestamp: Date = Date()
     var type: MonologueType = .thought
+    /// Provenance is displayed separately from the prose so generated text is
+    /// not mistaken for a direct observation.
+    var source: String = "Autonomy"
+    var epistemicStatus: EpistemicStatus = .simulated
 
     enum MonologueType {
         case thought, loopTrigger, revision, memory, insight
