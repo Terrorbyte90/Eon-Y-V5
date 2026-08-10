@@ -599,6 +599,7 @@ final class ConsciousnessEngine: ObservableObject {
             let telemetrySnapshot = unifiedConsciousState
             Task.detached(priority: .utility) {
                 await EventJournal.shared.startSession(sessionID: "eon-live")
+                let canonicalSnapshot = CognitiveSnapshotBuilder.make(from: telemetrySnapshot, sessionID: "eon-live")
                 await EventJournal.shared.append(EonObservableEvent(
                     sessionID: "eon-live",
                     cycleID: telemetrySnapshot.cycleIndex,
@@ -612,6 +613,7 @@ final class ConsciousnessEngine: ObservableObject {
                         "broadcastCount": String(telemetrySnapshot.globalBroadcast.count)
                     ]
                 ))
+                await EventJournal.shared.append(snapshot: canonicalSnapshot)
                 await BackgroundTelemetryBridge.shared.enqueue(snapshot: telemetrySnapshot)
                 await HermesExportCoordinator.shared.startIfConfigured()
                 await HermesExportCoordinator.shared.flush()
