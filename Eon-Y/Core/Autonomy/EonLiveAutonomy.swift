@@ -1102,7 +1102,8 @@ final class EonLiveAutonomy: ObservableObject {
         )
 
         let monologueType: MonologueLine.MonologueType = [.thought, .insight, .memory, .loopTrigger].randomElement() ?? .thought
-        let line = MonologueLine(text: thoughtText, type: monologueType)
+        let line = MonologueLine(text: thoughtText, type: monologueType,
+                                 source: "DeepThoughtEngine", epistemicStatus: .simulated)
         brain.innerMonologue.append(line)
         if brain.innerMonologue.count > 400 {
             brain.innerMonologue.removeFirst(100)
