@@ -306,7 +306,7 @@ struct EonPulseHomeView: View {
                     frontColor: Color(hex: "#38BDF8"),
                     backContent: AnyView(
                         VStack(spacing: 2) {
-                            Text("MEDVETANDE")
+                        Text("KOGNITIV PROXY")
                                 .font(.system(size: 5, weight: .bold, design: .monospaced))
                                 .foregroundStyle(Color(hex: "#38BDF8").opacity(0.6))
                             Text(consciousnessShortLabel)
