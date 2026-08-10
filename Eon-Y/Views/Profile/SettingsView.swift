@@ -139,7 +139,7 @@ struct SettingsView: View {
             }
 
             // Autonom evolution
-            settingsGroup(title: "AUTONOM EVOLUTION", icon: "arrow.triangle.2.circlepath", color: Color(hex: "#F59E0B")) {
+            settingsGroup(title: "EXPERIMENT OCH UTVÄRDERING", icon: "arrow.triangle.2.circlepath", color: Color(hex: "#F59E0B")) {
                 settingToggle("LoRA-träning", icon: "cpu.fill", binding: $loraTraining, color: Color(hex: "#F59E0B"))
                 Divider().background(Color.white.opacity(0.06))
                 settingToggle("AERO-cykler", icon: "arrow.triangle.2.circlepath.circle", binding: $aeroEnabled, color: Color(hex: "#F59E0B"))
@@ -204,7 +204,7 @@ struct SettingsView: View {
                 if verboseLogging {
                     Divider().background(Color.white.opacity(0.06))
                     settingRow {
-                        Text("Utökad loggning visar alla interna tankar, motorändringar och kognitiva beslut i realtid.")
+                        Text("Utökad loggning visar bearbetningshändelser, motorstatus och kognitiva beslut. Textspår är genererade eller härledda data, inte direkt åtkomst till upplevelse.")
                             .font(.system(size: 11, design: .rounded))
                             .foregroundStyle(.white.opacity(0.4))
                             .fixedSize(horizontal: false, vertical: true)
@@ -240,7 +240,7 @@ struct SettingsView: View {
                         }
                         HStack(spacing: 16) {
                             HStack(spacing: 4) {
-                                Text("Embed:")
+                                Text("Qwen:")
                                     .font(.system(size: 10, design: .monospaced))
                                     .foregroundStyle(.white.opacity(0.35))
                                 Text(brain.bertLoaded ? "Laddad" : "Av")
@@ -248,7 +248,7 @@ struct SettingsView: View {
                                     .foregroundStyle(brain.bertLoaded ? Color(hex: "#34D399") : .white.opacity(0.3))
                             }
                             HStack(spacing: 4) {
-                                Text("LLM:")
+                                Text("Läge:")
                                     .font(.system(size: 10, design: .monospaced))
                                     .foregroundStyle(.white.opacity(0.35))
                                 Text(brain.gptLoaded ? "Laddad" : "Av")
