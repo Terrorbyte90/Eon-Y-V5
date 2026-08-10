@@ -125,7 +125,15 @@ struct QwenLabView: View {
         output = "Qwen analyserar…"
         Task {
             await QwenAutonomyQueue.shared.enqueue(.make(kind: kind, reason: "Manuell auditerad uppgift"))
+            let task = await QwenAutonomyQueue.shared.next()
             let result = await NeuralEngineOrchestrator.shared.generate(prompt: prompt, maxTokens: 180, temperature: 0.4, enableThinking: false)
+            if let task {
+                await QwenAutonomyQueue.shared.recordProposal(QwenProposal(
+                    id: UUID(), taskID: task.id, createdAt: Date(), summary: result,
+                    evidence: ["Qwen3 lokal analys", "Manuellt initierad auditerad uppgift"],
+                    requiresHumanApproval: true, canMutateProduction: false, canContactHermes: false
+                ))
+            }
             await MainActor.run {
                 output = result
                 isRunning = false
