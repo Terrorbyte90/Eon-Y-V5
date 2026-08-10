@@ -442,7 +442,7 @@ struct AboutEonView: View {
                         // Version
                         HStack {
                             Spacer()
-                            Text("Eon v6 — Alltid medveten, intelligent vilotagning")
+                            Text("Eon v6 — Kontinuerlig kognition, intelligent vilotagning")
                                 .font(.system(size: 10, design: .rounded))
                                 .foregroundStyle(.white.opacity(0.2))
                             Spacer()
