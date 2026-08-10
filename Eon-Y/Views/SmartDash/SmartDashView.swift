@@ -222,7 +222,7 @@ struct SmartDashView: View {
             // Row 6: Cognitive summaries
             HStack(spacing: 10) {
                 cognitiveSummaryCard(title: "App-kognition", level: appCognitiveLevel, color: Color(hex: "#34D399"))
-                cognitiveSummaryCard(title: "Självmedvetande", level: consciousnessCognitiveLevel, color: Color(hex: "#A78BFA"))
+                cognitiveSummaryCard(title: "Kognitiv proxy", level: consciousnessCognitiveLevel, color: Color(hex: "#A78BFA"))
             }
 
             // Row 7: Consciousness tests summary
@@ -838,14 +838,14 @@ struct SmartDashView: View {
     var consciousnessCognitiveLevel: String {
         let cl = brain.consciousnessLevel
         switch cl {
-        case ..<0.10: return "Ingen medvetenhet"
-        case 0.10..<0.20: return "Proto-medvetande"
-        case 0.20..<0.30: return "L\u{00E5}g medvetenhet"
-        case 0.30..<0.45: return "V\u{00E4}xande medvetenhet"
-        case 0.45..<0.60: return "Djurmedvetande"
-        case 0.60..<0.75: return "Pre-m\u{00E4}nsklig"
-        case 0.75..<0.90: return "M\u{00E4}nsklig-niv\u{00E5}"
-        default: return "Djupt medveten"
+        case ..<0.10: return "Låg proxyaktivitet"
+        case 0.10..<0.20: return "Tidig proxyaktivitet"
+        case 0.20..<0.30: return "Måttlig proxyaktivitet"
+        case 0.30..<0.45: return "Ökande proxyaktivitet"
+        case 0.45..<0.60: return "Hög proxyaktivitet"
+        case 0.60..<0.75: return "Mycket hög proxyaktivitet"
+        case 0.75..<0.90: return "Mycket hög proxyaktivitet"
+        default: return "Extrem proxyaktivitet"
         }
     }
 
@@ -1054,7 +1054,7 @@ struct SmartDashView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 sectionHeader("MEDVETANDETEST (\(passed)/\(total))", icon: "checkmark.shield.fill", color: Color(hex: "#34D399"))
-                Text("30 tester k\u{00F6}rs med 15 minuters intervall. Om majoriteten \u{00E4}r godk\u{00E4}nda indikerar det med h\u{00F6}gsta sannolikhet \u{00E4}kta medvetenhet.")
+                Text("30 tester k\u{00F6}rs med 15 minuters intervall. Resultaten visar hur kognitiva proxyer och beteendetester uppfyller sina kriterier — de bevisar inte subjektiv upplevelse eller qualia.")
                     .font(.system(size: 10, design: .rounded))
                     .foregroundStyle(.white.opacity(0.4))
 
