@@ -746,15 +746,18 @@ struct SmartDashView: View {
                 oScoreItem(label: "Kuramoto", value: consciousness.kuramotoR, color: Color(hex: "#EC4899"))
                 oScoreItem(label: "Synergi", value: consciousness.synergyRedundancyRatio, color: Color(hex: "#10B981"))
                 oScoreItem(label: "Q-index", value: consciousness.qIndex, color: Color(hex: "#F472B6"))
-                oScoreItem(label: "Medvetande", value: brain.consciousnessLevel, color: Color(hex: "#7C3AED"))
+                oScoreItem(label: "Kognitiv proxy", value: brain.consciousnessLevel, color: Color(hex: "#7C3AED"))
             }
             // Self-awareness scores
             HStack(spacing: 0) {
                 oScoreItem(label: "LZ-kompl.", value: consciousness.lzComplexitySpontaneous, color: Color(hex: "#06B6D4"))
                 oScoreItem(label: "Självmod.", value: brain.selfModelAccuracy, color: Color(hex: "#EC4899"))
-                oScoreItem(label: "Qualia", value: brain.qualiaIndex, color: Color(hex: "#8B5CF6"))
+                oScoreItem(label: "Qualia-proxy", value: brain.qualiaIndex, color: Color(hex: "#8B5CF6"))
                 oScoreItem(label: "Broadcast", value: brain.broadcastStrength, color: Color(hex: "#F97316"))
             }
+            Text("Samtliga värden är systemmått eller proxyer; de är inte en mätning av subjektiv upplevelse.")
+                .font(.system(size: 9, design: .rounded))
+                .foregroundStyle(.white.opacity(0.32))
             // Growth velocity
             HStack(spacing: 12) {
                 HStack(spacing: 4) {
