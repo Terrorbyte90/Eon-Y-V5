@@ -20,7 +20,6 @@ struct EonPulseHomeView: View {
     @State private var showCognitionLog = false
     @State private var showFullLog = false
     @State private var showSmartDash = false
-    @State private var showSuperView = false
 
     // Flip meter states
     @State private var autonomFlipped = false
@@ -227,7 +226,7 @@ struct EonPulseHomeView: View {
                     // Liten indikator längst ner på kärnan
                     VStack {
                         Spacer()
-                        Text(showingSelfAwareness ? "MEDVETANDE" : "FULL-LOG")
+                        Text(showingSelfAwareness ? "KOGNITIV PROXY" : "FULL-LOG")
                             .font(.system(size: 6, weight: .black, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.35))
                             .tracking(1)
@@ -271,7 +270,6 @@ struct EonPulseHomeView: View {
                         LinearGradient(colors: [Color(hex: "#38BDF8"), Color(hex: "#06B6D4")], startPoint: .top, endPoint: .bottom)
                     )
                     .shadow(color: dominant.opacity(0.4), radius: 16)
-                    .onTapGesture { showSuperView = true }
                 Text("N")
                     .font(.system(size: 54, weight: .black, design: .rounded))
                     .foregroundStyle(
@@ -281,9 +279,6 @@ struct EonPulseHomeView: View {
             }
             .shadow(color: dominant.opacity(0.5), radius: 24)
             .fullScreenCover(isPresented: $showSmartDash) {
-                RuntimeDashboardView().environmentObject(brain)
-            }
-            .fullScreenCover(isPresented: $showSuperView) {
                 RuntimeDashboardView().environmentObject(brain)
             }
 
