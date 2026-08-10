@@ -578,28 +578,35 @@ actor LearningEngine {
         let parsed = parseQwenWordResponse(response)
         guard let word = parsed.word, let definition = parsed.definition else { return }
 
-        recordSwedishWord(word)
+        // Qwen proposes a candidate. The learning engine validates it before
+        // any durable mutation; malformed or non-lexical output is discarded.
+        guard let candidate = SwedishLearningPolicy.candidate(
+            word: word, definition: definition, example: parsed.example,
+            domain: parsed.domain ?? weakestDomain, source: "qwen3_autonomous_learning"
+        ) else { return }
+
+        recordSwedishWord(candidate.word)
 
         await PersistentMemoryStore.shared.saveFact(
-            subject: word,
+            subject: candidate.word,
             predicate: "definition",
-            object: definition,
-            confidence: 0.75,
-            source: "qwen3_autonomous_learning"
+            object: candidate.definition,
+            confidence: candidate.confidence,
+            source: candidate.source
         )
 
-        if let example = parsed.example {
+        if let example = candidate.example {
             await PersistentMemoryStore.shared.saveFact(
-                subject: word,
+                subject: candidate.word,
                 predicate: "användningsexempel",
                 object: example,
-                confidence: 0.7,
-                source: "qwen3_autonomous_learning"
+                confidence: candidate.confidence - 0.05,
+                source: candidate.source
             )
         }
 
-        let domain = parsed.domain ?? weakestDomain
-        addFSRSItem(topic: "Qwen-ord: \(word)", domain: domain, initialDifficulty: 0.4)
+        let domain = candidate.domain
+        addFSRSItem(topic: "Qwen-ord: \(candidate.word)", domain: domain, initialDifficulty: 0.4)
 
         if var comp = competencyBook[domain] {
             comp.level = min(0.95, comp.level + 0.002)

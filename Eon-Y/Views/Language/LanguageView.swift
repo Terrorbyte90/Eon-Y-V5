@@ -200,6 +200,26 @@ struct LanguageView: View {
                 langStatBox(label: "Samtal", value: "\(brain.conversationCount)", color: Color(hex: "#EC4899"))
             }
 
+            GlassCard(tint: Color(hex: "#A78BFA")) {
+                VStack(alignment: .leading, spacing: 8) {
+                    PanelHeader(icon: "arrow.triangle.2.circlepath", title: "AUTONOM SVENSKA-INLÄRNING", color: Color(hex: "#A78BFA")) {
+                        Text(brain.gptLoaded ? "Qwen redo" : "Regelbaserat läge")
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(Color(hex: "#A78BFA").opacity(0.7))
+                    }
+                    Text("Eon väljer svaga områden, låter Qwen föreslå ord och exempel, validerar formatet och sparar först därefter. Termik och modelläge kan pausa djupanalys.")
+                        .font(.system(size: 11, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 12) {
+                        Label("Qwen-hjälp", systemImage: brain.gptLoaded ? "checkmark.circle.fill" : "pause.circle")
+                        Label("Termik: \(brain.thermalState)", systemImage: "thermometer.medium")
+                    }
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.42))
+                }
+            }
+
             // Vocabulary growth sparkline
             GlassCard(tint: Color(hex: "#38BDF8")) {
                 VStack(alignment: .leading, spacing: 8) {
