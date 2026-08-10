@@ -18,4 +18,14 @@ final class ConsciousnessVerificationTests: XCTestCase {
         XCTAssertEqual(result.level, .level2)
         XCTAssertNotEqual(result.level, .level5)
     }
+
+    func testQualiaLabelledTestIsNotCountedAsIndependentEvidence() {
+        let tests = [
+            ConsciousnessTest(id: "qualia_emergence", name: "Qualia", description: "self report", category: "validation"),
+            ConsciousnessTest(id: "canary_test", name: "Canary", description: "control", category: "validation")
+        ]
+        let evidence = ConsciousnessVerificationEvaluator.evidenceEligibleTestCount(from: tests)
+        XCTAssertEqual(evidence.total, 1)
+        XCTAssertEqual(evidence.passed, 0)
+    }
 }

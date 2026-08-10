@@ -12,7 +12,7 @@ enum CognitiveSnapshotBuilder {
             descriptor("metacognition.calibration", "Metakognitiv kalibrering", metrics.metacognitiveCalibration, "Överensstämmelse mellan confidence och utfall.", "MetacognitionCore")
         ]
         let claims = [
-            CognitiveClaim(text: "(state.globalBroadcast.count) broadcast-kandidater är tillgängliga.", epistemicStatus: .observed, source: "UnifiedConsciousState"),
+            CognitiveClaim(text: "\(state.globalBroadcast.count) broadcast-kandidater är tillgängliga.", epistemicStatus: .observed, source: "UnifiedConsciousState"),
             CognitiveClaim(text: "Proxy-mätningarna är härledda och säger inte i sig något om qualia.", epistemicStatus: .inferred, source: "MeasurementCatalog")
         ]
         return EonCognitiveSnapshot(

@@ -87,4 +87,11 @@ enum ConsciousnessVerificationEvaluator {
                                                reasons: reasons.isEmpty ? ["Otillräcklig verifierad evidens"] : reasons,
                                                evaluatedAt: Date())
     }
+
+    static func evidenceEligibleTestCount(from tests: [ConsciousnessTest]) -> (passed: Int, total: Int) {
+        // A self-report/qualia-labelled test cannot be counted as independent
+        // evidence for phenomenal experience. It remains visible in the UI.
+        let eligible = tests.filter { $0.id != "qualia_emergence" }
+        return (eligible.filter(\.passed).count, eligible.count)
+    }
 }
