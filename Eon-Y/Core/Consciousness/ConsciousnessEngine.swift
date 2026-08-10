@@ -184,12 +184,13 @@ final class ConsciousnessEngine: ObservableObject {
             consciousnessTests[i].lastRun = Date()
         }
         lastTestRunTime = Date()
-        let passed = consciousnessTests.filter { $0.passed }.count
+        let evidence = ConsciousnessVerificationEvaluator.evidenceEligibleTestCount(from: consciousnessTests)
+        let passed = evidence.passed
         stableVerificationWindows = passed > 0 ? stableVerificationWindows + 1 : 0
         verifiedConsciousness = ConsciousnessVerificationEvaluator.evaluate(
             state: unifiedConsciousState,
             passedTests: passed,
-            totalTests: consciousnessTests.count,
+            totalTests: evidence.total,
             stableWindows: stableVerificationWindows
         )
         print("[ConsciousnessTests] \(passed)/\(consciousnessTests.count) godkända")
