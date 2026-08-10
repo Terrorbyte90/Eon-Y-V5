@@ -51,4 +51,18 @@ final class ObservabilitySchemaTests: XCTestCase {
         XCTAssertFalse(encoded.localizedCaseInsensitiveContains("proven conscious"))
         XCTAssertEqual(snapshot.claims.first?.epistemicStatus, .observed)
     }
+
+    func testSnapshotBuilderPublishesAllProxyMeasurements() {
+        var state = UnifiedConsciousState()
+        state.cycleIndex = 7
+        state.metrics.integrationProxy = 0.4
+        state.metrics.globalAvailability = 0.8
+
+        let snapshot = CognitiveSnapshotBuilder.make(from: state, sessionID: "session-1")
+
+        XCTAssertEqual(snapshot.cycleID, 7)
+        XCTAssertEqual(snapshot.measurements.count, 6)
+        XCTAssertTrue(snapshot.measurements.allSatisfy { $0.epistemicStatus == .inferred })
+        XCTAssertTrue(snapshot.claims.contains { $0.text.contains("qualia") })
+    }
 }
