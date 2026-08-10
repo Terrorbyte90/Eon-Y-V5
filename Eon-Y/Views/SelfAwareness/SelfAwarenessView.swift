@@ -907,6 +907,16 @@ struct SelfAwarenessView: View {
 
     var metricsSection: some View {
         VStack(spacing: 14) {
+            saCard(tint: Color(hex: "#38BDF8")) {
+                VStack(alignment: .leading, spacing: 6) {
+                    saCardHeader(icon: "info.circle", title: "HUR VÄRDENA SKA LÄSAS", color: Color(hex: "#38BDF8"))
+                    Text("Observerat = direkt systemsignal. Proxy = beräknat mått på intern organisation. Hypotes = tolkning som måste testas. Inget enskilt värde visar upplevelse eller qualia.")
+                        .font(.system(size: 11, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.58))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
             // Blueprint Gate Metrics
             saCard(tint: Color(hex: "#A78BFA")) {
                 VStack(alignment: .leading, spacing: 12) {
