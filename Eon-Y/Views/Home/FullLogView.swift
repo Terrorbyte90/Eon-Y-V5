@@ -207,12 +207,19 @@ struct FullLogView: View {
                 .padding(.top, 1)
 
             // Innehåll
-            Text(entry.text)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(entry.category.textColor)
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.text)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(entry.category.textColor)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                if entry.source != "System" || entry.epistemicStatus != "observed" {
+                    Text("Källa: \(entry.source) · status: \(entry.epistemicStatus)")
+                        .font(.system(size: 8, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.28))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 3)
         .padding(.horizontal, 4)
@@ -301,6 +308,16 @@ struct FullLogEntry: Identifiable {
     let date: Date
     let category: LogCategory
     let text: String
+    let source: String
+    let epistemicStatus: String
+
+    init(date: Date, category: LogCategory, text: String, source: String = "System", epistemicStatus: String = "observed") {
+        self.date = date
+        self.category = category
+        self.text = text
+        self.source = source
+        self.epistemicStatus = epistemicStatus
+    }
 
     var timeString: String {
         let f = DateFormatter()
@@ -399,7 +416,8 @@ final class FullLogMonitor: ObservableObject {
                     case .memory:      cat = .memory
                     case .insight:     cat = .insight
                     }
-                    self.appendEntry(FullLogEntry(date: Date(), category: cat, text: line.text))
+                    self.appendEntry(FullLogEntry(date: line.timestamp, category: cat, text: line.text,
+                                                  source: line.source, epistemicStatus: line.epistemicStatus.rawValue))
                 }
             }
     }
