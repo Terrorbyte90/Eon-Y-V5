@@ -726,6 +726,7 @@ struct SmartDashView: View {
 
     var intelligenceScoresCard: some View {
         VStack(alignment: .leading, spacing: 8) {
+            MeasurementProvenanceLegend()
             HStack(spacing: 4) {
                 Image(systemName: "chart.bar.fill")
                     .font(.system(size: 10))
