@@ -8,7 +8,7 @@ actor HermesExportCoordinator {
     private let endpoint: URL?
     private let token: String?
     private var started = false
-    private var lastExportedSequence = 0
+    private var lastAttemptAt: Date?
 
     private init() {
         let values = Bundle.main.infoDictionary ?? [:]
@@ -28,8 +28,11 @@ actor HermesExportCoordinator {
 
     func flush() async {
         guard let endpoint else { return }
-        let events = await EventJournal.shared.exportBatch(maxBytes: 24 * 1024)
-            .filter { $0.sequence > lastExportedSequence }
+        // Normal cognition can produce many events; batch the background channel.
+        if let lastAttemptAt, Date().timeIntervalSince(lastAttemptAt) < 60 { return }
+        lastAttemptAt = Date()
+        let cursor = await EventJournal.shared.exportedEventID()
+        let events = await EventJournal.shared.exportBatch(maxBytes: 24 * 1024, afterEventID: cursor)
         guard !events.isEmpty else { return }
         let payload = HermesJournalEnvelope(version: 1, type: "journal", sessionID: events[0].sessionID, events: events)
         guard let body = try? JSONEncoder().encode(payload) else { return }
@@ -42,12 +45,13 @@ actor HermesExportCoordinator {
         do {
             let (_, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { return }
-            lastExportedSequence = events.map(\.sequence).max() ?? lastExportedSequence
+            if let lastEventID = events.last?.eventID {
+                await EventJournal.shared.acknowledgeExported(eventID: lastEventID)
+            }
             await EventJournal.shared.flush()
         } catch {
-            await EventJournal.shared.append(EonObservableEvent(sessionID: payload.sessionID, cycleID: 0, sequence: lastExportedSequence,
-                                                               source: "HermesExportCoordinator", kind: .error, severity: .warning,
-                                                               payload: ["error": "journal export deferred"]))
+            // Never append transport failures to this same queue: that creates a
+            // self-feeding loop and obscures the original event stream.
         }
     }
 }

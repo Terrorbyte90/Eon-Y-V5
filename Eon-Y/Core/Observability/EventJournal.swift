@@ -63,9 +63,12 @@ actor EventJournal {
         try? handle.close()
         currentSegmentBytes += line.count
         currentSegmentEvents += 1
-        manifestValue?.eventCount += 1
-        manifestValue?.lastSequence = max(manifestValue?.lastSequence ?? 0, event.sequence)
-        manifestValue?.updatedAt = Date()
+        if var manifest = manifestValue {
+            manifest.eventCount += 1
+            manifest.lastSequence = max(manifest.lastSequence, event.sequence)
+            manifest.updatedAt = Date()
+            manifestValue = manifest
+        }
     }
 
     func append(snapshot: EonCognitiveSnapshot) {
@@ -73,10 +76,49 @@ actor EventJournal {
                                        source: "CognitiveSnapshot", kind: .measurement, severity: .info,
                                        payload: ["schemaVersion": String(snapshot.schemaVersion), "runtimeMode": snapshot.runtimeMode])
         append(event)
-        manifestValue?.snapshotCount += 1
+        if var manifest = manifestValue {
+            manifest.snapshotCount += 1
+            manifestValue = manifest
+        }
     }
 
     func flush() { persistManifest() }
+
+    func exportBatch(maxBytes: Int = 24 * 1024, afterEventID: String? = nil) -> [EonObservableEvent] {
+        guard let directory = sessionDirectory,
+              let files = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return [] }
+        var result: [EonObservableEvent] = []
+        var bytes = 0
+        var cursorPassed = afterEventID == nil
+        for file in files.filter({ $0.pathExtension == "jsonl" }).sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+            guard let text = try? String(contentsOf: file, encoding: .utf8) else { continue }
+            for line in text.split(separator: "\n") {
+                guard let data = line.data(using: .utf8), let event = try? JSONDecoder.eon.decode(EonObservableEvent.self, from: data) else { continue }
+                if !cursorPassed {
+                    cursorPassed = event.eventID.uuidString == afterEventID
+                    continue
+                }
+                let lineBytes = line.utf8.count + 1
+                if bytes + lineBytes > maxBytes { return result }
+                result.append(event)
+                bytes += lineBytes
+            }
+        }
+        return result
+    }
+
+    // The cursor is advanced only after Hermes confirms a successful HTTP response.
+    func acknowledgeExported(eventID: UUID) {
+        guard let directory = sessionDirectory else { return }
+        let data = Data(eventID.uuidString.utf8)
+        try? data.write(to: directory.appendingPathComponent("export.cursor"), options: [.atomic])
+    }
+
+    func exportedEventID() -> String? {
+        guard let directory = sessionDirectory,
+              let data = try? Data(contentsOf: directory.appendingPathComponent("export.cursor")) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
 
     func manifest() -> JournalManifest {
         manifestValue ?? JournalManifest(schemaVersion: 1, sessionID: sessionID, startedAt: Date(), updatedAt: Date(), eventCount: 0, snapshotCount: 0, lastSequence: 0, segmentCount: 0)
@@ -89,24 +131,6 @@ actor EventJournal {
             let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
             return JournalSegmentInfo(id: url.deletingPathExtension().lastPathComponent, url: url, byteCount: size, eventCount: url == currentSegmentURL ? currentSegmentEvents : 0)
         }
-    }
-
-    func exportBatch(maxBytes: Int = 24 * 1024) -> [EonObservableEvent] {
-        guard let directory = sessionDirectory,
-              let files = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return [] }
-        var result: [EonObservableEvent] = []
-        var bytes = 0
-        for file in files.filter({ $0.pathExtension == "jsonl" }).sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
-            guard let text = try? String(contentsOf: file, encoding: .utf8) else { continue }
-            for line in text.split(separator: "\n") {
-                let lineBytes = line.utf8.count + 1
-                if bytes + lineBytes > maxBytes { return result }
-                guard let data = line.data(using: .utf8), let event = try? JSONDecoder.eon.decode(EonObservableEvent.self, from: data) else { continue }
-                result.append(event)
-                bytes += lineBytes
-            }
-        }
-        return result
     }
 
     private func rotateSegment() {
