@@ -608,7 +608,8 @@ final class ConsciousnessEngine: ObservableObject {
                 state: unifiedConsciousState,
                 input: cycleInput
             ).state
-            let telemetrySnapshot = unifiedConsciousState
+        let telemetrySnapshot = unifiedConsciousState
+            let latestThought = self.thoughtStream.last
             Task.detached(priority: .utility) {
                 await EventJournal.shared.startSession(sessionID: "eon-live")
                 let canonicalSnapshot = CognitiveSnapshotBuilder.make(from: telemetrySnapshot, sessionID: "eon-live")
@@ -626,6 +627,22 @@ final class ConsciousnessEngine: ObservableObject {
                     ]
                 ))
                 await EventJournal.shared.append(snapshot: canonicalSnapshot)
+                if let latestThought {
+                    await EventJournal.shared.append(EonObservableEvent(
+                        sessionID: "eon-live",
+                        cycleID: telemetrySnapshot.cycleIndex,
+                        sequence: telemetrySnapshot.cycleIndex,
+                        source: "ThoughtTrace",
+                        kind: .workspace,
+                        severity: .info,
+                        payload: [
+                            "category": latestThought.category.rawValue,
+                            "intensity": String(latestThought.intensity),
+                            "isConsciousClaim": String(latestThought.isConscious),
+                            "content": String(latestThought.content.prefix(600))
+                        ]
+                    ))
+                }
                 await BackgroundTelemetryBridge.shared.enqueue(snapshot: telemetrySnapshot)
                 await HermesExportCoordinator.shared.startIfConfigured()
                 await HermesExportCoordinator.shared.flush()

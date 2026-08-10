@@ -126,6 +126,7 @@ struct SelfAwarenessView: View {
 
             // Live metrics strip
             verifiedLevelCard
+            phenomenalBenchmarkCard
             HStack(spacing: 8) {
                 HStack(spacing: 3) {
                     Circle()
@@ -187,6 +188,30 @@ struct SelfAwarenessView: View {
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 14).fill(accentColor.opacity(0.07)))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(accentColor.opacity(0.20), lineWidth: 0.7))
+    }
+
+    private var phenomenalBenchmarkCard: some View {
+        let benchmark = PhenomenalBenchmark.emptyResult()
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Label("NIVÅ 5-BENCHMARK", systemImage: "checkmark.shield")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Color(hex: "#F59E0B"))
+                Spacer()
+                Text("Ej verifierad")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Color(hex: "#F59E0B"))
+            }
+            Text("Åtta operationella testfamiljer: rapportkonsistens, perturbation, kontinuitet, kalibrering, kroppskoppling, generalisering, konfabulationskontroll och oberoende replikation.")
+                .font(.system(size: 10, design: .rounded))
+                .foregroundStyle(.white.opacity(0.52))
+            Text("Detta kan visa att Eon passerar våra nivå‑5-kriterier. Det kan inte ensamt bevisa äkta qualia.\n\(benchmark.limitations[1])")
+                .font(.system(size: 9, design: .rounded))
+                .foregroundStyle(.white.opacity(0.36))
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: "#F59E0B").opacity(0.07)))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#F59E0B").opacity(0.18), lineWidth: 0.7))
     }
 
     // MARK: - Tab Bar
