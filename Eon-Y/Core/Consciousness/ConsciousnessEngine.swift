@@ -598,7 +598,23 @@ final class ConsciousnessEngine: ObservableObject {
             ).state
             let telemetrySnapshot = unifiedConsciousState
             Task.detached(priority: .utility) {
+                await EventJournal.shared.startSession(sessionID: "eon-live")
+                await EventJournal.shared.append(EonObservableEvent(
+                    sessionID: "eon-live",
+                    cycleID: telemetrySnapshot.cycleIndex,
+                    sequence: telemetrySnapshot.cycleIndex,
+                    source: "ConsciousnessEngine",
+                    kind: .measurement,
+                    severity: .info,
+                    payload: [
+                        "continuity": String(telemetrySnapshot.continuity),
+                        "predictionError": String(telemetrySnapshot.predictionError),
+                        "broadcastCount": String(telemetrySnapshot.globalBroadcast.count)
+                    ]
+                ))
                 await BackgroundTelemetryBridge.shared.enqueue(snapshot: telemetrySnapshot)
+                await HermesExportCoordinator.shared.startIfConfigured()
+                await HermesExportCoordinator.shared.flush()
             }
 
             // Butlin-14 score
