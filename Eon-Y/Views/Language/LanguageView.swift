@@ -431,7 +431,7 @@ struct LanguageView: View {
             // Qwen3 learning activity
             GlassCard(tint: Color(hex: "#7C3AED")) {
                 VStack(alignment: .leading, spacing: 10) {
-                    PanelHeader(icon: "waveform.path.ecg", title: "Qwen3 inlärningsaktivitet", color: Color(hex: "#7C3AED")) {
+                    PanelHeader(icon: "waveform.path.ecg", title: "Qwen3-bearbetning", color: Color(hex: "#7C3AED")) {
                         HStack(spacing: 3) {
                             Circle()
                                 .fill(brain.gptLoaded ? Color(hex: "#34D399") : Color(hex: "#EF4444"))
@@ -447,7 +447,7 @@ struct LanguageView: View {
                         .suffix(5)
 
                     if qwenThoughts.isEmpty {
-                        Text("Qwen3 bearbetar i bakgrunden. Aktivitet visas här när modellen körs.")
+                        Text("Qwen3:s lokala bearbetning visas här när modellen körs. Detta är inte automatiskt ny inlärning.")
                             .font(.system(size: 11, design: .rounded).italic())
                             .foregroundStyle(.white.opacity(0.3))
                     } else {
