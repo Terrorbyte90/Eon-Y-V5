@@ -500,7 +500,7 @@ struct CategoryArticleView: View {
                         Text("Inga artiklar ännu")
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
                             .foregroundStyle(.white.opacity(0.5))
-                        Text("Eon lär sig kontinuerligt och lägger\ntill artiklar autonomt.")
+                        Text("Eon bearbetar och föreslår kunskap kontinuerligt. Nytt innehåll ska kunna spåras till källa eller märkas som genererat.")
                             .font(.system(size: 13, design: .rounded))
                             .foregroundStyle(.white.opacity(0.25))
                             .multilineTextAlignment(.center)
@@ -753,7 +753,7 @@ struct ArticleDetailView: View {
                                     Image(systemName: "brain.head.profile")
                                         .font(.system(size: 10))
                                         .foregroundStyle(article.domainColor)
-                                    Text("Genererad autonomt av Eon")
+                                    Text("Genererad av Eon — kräver källgranskning")
                                         .font(.system(size: 10, design: .monospaced))
                                         .foregroundStyle(.white.opacity(0.3))
                                 }
