@@ -193,13 +193,18 @@ final class EonBrain: ObservableObject {
            Date().timeIntervalSince(previous.timestamp) < 20 {
             return
         }
+        let safeFocus = EonTextSanitizer.clean(
+            attentionFocus.isEmpty ? currentWorkspaceFocus : attentionFocus,
+            maxLength: 120
+        )
+        let safeObservation = EonTextSanitizer.clean(line.text, maxLength: 320)
         let priorObservation = innerMonologue.reversed()
             .first(where: { !$0.source.hasPrefix("SelfNarrative/") })?.text
         // Internal prose is routed through the narrative boundary so the UI
         // does not present static subsystem labels as if they were thoughts.
         let context = SelfNarrativeContext(
-            focus: attentionFocus.isEmpty ? currentWorkspaceFocus : attentionFocus,
-            observation: line.text,
+            focus: safeFocus.isEmpty ? "den aktuella signalen" : safeFocus,
+            observation: safeObservation,
             prediction: nil,
             actual: nil,
             uncertainty: max(0, min(1, 1 - confidence)),
