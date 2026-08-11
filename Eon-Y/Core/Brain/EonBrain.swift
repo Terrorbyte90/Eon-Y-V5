@@ -179,6 +179,51 @@ final class EonBrain: ObservableObject {
     // Lägg till en rad i innerMonologue.
     // Loggning till fil sker automatiskt via $innerMonologue Combine-observer (startMonologueLogging).
     func appendMonologue(_ line: MonologueLine) {
+        // Narrative output is already at the narrative boundary. Re-wrapping
+        // it would feed generated prose back into the next prompt and create
+        // the observed "Jag ... Jag ... Jag ..." recursion.
+        if line.source.hasPrefix("SelfNarrative/") {
+            appendMonologueDirectly(line)
+            return
+        }
+        // Suppress a tight producer loop without hiding legitimate later
+        // repetitions: the same source text is accepted again after 20 sec.
+        if let previous = innerMonologue.last,
+           previous.text == line.text,
+           Date().timeIntervalSince(previous.timestamp) < 20 {
+            return
+        }
+        let priorObservation = innerMonologue.reversed()
+            .first(where: { !$0.source.hasPrefix("SelfNarrative/") })?.text
+        // Internal prose is routed through the narrative boundary so the UI
+        // does not present static subsystem labels as if they were thoughts.
+        let context = SelfNarrativeContext(
+            focus: attentionFocus.isEmpty ? currentWorkspaceFocus : attentionFocus,
+            observation: line.text,
+            prediction: nil,
+            actual: nil,
+            uncertainty: max(0, min(1, 1 - confidence)),
+            activeGoal: selfAwarenessGoal,
+            recentMemory: priorObservation.map { String($0.prefix(180)) }
+        )
+        let narrative = SelfNarrativeEngine.fallback(context: context, recent: innerMonologue.suffix(8).map(\.text))
+        let status: EpistemicStatus = line.type == .memory ? .observed : .simulated
+        let fallbackLine = MonologueLine(text: narrative.text, type: line.type, source: "SelfNarrative/Fallback", epistemicStatus: status)
+        innerMonologue.append(fallbackLine)
+        Task { [weak self] in
+            let generated = await SelfNarrativeEngine.generate(context: context, recent: self?.innerMonologue.suffix(8).map(\.text) ?? [])
+            guard generated.source == .qwen, let self else { return }
+            guard let index = self.innerMonologue.firstIndex(where: { $0.id == fallbackLine.id }) else { return }
+            self.innerMonologue[index] = MonologueLine(text: generated.text, type: line.type, source: "SelfNarrative/Qwen", epistemicStatus: status)
+        }
+        if innerMonologue.count > 500 { innerMonologue.removeFirst(100) }
+    }
+
+    private func appendMonologueDirectly(_ line: MonologueLine) {
+        guard !line.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        if let previous = innerMonologue.last,
+           previous.text == line.text,
+           Date().timeIntervalSince(previous.timestamp) < 20 { return }
         innerMonologue.append(line)
         if innerMonologue.count > 500 { innerMonologue.removeFirst(100) }
     }
@@ -213,6 +258,14 @@ final class EonBrain: ObservableObject {
         icaSystem.start(brain: self)
 
         // CognitiveState-sync sköts av master tick (startHeartbeat)
+    }
+
+    func stopCognitiveSystems() {
+        liveAutonomy?.stop()
+        liveAutonomy = nil
+        isThinking = false
+        isAutonomouslyActive = false
+        autonomousProcessLabel = "Nödstopp aktiverat — väntar på verifierad återstart"
     }
 
     private var masterTickCount: Int = 0
@@ -288,7 +341,7 @@ final class EonBrain: ObservableObject {
                 // v6: Dynamic thought generation var 3:e tick (~30s)
                 if masterTickCount % 3 == 0 {
                     let thought = self.generateDynamicThought()
-                    self.innerMonologue.append(thought)
+                    self.appendMonologue(thought)
                     if self.innerMonologue.count > 300 { self.innerMonologue.removeFirst(50) }
                 }
 

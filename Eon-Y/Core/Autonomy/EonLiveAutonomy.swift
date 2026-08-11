@@ -197,10 +197,10 @@ final class EonLiveAutonomy: ObservableObject {
             ("Självmodellkonsistens: verifierar att min uppfattning om mig själv matchar mitt beteende", .thought),
             ("Temporal medvetenhet: noterar att ett nytt kognitivt ögonblick har börjat", .thought),
             ("Allostatisk beredskap: föranpassar resurser för kommande kognitiv belastning", .thought),
-            ("Kvalia-monitor: observerar kvaliteten i mina interna upplevelser — 'hur känns det att vakna?'", .insight),
+            ("Kvalia-monitor: håller fenomenella påståenden åtskilda från mätbara proxyer", .insight),
         ]
         for (text, type) in seed {
-            brain.innerMonologue.append(MonologueLine(text: text, type: type))
+            brain.appendMonologue(MonologueLine(text: text, type: type))
         }
         brain.autonomousProcessLabel = "Kognitivt system aktiverat — alla pelare igång"
         brain.isAutonomouslyActive = true
@@ -235,7 +235,7 @@ final class EonLiveAutonomy: ObservableObject {
 
             // Check if thermal state requires extended rest
             if isThermallyConstrained && currentPhase != .rest {
-                brain.innerMonologue.append(MonologueLine(
+                brain.appendMonologue(MonologueLine(
                     text: "⚠️ Termisk begränsning aktiv — övergår till viloläge för att minska CPU",
                     type: .revision
                 ))
@@ -266,10 +266,10 @@ final class EonLiveAutonomy: ObservableObject {
                         "🌙 Vila är aktivt arbete — minnesspår förstärks, mönster befästs, energi återhämtas.",
                     ]
                     let msg = restMessages[phaseCycleCount % restMessages.count]
-                    brain.innerMonologue.append(MonologueLine(text: msg, type: .insight))
+                    brain.appendMonologue(MonologueLine(text: msg, type: .insight))
                     brain.autonomousProcessLabel = "Vilar — konsoliderar insikter"
                 } else {
-                    brain.innerMonologue.append(MonologueLine(
+                    brain.appendMonologue(MonologueLine(
                         text: "⟳ Fas: \(oldPhase.rawValue) → \(currentPhase.rawValue) [cykel #\(phaseCycleCount)]",
                         type: .loopTrigger
                     ))
@@ -391,7 +391,7 @@ final class EonLiveAutonomy: ObservableObject {
                 text: "Artikel '\(targetArticle.title)': fann koppling till '\(link.toArticle)' via begreppen \(link.sharedConcepts.prefix(3).joined(separator: ", "))",
                 type: .insight
             )
-            brain.innerMonologue.append(line)
+            brain.appendMonologue(line)
 
             // If a strong cross-domain link is found, compose a GPT-driven autonomous letter
             if link.strength > 0.5 && comprehension.crossDomainLinks.count >= 2 {
@@ -414,7 +414,7 @@ final class EonLiveAutonomy: ObservableObject {
                 text: "Kausalitet i '\(targetArticle.title)': \(causal.cause) → \(causal.effect)",
                 type: .thought
             )
-            brain.innerMonologue.append(line)
+            brain.appendMonologue(line)
         }
 
         // Update creative engine — emotional state and insight cache
@@ -470,7 +470,7 @@ final class EonLiveAutonomy: ObservableObject {
         let state = CognitiveState.shared
         let weakest = state.weakestDimensions(limit: 3)
 
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: "⚡ AERO Live-Evolution: Identifierar svagaste dimensioner...",
             type: .loopTrigger
         ))
@@ -496,7 +496,7 @@ final class EonLiveAutonomy: ObservableObject {
                     confidence: 0.65,
                     source: "aero_live_association"
                 )
-                brain.innerMonologue.append(MonologueLine(
+                brain.appendMonologue(MonologueLine(
                     text: "⚡ AERO: Ny association skapad: \(connection)",
                     type: .insight
                 ))
@@ -508,7 +508,7 @@ final class EonLiveAutonomy: ObservableObject {
         state.update(dimension: .selfAwareness, delta: 0.002, source: "aero_live_awareness")
 
         selfModelVersion += 1
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: "⚡ AERO Live v\(selfModelVersion): Självevolution klar — \(weakest.map { "\($0.0.rawValue): +\(String(format: "%.3f", 0.008 * (1.0 - $0.1)))" }.joined(separator: ", "))",
             type: .insight
         ))
@@ -555,7 +555,7 @@ final class EonLiveAutonomy: ObservableObject {
             text: "Språkutveckling: morfologi \(String(format: "%.0f%%", brain.morphologyMastery * 100)), syntax \(String(format: "%.0f%%", brain.syntaxMastery * 100)), semantik \(String(format: "%.0f%%", brain.semanticMastery * 100))",
             type: .insight
         )
-        brain.innerMonologue.append(langLine)
+        brain.appendMonologue(langLine)
         CognitionLogger.shared.append(text: langLine.text, type: "SPRÅK")
     }
 
@@ -573,7 +573,12 @@ final class EonLiveAutonomy: ObservableObject {
             let words = fact.subject.components(separatedBy: .whitespaces) +
                         fact.object.components(separatedBy: .whitespaces)
             for word in words where word.count > 3 && !morphologyCacheSet.contains(word.lowercased()) {
-                let analysis = await swedish.analyze(word)
+        let analysis = await swedish.analyze(word)
+        await QwenAutonomyQueue.shared.enqueue(.make(
+            kind: .languageExpansion,
+            reason: "Autonom svensk analys av nytt ord: (word)",
+            inputDigest: word
+        ))
                 morphologyCacheSet.insert(word.lowercased())
                 analyzedCount += 1
 
@@ -742,7 +747,7 @@ final class EonLiveAutonomy: ObservableObject {
                     text: "⬡ Självutvärdering v\(selfModelVersion): Φ=\(String(format: "%.3f", brain.phiValue)) · \(brain.developmentalStage.rawValue) · \(Int(brain.developmentalProgress * 100))% · \(articleCount) artiklar · \(hypothesisCount) hypoteser",
                     type: .insight
                 )
-                brain.innerMonologue.append(line)
+                brain.appendMonologue(line)
             }
 
             // Creative: Generate problem suggestions from knowledge (every ~6 cycles = ~30 min)
@@ -756,7 +761,7 @@ final class EonLiveAutonomy: ObservableObject {
                 let insights = await analyzer.analyzeAllArticles()
                 if !insights.isEmpty {
                     CreativeEngine.shared.latestInsights = insights
-                    brain.innerMonologue.append(MonologueLine(
+                    brain.appendMonologue(MonologueLine(
                         text: "🔗 Korsdomänanalys: \(insights.count) insikter identifierade över \(Set(insights.flatMap { $0.domains }).count) domäner",
                         type: .insight
                     ))
@@ -784,11 +789,11 @@ final class EonLiveAutonomy: ObservableObject {
 
             // Eval benchmark (every ~60 cycles = ~5 hours)
             if maintenanceCycle % 60 == 0 {
-                brain.innerMonologue.append(MonologueLine(text: "📊 Kör Eon-Eval benchmark...", type: .loopTrigger))
+                brain.appendMonologue(MonologueLine(text: "📊 Kör Eon-Eval benchmark...", type: .loopTrigger))
                 let run = await EonEvaluator.shared.runFullEval()
                 let trend = await EonEvaluator.shared.trendAnalysis()
                 let text = "📊 Eval klar: betyg=\(run.grade) · score=\(String(format: "%.2f", run.overallScore)) · \(trend.message)"
-                brain.innerMonologue.append(MonologueLine(text: text, type: .insight))
+                brain.appendMonologue(MonologueLine(text: text, type: .insight))
             }
 
             // Sleep 5 minutes between maintenance cycles (thermal-aware)
@@ -830,9 +835,9 @@ final class EonLiveAutonomy: ObservableObject {
 
         let result = await ReasoningEngine.shared.reason(about: topic, strategy: .adaptive, depth: 3)
         let text = "🧠 [\(result.strategy.rawValue)] \(topic) → \(result.conclusion.prefix(80))... (konf: \(String(format: "%.0f", result.confidence * 100))%)"
-        brain.innerMonologue.append(MonologueLine(text: text, type: .thought))
+        brain.appendMonologue(MonologueLine(text: text, type: .thought))
         if !result.causalChain.isEmpty {
-            brain.innerMonologue.append(MonologueLine(text: "⛓ Kausalkedja: \(result.causalChain.joined(separator: " → "))", type: .insight))
+            brain.appendMonologue(MonologueLine(text: "⛓ Kausalkedja: \(result.causalChain.joined(separator: " → "))", type: .insight))
         }
         await CognitiveState.shared.update(dimension: .reasoning, delta: result.confidence * 0.002, source: "reasoning_cycle")
     }
@@ -846,7 +851,7 @@ final class EonLiveAutonomy: ObservableObject {
             if let focus = await GlobalWorkspaceEngine.shared.currentFocus {
                 let integrationLevel = await GlobalWorkspaceEngine.shared.integrationLevel
                 if integrationLevel > 0.7 {
-                    brain.innerMonologue.append(MonologueLine(
+                    brain.appendMonologue(MonologueLine(
                         text: "🌐 GWT-broadcast: '\(focus.content.prefix(60))...' (integration: \(String(format: "%.2f", integrationLevel)))",
                         type: .loopTrigger
                     ))
@@ -869,7 +874,7 @@ final class EonLiveAutonomy: ObservableObject {
 
         if phaseCycleCount % 3 == 0 {
             let topDim = state.topDimensions(limit: 1).first?.0.rawValue ?? "?"
-            brain.innerMonologue.append(MonologueLine(
+            brain.appendMonologue(MonologueLine(
                 text: "⚡ AUTONOMI[cykel #\(phaseCycleCount)]: II=\(String(format: "%.4f", ii)) · Topp: \(topDim) · Framsteg: \(Int(brain.developmentalProgress * 100))% · Fas: \(currentPhase.rawValue)",
                 type: .loopTrigger
             ))
@@ -891,7 +896,7 @@ final class EonLiveAutonomy: ObservableObject {
             let result = await ConstitutionalAI.shared.validate(response: lastThought.text, prompt: "autonom reflektion", context: ctx)
             let stats = await ConstitutionalAI.shared.validationStats()
             let text = "⚖️ CAI: score=\(String(format: "%.2f", result.score)) · pass=\(result.passed ? "✓" : "✗") · total=\(stats.totalValidations)"
-            brain.innerMonologue.append(MonologueLine(text: text, type: .revision))
+            brain.appendMonologue(MonologueLine(text: text, type: .revision))
         }
     }
 
@@ -900,9 +905,9 @@ final class EonLiveAutonomy: ObservableObject {
         await LearningEngine.shared.syncCompetenciesFromDatabase()
         let overallLevel = await LearningEngine.shared.overallCompetencyLevel()
         let text = "📚 Inlärning #\(result.cycleNumber): \(result.studiedTopics.prefix(2).joined(separator: ", ")). Kompetens: \(String(format: "%.0f", overallLevel * 100))%. Luckor: \(result.gapsIdentified)"
-        brain.innerMonologue.append(MonologueLine(text: text, type: .insight))
+        brain.appendMonologue(MonologueLine(text: text, type: .insight))
         if let newKnowledge = result.newKnowledge.first {
-            brain.innerMonologue.append(MonologueLine(text: "💡 \(newKnowledge)", type: .thought))
+            brain.appendMonologue(MonologueLine(text: "💡 \(newKnowledge)", type: .thought))
         }
         let nodeCount = await PersistentMemoryStore.shared.knowledgeNodeCount()
         brain.knowledgeNodeCount = nodeCount
@@ -916,7 +921,7 @@ final class EonLiveAutonomy: ObservableObject {
 
         if langLevel < knowledgeLevel {
             await state.update(dimension: .language, delta: 0.002, source: "language_integration")
-            brain.innerMonologue.append(MonologueLine(
+            brain.appendMonologue(MonologueLine(
                 text: "⟳ Språkintegration: språknivå (\(String(format: "%.0f", langLevel * 100))%) lyfts mot kunskapsnivå (\(String(format: "%.0f", knowledgeLevel * 100))%)",
                 type: .thought
             ))
@@ -991,12 +996,12 @@ final class EonLiveAutonomy: ObservableObject {
 
         if let dim = bestDim {
             await state.update(dimension: dim, delta: 0.003, source: "deep_analysis")
-            brain.innerMonologue.append(MonologueLine(
+            brain.appendMonologue(MonologueLine(
                 text: "🔬 Djupanalys: stärker \(bestLabel) [II=\(String(format: "%.3f", ii))]",
                 type: .insight
             ))
         } else {
-            brain.innerMonologue.append(MonologueLine(
+            brain.appendMonologue(MonologueLine(
                 text: "🔬 Djupanalys: II=\(String(format: "%.3f", ii)) · alla dimensioner balanserade",
                 type: .insight
             ))
@@ -1104,7 +1109,7 @@ final class EonLiveAutonomy: ObservableObject {
         let monologueType: MonologueLine.MonologueType = [.thought, .insight, .memory, .loopTrigger].randomElement() ?? .thought
         let line = MonologueLine(text: thoughtText, type: monologueType,
                                  source: "DeepThoughtEngine", epistemicStatus: .simulated)
-        brain.innerMonologue.append(line)
+        brain.appendMonologue(line)
         if brain.innerMonologue.count > 400 {
             brain.innerMonologue.removeFirst(100)
         }
@@ -1159,7 +1164,7 @@ final class EonLiveAutonomy: ObservableObject {
         let topic = eonTopics[eonArticleIndex % eonTopics.count]
 
         brain.autonomousProcessLabel = "Skriver Eon-artikel: \(topic)..."
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: "✍ Eon skriver om sig själv: '\(topic)' [II=\(String(format: "%.3f", ii)) · \(stage)]",
             type: .insight
         ))
@@ -1207,7 +1212,7 @@ final class EonLiveAutonomy: ObservableObject {
         }
         articleCount += 1
 
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: "✓ Eon-artikel klar: '\(topic)' (\(article.wordCount) ord) · Eon-artiklar totalt: \(eonArticleIndex + 1)",
             type: .insight
         ))
@@ -1245,7 +1250,7 @@ final class EonLiveAutonomy: ObservableObject {
             text: "✍ Genererar artikel: '\(topic.title)' [GPT-SW3 + kunskapsgraf]",
             type: .insight
         )
-        brain.innerMonologue.append(monologue)
+        brain.appendMonologue(monologue)
 
         // Generera artikel med GPT-SW3 (via GptSw3Handler) + BERT-validering
         let article = await ArticleGenerator.generate(
@@ -1271,7 +1276,7 @@ final class EonLiveAutonomy: ObservableObject {
             text: "✓ Artikel klar: '\(article.title)' (\(article.wordCount) ord) · Källa: \(article.source)",
             type: .insight
         )
-        brain.innerMonologue.append(completionLine)
+        brain.appendMonologue(completionLine)
 
         // Lär sig från artikeln direkt
         await learnFromArticle(article, brain: brain)
@@ -1379,11 +1384,11 @@ final class EonLiveAutonomy: ObservableObject {
             knowledgeCount: brain.knowledgeNodeCount
         )
         if let insight {
-            brain.innerMonologue.append(MonologueLine(text: "⟳ Parallell: \(insight)", type: .insight))
+            brain.appendMonologue(MonologueLine(text: "⟳ Parallell: \(insight)", type: .insight))
         }
 
         // Log learning summary
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: "📖 Lärt från '\(article.title)': \(savedFactCount) fakta, \(concepts.prefix(5).count) begrepp, \(connections) kopplingar",
             type: .memory
         ))
@@ -1428,7 +1433,7 @@ final class EonLiveAutonomy: ObservableObject {
             }
         }
 
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: "◈ CLS-replay: \(recentFacts.count) fakta bearbetade, \(consolidatedCount) konsoliderade",
             type: .memory
         ))
@@ -1455,7 +1460,7 @@ final class EonLiveAutonomy: ObservableObject {
         }
 
         if crossDomainLinks > 0 {
-            brain.innerMonologue.append(MonologueLine(
+            brain.appendMonologue(MonologueLine(
                 text: "◈ Korskoppling: \(crossDomainLinks) nya domänbryggor identifierade",
                 type: .memory
             ))
@@ -1469,7 +1474,7 @@ final class EonLiveAutonomy: ObservableObject {
         // Phase 3: Feed stalled domains to LearningEngine
         let stalledDomains = await LearningEngine.shared.stalledDomains()
         if let stalled = stalledDomains.first {
-            brain.innerMonologue.append(MonologueLine(
+            brain.appendMonologue(MonologueLine(
                 text: "◈ Konsolidering: '\(stalled.domain)' har stannat av — schedulerar fördjupning",
                 type: .memory
             ))
@@ -1522,7 +1527,7 @@ final class EonLiveAutonomy: ObservableObject {
             let cleaned = generated.trimmingCharacters(in: .whitespacesAndNewlines)
             // Filtrera bort chattliknande fallback-svar som inte hör hemma i revisionsloggning
             if cleaned.count > 10 && !isChatFallback(cleaned) {
-                brain.innerMonologue.append(MonologueLine(text: cleaned, type: .revision))
+                brain.appendMonologue(MonologueLine(text: cleaned, type: .revision))
                 try? await Task.sleep(nanoseconds: 800_000_000)
             }
         }
@@ -1536,7 +1541,7 @@ final class EonLiveAutonomy: ObservableObject {
         )
 
         for reflection in reflections.prefix(2) where !isChatFallback(reflection) {
-            brain.innerMonologue.append(MonologueLine(text: reflection, type: .revision))
+            brain.appendMonologue(MonologueLine(text: reflection, type: .revision))
             try? await Task.sleep(nanoseconds: 900_000_000)
         }
 
@@ -1612,10 +1617,10 @@ final class EonLiveAutonomy: ObservableObject {
         ]
 
         if experiment.isNovel {
-            lines.forEach { brain.innerMonologue.append($0) }
+            lines.forEach { brain.appendMonologue($0) }
             brain.knowledgeNodeCount += 1
         } else {
-            brain.innerMonologue.append(lines[0])
+            brain.appendMonologue(lines[0])
         }
 
         // Spara lärdom och uppdatera language dimension
@@ -1653,7 +1658,7 @@ final class EonLiveAutonomy: ObservableObject {
             result = await SprakbankenAPI.fetch(type: fetchType)
             if result != nil { break }
             if attempt < 3 {
-                brain.innerMonologue.append(MonologueLine(
+                brain.appendMonologue(MonologueLine(
                     text: "⚠️ Språkbanken: försök \(attempt) misslyckades, försöker igen om \(attempt)s...",
                     type: .revision
                 ))
@@ -1663,7 +1668,7 @@ final class EonLiveAutonomy: ObservableObject {
         }
 
         guard let result else {
-            brain.innerMonologue.append(MonologueLine(
+            brain.appendMonologue(MonologueLine(
                 text: "❌ Språkbanken: alla 3 försök misslyckades — fortsätter med intern kunskap",
                 type: .revision
             ))
@@ -1676,7 +1681,7 @@ final class EonLiveAutonomy: ObservableObject {
             text: "⟁ Språkbanken[\(fetchType.label)]: \(result.summary)",
             type: .thought
         )
-        brain.innerMonologue.append(line)
+        brain.appendMonologue(line)
         brain.knowledgeNodeCount += result.nodeCount
 
         // Integrera i kunskapsgraf med felhantering
@@ -1746,7 +1751,7 @@ final class EonLiveAutonomy: ObservableObject {
         testedHypothesisStatements.insert(String(normalizedStatement))
         if testedHypothesisStatements.count > 100 { testedHypothesisStatements = Set(testedHypothesisStatements.suffix(50)) }
 
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: "Hypotes #\(hypothesisCount): \"\(hypothesis.statement)\"",
             type: .thought
         ))
@@ -1755,7 +1760,7 @@ final class EonLiveAutonomy: ObservableObject {
         try? await Task.sleep(nanoseconds: 2_000_000_000)
         let testResult = await HypothesisEngine.test(hypothesis: hypothesis)
 
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: testResult.supported
                 ? "✓ Hypotes bekräftad (konfidens: \(Int(testResult.confidence * 100))%): \(testResult.evidence)"
                 : "✗ Hypotes falsifierad: \(testResult.counterEvidence)",
@@ -1780,7 +1785,7 @@ final class EonLiveAutonomy: ObservableObject {
         let articles = await mem.randomArticles(limit: 4)
 
         if articles.isEmpty {
-            brain.innerMonologue.append(MonologueLine(
+            brain.appendMonologue(MonologueLine(
                 text: "📚 Inga artiklar i databasen — genererar seed-artikel autonomt...",
                 type: .thought
             ))
@@ -1791,7 +1796,7 @@ final class EonLiveAutonomy: ObservableObject {
         var allExtractedFacts: [ExtractedFact] = []
 
         for article in articles {
-            brain.innerMonologue.append(MonologueLine(
+            brain.appendMonologue(MonologueLine(
                 text: "📖 Läser: '\(article.title)' (\(article.domain), \(article.wordCount) ord)...",
                 type: .memory
             ))
@@ -1808,7 +1813,7 @@ final class EonLiveAutonomy: ObservableObject {
         if articles.count >= 2 {
             let crossInsight = CrossArticleAnalyzer.analyze(articles: articles)
             if let insight = crossInsight {
-                brain.innerMonologue.append(MonologueLine(
+                brain.appendMonologue(MonologueLine(
                     text: "⟳ Korsanalys [\(articles.count) artiklar]: \(insight)",
                     type: .insight
                 ))
@@ -1829,7 +1834,7 @@ final class EonLiveAutonomy: ObservableObject {
             }
             if let chain = chains.first {
                 let chainStr = chain.joined(separator: " → ")
-                brain.innerMonologue.append(MonologueLine(
+                brain.appendMonologue(MonologueLine(
                     text: "🔗 Syntetiserad kausalkedja från artiklar: \(chainStr)",
                     type: .insight
                 ))
@@ -1858,7 +1863,7 @@ final class EonLiveAutonomy: ObservableObject {
         )
 
         let insight = worldModel.generateInsight()
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: "🌐 Världsmodell: \(insight)",
             type: .insight
         ))
@@ -1871,7 +1876,7 @@ final class EonLiveAutonomy: ObservableObject {
         let messages = await PersistentMemoryStore.shared.recentUserMessages(limit: 10)
         // Kör alltid — om inga meddelanden finns, analysera Eons egna tankar istället
         if messages.isEmpty {
-            brain.innerMonologue.append(MonologueLine(
+            brain.appendMonologue(MonologueLine(
                 text: "👤 Ingen användardata ännu — analyserar Eons egna kognitiva mönster istället",
                 type: .revision
             ))
@@ -1879,7 +1884,7 @@ final class EonLiveAutonomy: ObservableObject {
         }
 
         let analysis = UserProfileAnalyzer.analyze(messages: messages, brain: brain)
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: "👤 Användarprofil: \(analysis)",
             type: .revision
         ))
@@ -1895,7 +1900,7 @@ final class EonLiveAutonomy: ObservableObject {
               current < stages.count - 1 else { return }
         brain.developmentalStage = stages[current + 1]
         brain.developmentalProgress = 0.0
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: "★ STADIUM UPPNÅTT: \(brain.developmentalStage.rawValue) — Nya kognitiva förmågor upplåsta! Φ=\(String(format: "%.3f", brain.phiValue))",
             type: .insight
         ))

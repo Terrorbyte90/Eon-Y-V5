@@ -104,6 +104,9 @@ actor BackgroundTelemetryBridge {
         let url = directory.appendingPathComponent("verified-\(UUID().uuidString).json")
         guard let data = try? JSONEncoder().encode(decoded) else { return }
         try? data.write(to: url, options: [.atomic, .completeFileProtection])
+        if case .control(let directive) = decoded {
+            Task { @MainActor in RemoteControlCenter.shared.apply(directive) }
+        }
     }
 }
 
@@ -179,14 +182,16 @@ struct SignedKnowledgeEnvelope: Codable, Sendable {
 enum SafeRemotePayload: Codable, Sendable {
     case knowledge([RemoteKnowledgeRecord])
     case experiment(RemoteExperimentProposal)
+    case control(RemoteControlDirective)
 
-    private enum CodingKeys: String, CodingKey { case type, records, proposal }
+    private enum CodingKeys: String, CodingKey { case type, records, proposal, directive }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         switch try container.decode(String.self, forKey: .type) {
         case "knowledge": self = .knowledge(try container.decode([RemoteKnowledgeRecord].self, forKey: .records))
         case "experiment": self = .experiment(try container.decode(RemoteExperimentProposal.self, forKey: .proposal))
+        case "control": self = .control(try container.decode(RemoteControlDirective.self, forKey: .directive))
         default: throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "unsupported data type")
         }
     }
@@ -198,6 +203,8 @@ enum SafeRemotePayload: Codable, Sendable {
             try container.encode("knowledge", forKey: .type); try container.encode(records, forKey: .records)
         case .experiment(let proposal):
             try container.encode("experiment", forKey: .type); try container.encode(proposal, forKey: .proposal)
+        case .control(let directive):
+            try container.encode("control", forKey: .type); try container.encode(directive, forKey: .directive)
         }
     }
 }

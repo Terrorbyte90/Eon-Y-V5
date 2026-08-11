@@ -18,7 +18,11 @@ struct ConsciousnessPerturbationSuite: Sendable {
     }
 
     func run(orchestrator: ConsciousnessOrchestrator, input: ConsciousnessCycleInput) -> [Result] {
-        let baselineState = orchestrator.advance(state: UnifiedConsciousState(), input: input).state
+        // Use one shared pre-perturbation state. Starting every branch from a
+        // fresh state made the old test measure initialization differences,
+        // not the causal contribution of the mechanism being removed.
+        let prePerturbation = UnifiedConsciousState()
+        let baselineState = orchestrator.advance(state: prePerturbation, input: input).state
         return Perturbation.allCases.map { perturbation in
             var alteredInput = input
             switch perturbation {
@@ -27,7 +31,7 @@ struct ConsciousnessPerturbationSuite: Sendable {
             case .bodySignalMismatch: alteredInput.thermalLoad = 1 - input.thermalLoad
             case .memoryDiscontinuity: alteredInput.signals["memoryContinuity"] = 0
             }
-            let altered = orchestrator.advance(state: UnifiedConsciousState(), input: alteredInput).state
+            let altered = orchestrator.advance(state: prePerturbation, input: alteredInput).state
             return Result(perturbation: perturbation, baseline: baselineState.metrics,
                           perturbed: altered.metrics,
                           causalSensitivity: abs(baselineState.metrics.mean - altered.metrics.mean))

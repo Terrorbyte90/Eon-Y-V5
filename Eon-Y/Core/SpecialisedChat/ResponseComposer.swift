@@ -70,8 +70,9 @@ actor ResponseComposer {
             )
         }
 
+        let polishedText = await SwedishLanguageQualityGate.repair(text, question: question.resolvedInput)
         return ResponseDraft(
-            text: text,
+            text: polishedText,
             sources: knowledge.sources,
             usedKnowledge: strategy.useKnowledge,
             usedSelfKnowledge: strategy.useSelfKnowledge,
@@ -161,10 +162,14 @@ actor ResponseComposer {
         thinkingResults: [ThinkingPath]
     ) -> String {
         var parts: [String] = []
-        var charBudget = 900  // ~350 tokens ≈ 900 tecken
+        var charBudget = 1500  // Mer svensk kontext, men fortfarande inom Qwen3:s iOS-budget
 
         // 1. Systeminstruktion (kort)
-        let sysInstruction = "Du är Eon, AI på svenska. Svara koncist och korrekt."
+        let sysInstruction = """
+        Du är Eon. Svara på naturlig, idiomatisk svenska med tydlig struktur.
+        Förstå frågans avsikt innan du svarar. Skilj fakta, slutsats och osäkerhet.
+        Använd hela meningar, konkreta verb och relevanta detaljer; upprepa inte frågan.
+        """
         parts.append(sysInstruction)
         charBudget -= sysInstruction.count
 

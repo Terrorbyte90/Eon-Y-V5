@@ -29,7 +29,9 @@ actor HermesExportCoordinator {
     func flush() async {
         guard let endpoint else { return }
         // Normal cognition can produce many events; batch the background channel.
-        if let lastAttemptAt, Date().timeIntervalSince(lastAttemptAt) < 60 { return }
+        // Keep the one-way stream near-real-time while still batching to avoid
+        // waking the radio for every individual event.
+        if let lastAttemptAt, Date().timeIntervalSince(lastAttemptAt) < 5 { return }
         lastAttemptAt = Date()
         let cursor = await EventJournal.shared.exportedEventID()
         let events = await EventJournal.shared.exportBatch(maxBytes: 24 * 1024, afterEventID: cursor)

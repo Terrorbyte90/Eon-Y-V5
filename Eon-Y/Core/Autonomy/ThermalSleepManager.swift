@@ -80,7 +80,7 @@ final class ThermalSleepManager: ObservableObject {
                 exitSleep(brain: brain)
             }
             if lastThermalState == .nominal {
-                brain.innerMonologue.append(MonologueLine(
+                brain.appendMonologue(MonologueLine(
                     text: "🌡️ Enheten blir varm — reducerar Qwen-inferens med 30%. Kognitiva processer fortsätter i lägre tempo.",
                     type: .thought
                 ))
@@ -111,7 +111,7 @@ final class ThermalSleepManager: ObservableObject {
             } else {
                 let elapsed = sleepStartTime.map { Date().timeIntervalSince($0) } ?? 0
                 if elapsed > 60 {
-                    brain.innerMonologue.append(MonologueLine(
+                    brain.appendMonologue(MonologueLine(
                         text: "💤 Fortsätter vila — enheten är fortfarande varm. Sömn är inte passivitet; det är nödvändig återhämtning.",
                         type: .thought
                     ))
@@ -163,7 +163,7 @@ final class ThermalSleepManager: ObservableObject {
         isSleeping = true
         sleepReason = reason
         sleepStartTime = Date()
-        brain.innerMonologue.append(MonologueLine(text: message, type: type))
+        brain.appendMonologue(MonologueLine(text: message, type: type))
         brain.autonomousProcessLabel = "💤 Vila — termisk återhämtning"
         print("[ThermalSleep] Sömn aktiverad: \(reason)")
     }
@@ -173,7 +173,7 @@ final class ThermalSleepManager: ObservableObject {
         isSleeping = false
         sleepReason = ""
         sleepStartTime = nil
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: "☀️ Enheten har svalnat efter \(Int(duration))s vila. Kognitiva processer återupptas — precis som efter en god natts sömn.",
             type: .insight
         ))

@@ -34,6 +34,9 @@ actor BackgroundDataImporter {
             case .experiment:
                 // Experiments are deliberately not imported into knowledge.
                 continue
+            case .control:
+                // Controls are applied immediately by the signed transport.
+                continue
             }
             try? FileManager.default.removeItem(at: file)
         }

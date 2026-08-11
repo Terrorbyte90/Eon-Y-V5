@@ -163,6 +163,12 @@ final class ConsciousnessEngine: ObservableObject {
         print("[ConsciousnessEngine v10] Startat — 4 tasks (was 6), .background priority, thermal-aware ✓")
     }
 
+    func stop() {
+        tasks.forEach { $0.cancel() }
+        tasks.removeAll()
+        isRunning = false
+    }
+
     // MARK: - Consciousness Test Loop (30 tests, 15-min intervals)
 
     private func consciousnessTestLoop() async {
@@ -600,7 +606,15 @@ final class ConsciousnessEngine: ObservableObject {
                     "thermal": bodyBudget.thermalLevel,
                     "arousal": bodyBudget.arousal,
                     "predictionError": newError,
-                    "activity": activity
+                    "activity": activity,
+                    // Feed the shared state machine with an explicit memory
+                    // continuity signal. Without this, its memory stage was
+                    // permanently empty even while Eon had prior traces.
+                    "memoryRecall": brain.innerMonologue.isEmpty ? 0 : 1,
+                    // A cycle is considered successful only when the current
+                    // prediction was sufficiently calibrated. This signal
+                    // drives agency; it is not a free-running progress value.
+                    "action_success": newError < 0.5 ? 1 : 0
                 ],
                 thermalLoad: bodyBudget.thermalLevel,
                 candidateBroadcasts: [focusTarget]
@@ -610,6 +624,21 @@ final class ConsciousnessEngine: ObservableObject {
                 input: cycleInput
             ).state
         let telemetrySnapshot = unifiedConsciousState
+            let action = bodyBudget.thermalLevel > 0.8
+                ? "Jag sänker arbetsbelastningen och prioriterar återhämtning."
+                : "Jag fortsätter den aktiva bearbetningen och jämför nästa observation med min prediktion."
+            let result = bodyBudget.thermalLevel > 0.8
+                ? "Termisk belastning kräver försiktigare tempo."
+                : "Nästa cykel används som nytt jämförelseunderlag."
+            EonInnerState.shared.record(
+                attention: focusTarget,
+                observation: "Prediktionsfel \(String(format: "%.3f", newError)); aktivitet \(String(format: "%.2f", activity)).",
+                interpretation: currentSelfReflection.isEmpty ? "Jag håller tolkningen preliminär tills fler cykler bekräftar mönstret." : currentSelfReflection,
+                goal: brain.selfAwarenessGoal,
+                action: action,
+                result: result,
+                selfModelRevision: "Jag uppdaterar min bild av sambandet mellan belastning, fokus och återkoppling."
+            )
             let latestThought = self.thoughtStream.last
             Task.detached(priority: .utility) {
                 await EventJournal.shared.startSession(sessionID: "eon-live")
@@ -1545,7 +1574,7 @@ final class ConsciousnessEngine: ObservableObject {
             lastUpdatedGoalFromArticle = updatedGoal
 
             // 5. Logga i monologen
-            brain.innerMonologue.append(MonologueLine(
+            brain.appendMonologue(MonologueLine(
                 text: "📖 Läser: '\(article.title)' [Domän: \(article.domain)] — \(insight)",
                 type: .insight
             ))
