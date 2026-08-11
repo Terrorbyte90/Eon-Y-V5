@@ -6,7 +6,7 @@ final class EonV6Runtime: ObservableObject {
     static let shared = EonV6Runtime()
     @Published private(set) var state = EonCoreStateV2()
     @Published private(set) var evidence = EonEvidenceProfile()
-    @Published private(set) var verification = ConsciousnessVerificationResult(level: .level0, confidence: 0, passedTests: 0, totalTests: 0, ceiling: .level4, reasons: ["Startar verifiering"], evaluatedAt: Date())
+    @Published private(set) var verification = ConsciousnessVerificationResult(level: .level0, confidence: 0, passedTests: 0, totalTests: 0, ceiling: .level5, levelPassed: [0: true], reasons: ["Startar verifiering"], evaluatedAt: Date())
     @Published private(set) var testRows: [(String, Bool, Double)] = []
     @Published private(set) var fullLog = ""
     private var timer: Timer?
@@ -41,7 +41,7 @@ final class EonV6Runtime: ObservableObject {
     private func refreshFullLog(brain: EonBrain, state: EonCoreStateV2) async {
         let events = await EventJournal.shared.exportBatch(maxBytes: 120_000)
         let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601; encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        var sections = ["=== EON V6 FULL LOG ===", "generated=\(ISO8601DateFormatter().string(from: Date()))", "cycle=\(state.cycle)", "verified_level=\(verification.level.rawValue)", "verified_title=\(verification.level.title)", "passed_tests=\(verification.passedTests)/\(verification.totalTests)", "reasons=\(verification.reasons.joined(separator: " | "))", "--- INNER TRACE ---"]
+        var sections = ["=== EON V6 FULL LOG ===", "generated=\(ISO8601DateFormatter().string(from: Date()))", "cycle=\(state.cycle)", "verified_level=\(verification.level.rawValue)", "verified_title=\(verification.level.title)", "passed_tests=\(verification.passedTests)/\(verification.totalTests)", "level_status=\(VerifiedConsciousnessLevel.allCases.map { "\($0.rawValue):\(verification.levelPassed[$0.rawValue] == true ? "PASS" : "PENDING")" }.joined(separator: ","))", "reasons=\(verification.reasons.joined(separator: " | "))", "--- INNER TRACE ---"]
         sections += brain.innerMonologue.suffix(80).filter { !EonTextSanitizer.isRecursive($0.text) }.map { "[\($0.timestamp.ISO8601Format())] [\($0.source)] \(EonTextSanitizer.clean($0.text, maxLength: 600))" }
         sections.append("--- JOURNAL EVENTS ---")
         sections += events.compactMap { event in guard let data = try? encoder.encode(event), let text = String(data: data, encoding: .utf8) else { return nil }; return text }

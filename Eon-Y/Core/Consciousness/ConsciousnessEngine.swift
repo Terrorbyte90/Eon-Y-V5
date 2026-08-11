@@ -103,8 +103,8 @@ final class ConsciousnessEngine: ObservableObject {
     @Published var consciousnessTests: [ConsciousnessTest] = ConsciousnessTest.allTests
     @Published var lastTestRunTime: Date? = nil
     @Published private(set) var verifiedConsciousness = ConsciousnessVerificationResult(
-        level: .level0, confidence: 0, passedTests: 0, totalTests: ConsciousnessTest.allTests.count,
-        ceiling: .level4, reasons: ["Tester har ännu inte körts"], evaluatedAt: .distantPast
+        level: .level0, confidence: 0, passedTests: 0, totalTests: ConsciousnessTest.allTests.count - 1,
+        ceiling: .level5, levelPassed: [0: true], reasons: ["Tester har ännu inte körts"], evaluatedAt: .distantPast
     )
     private var stableVerificationWindows = 0
 
@@ -115,6 +115,7 @@ final class ConsciousnessEngine: ObservableObject {
     // for UI compatibility; this is the single hand-off point between subsystems.
     @Published private(set) var unifiedConsciousState = UnifiedConsciousState()
     private let consciousnessOrchestrator = ConsciousnessOrchestrator()
+    private let journalSessionID = "eon-" + UUID().uuidString
 
     private init() {
         initializeGoals()
@@ -209,7 +210,7 @@ final class ConsciousnessEngine: ObservableObject {
         print("[ConsciousnessTests] \(passed)/\(consciousnessTests.count) godkända — nivå \(result.level.rawValue)")
         Task {
             await EventJournal.shared.append(EonObservableEvent(
-                sessionID: "eon-live",
+                sessionID: journalSessionID,
                 cycleID: unifiedConsciousState.cycleIndex,
                 sequence: unifiedConsciousState.cycleIndex,
                 source: "ConsciousnessVerification",
@@ -659,11 +660,12 @@ final class ConsciousnessEngine: ObservableObject {
                 selfModelRevision: "Jag uppdaterar min bild av sambandet mellan belastning, fokus och återkoppling."
             )
             let latestThought = self.thoughtStream.last
+            let journalSessionID = self.journalSessionID
             Task.detached(priority: .utility) {
-                await EventJournal.shared.startSession(sessionID: "eon-live")
-                let canonicalSnapshot = CognitiveSnapshotBuilder.make(from: telemetrySnapshot, sessionID: "eon-live")
+                await EventJournal.shared.startSession(sessionID: journalSessionID)
+                let canonicalSnapshot = CognitiveSnapshotBuilder.make(from: telemetrySnapshot, sessionID: journalSessionID)
                 await EventJournal.shared.append(EonObservableEvent(
-                    sessionID: "eon-live",
+                    sessionID: journalSessionID,
                     cycleID: telemetrySnapshot.cycleIndex,
                     sequence: telemetrySnapshot.cycleIndex,
                     source: "ConsciousnessEngine",
@@ -678,7 +680,7 @@ final class ConsciousnessEngine: ObservableObject {
                 await EventJournal.shared.append(snapshot: canonicalSnapshot)
                 if let latestThought {
                     await EventJournal.shared.append(EonObservableEvent(
-                        sessionID: "eon-live",
+                        sessionID: journalSessionID,
                         cycleID: telemetrySnapshot.cycleIndex,
                         sequence: telemetrySnapshot.cycleIndex,
                         source: "ThoughtTrace",

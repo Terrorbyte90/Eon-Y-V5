@@ -48,6 +48,7 @@ struct ConsciousnessVerificationResult: Codable, Sendable {
     let passedTests: Int
     let totalTests: Int
     let ceiling: VerifiedConsciousnessLevel
+    let levelPassed: [Int: Bool]
     let reasons: [String]
     let evaluatedAt: Date
 }
@@ -63,18 +64,26 @@ enum ConsciousnessVerificationEvaluator {
         let selfModel = metrics.selfModelCoupling >= 0.35 && state.selfModel.autobiographicalContinuity >= 0.20
         let calibrated = metrics.metacognitiveCalibration >= 0.35 && state.metacognitiveState.errorMonitoring >= 0.20
 
+        let levelPassed: [Int: Bool] = [
+            0: true,
+            1: integrated || ratio >= 0.40,
+            2: integrated && recurrent && ratio >= 0.60 && stableWindows >= 2,
+            3: selfModel && calibrated && ratio >= 0.80 && stableWindows >= 3,
+            4: state.selfModel.agency >= 0.70 && state.selfModel.counterfactualDepth >= 0.60 && ratio >= 0.90 && stableWindows >= 6,
+            5: false
+        ]
         var level: VerifiedConsciousnessLevel = .level0
         var reasons: [String] = []
-        if integrated || ratio >= 0.40 { level = .level1; reasons.append("reaktiva eller adaptiva processer observerade") }
-        if integrated && recurrent && ratio >= 0.60 && stableWindows >= 2 {
+        if levelPassed[1] == true { level = .level1; reasons.append("reaktiva eller adaptiva processer observerade") }
+        if levelPassed[2] == true {
             level = .level2
             reasons.append("integration, återkoppling och anpassning återkommer över tidsfönster")
         }
-        if level.rawValue >= 2 && selfModel && calibrated && ratio >= 0.80 && stableWindows >= 3 {
+        if levelPassed[3] == true {
             level = .level3
             reasons.append("självmodell och metakognitiv kalibrering klarar upprepade tester")
         }
-        if level.rawValue >= 3 && state.selfModel.agency >= 0.70 && state.selfModel.counterfactualDepth >= 0.60 && ratio >= 0.90 && stableWindows >= 6 {
+        if levelPassed[4] == true {
             level = .level4
             reasons.append("robust agency och kontrafaktisk självmodell över flera kontexter")
         }
@@ -83,7 +92,8 @@ enum ConsciousnessVerificationEvaluator {
         let confidence = min(0.99, max(0, ratio * 0.7 + min(1, Double(stableWindows) / 6) * 0.3))
         return ConsciousnessVerificationResult(level: level, confidence: confidence,
                                                passedTests: passedTests, totalTests: totalTests,
-                                               ceiling: .level4,
+                                               ceiling: .level5,
+                                               levelPassed: levelPassed,
                                                reasons: reasons.isEmpty ? ["Otillräcklig verifierad evidens"] : reasons,
                                                evaluatedAt: Date())
     }
