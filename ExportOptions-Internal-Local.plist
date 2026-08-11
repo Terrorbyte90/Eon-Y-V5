@@ -5,7 +5,7 @@
 	<key>method</key>
 	<string>app-store-connect</string>
 	<key>destination</key>
-	<string>upload</string>
+	<string>export</string>
 	<key>teamID</key>
 	<string>G648H762LD</string>
 	<key>signingStyle</key>

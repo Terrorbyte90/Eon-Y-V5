@@ -256,7 +256,7 @@ final class IntegratedCognitiveArchitecture: ObservableObject {
         // Logga i brain monologue för UI
         let emoji = event.priority == .high ? "🔴" : event.priority == .medium ? "🟡" : "🟢"
         let monologueText = "\(emoji) ICA[\(event.source.rawValue)→\(event.target.rawValue)]: \(event.payload)"
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: monologueText,
             type: .loopTrigger
         ))
@@ -289,13 +289,13 @@ final class IntegratedCognitiveArchitecture: ObservableObject {
 
             for insight in report.insights.prefix(2) {
                 let prefix = insight.type == .regression ? "⚠️" : insight.type == .growth ? "📈" : "🧠"
-                brain.innerMonologue.append(MonologueLine(
+                brain.appendMonologue(MonologueLine(
                     text: "\(prefix) META: \(insight.content)",
                     type: .insight
                 ))
             }
             for bias in report.detectedBiases where bias.severity == .high {
-                brain.innerMonologue.append(MonologueLine(
+                brain.appendMonologue(MonologueLine(
                     text: "🔍 BIAS[\(bias.type.rawValue)]: \(bias.recommendation)",
                     type: .revision
                 ))
@@ -311,13 +311,13 @@ final class IntegratedCognitiveArchitecture: ObservableObject {
             lastGapAnalysis = analysis
 
             for gap in analysis.prioritizedGaps.prefix(2) {
-                brain.innerMonologue.append(MonologueLine(
+                brain.appendMonologue(MonologueLine(
                     text: "🎯 GAP[\(gap.priorityLabel)]: \(gap.dimension.rawValue) \(String(format: "%.0f", gap.currentLevel * 100))%→\(String(format: "%.0f", gap.targetLevel * 100))%",
                     type: .thought
                 ))
             }
             for result in analysis.results where result.improvementDelta > 0.001 {
-                brain.innerMonologue.append(MonologueLine(
+                brain.appendMonologue(MonologueLine(
                     text: "✅ INTERVENTION[\(result.dimension.rawValue)]: +\(String(format: "%.4f", result.improvementDelta))",
                     type: .insight
                 ))
@@ -468,7 +468,7 @@ final class IntegratedCognitiveArchitecture: ObservableObject {
         state.causalChainDepth = result.causalChain.count
         state.activeReasoningChain = result.causalChain
 
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: "⛓ KAUSAL[\(String(format: "%.2f", result.confidence))]: \(topic) → \(result.conclusion.prefix(70))...",
             type: .thought
         ))
@@ -511,7 +511,7 @@ final class IntegratedCognitiveArchitecture: ObservableObject {
         state.knowledgeFrontier = learningResult.studiedTopics
         state.consolidatedFacts += learningResult.studiedTopics.count
 
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: "📚 KUNSKAP[#\(learningResult.cycleNumber)]: kompetens \(String(format: "%.1f", overallLevel * 100))% · luckor: \(learningResult.gapsIdentified)",
             type: .thought
         ))
@@ -520,7 +520,7 @@ final class IntegratedCognitiveArchitecture: ObservableObject {
         if state.dimensionLevel(.knowledge) > 0.5 {
             let parallels = await synthesizeKnowledgeParallels()
             if let parallel = parallels {
-                brain.innerMonologue.append(MonologueLine(text: "🔗 SYNTES: \(parallel)", type: .insight))
+                brain.appendMonologue(MonologueLine(text: "🔗 SYNTES: \(parallel)", type: .insight))
                 await state.update(dimension: .analogyBuilding, delta: 0.003, source: "synthesis")
             }
         }
@@ -590,7 +590,7 @@ final class IntegratedCognitiveArchitecture: ObservableObject {
         let gain: Double = testResult.supported ? 0.005 : 0.002
         await state.update(dimension: .hypothesisGeneration, delta: gain, source: "hypothesis_pillar")
 
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: testResult.supported
                 ? "✅ HYPOTES[\(String(format: "%.0f", testResult.confidence * 100))%]: \(hypothesis.statement.prefix(60))"
                 : "❌ AVVISAD: \(testResult.counterEvidence.prefix(60))",
@@ -617,7 +617,7 @@ final class IntegratedCognitiveArchitecture: ObservableObject {
         await state.update(dimension: .analogyBuilding, delta: 0.004, source: "analogy_pillar")
         await state.update(dimension: .creativity, delta: 0.003, source: "analogy_pillar")
 
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: "🔗 ANALOGI[\(String(format: "%.2f", result.confidence))]: \(topic) → \(result.conclusion.prefix(60))...",
             type: .insight
         ))
@@ -644,7 +644,7 @@ final class IntegratedCognitiveArchitecture: ObservableObject {
                        "Abstraktionsnivåer kopplas samman vertikalt",
                        "Emergens detekterad: nya egenskaper ur befintliga fakta",
                        "Världsmodellens koherens ökar — färre interna motsägelser"]
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: "🌍 VÄRLDSMODELL[\(String(format: "%.2f", state.dimensionLevel(.worldModel)))]: \(insights.randomElement() ?? "")",
             type: .insight
         ))
@@ -661,7 +661,7 @@ final class IntegratedCognitiveArchitecture: ObservableObject {
             version: brain.loraVersion
         )
         for reflection in reflections.prefix(1) {
-            brain.innerMonologue.append(MonologueLine(text: "🪞 \(reflection)", type: .thought))
+            brain.appendMonologue(MonologueLine(text: "🪞 \(reflection)", type: .thought))
         }
 
         // v7: Self-awareness gain modulated by meta-attention level (genuine self-observation)
@@ -673,7 +673,7 @@ final class IntegratedCognitiveArchitecture: ObservableObject {
         // v7: If consciousness Q-index is improving, log the trajectory
         let ce = ConsciousnessEngine.shared
         if ce.qIndex > 0.3 {
-            brain.innerMonologue.append(MonologueLine(
+            brain.appendMonologue(MonologueLine(
                 text: "🪞 Q-index: \(String(format: "%.3f", ce.qIndex)) | Butlin: \(ce.butlin14Score)/14 | Meta-att: \(String(format: "%.0f%%", ast.metaAttentionLevel * 100))",
                 type: .insight
             ))
@@ -691,7 +691,7 @@ final class IntegratedCognitiveArchitecture: ObservableObject {
         let totalCount = max(1, analysis.morphemes.count)
         let recognitionRate = Double(morphCount) / Double(totalCount)
 
-        brain.innerMonologue.append(MonologueLine(
+        brain.appendMonologue(MonologueLine(
             text: "🗣 SPRÅK[\(String(format: "%.2f", state.dimensionLevel(.language)))]: \(experiment.rule) '\(experiment.baseWord)' → '\(experiment.derivedForm)' · Igenkänning: \(String(format: "%.0f", recognitionRate * 100))%",
             type: .thought
         ))
@@ -704,7 +704,7 @@ final class IntegratedCognitiveArchitecture: ObservableObject {
 
         // If idioms were detected, boost comprehension further
         if let firstIdiom = analysis.detectedIdioms.first {
-            brain.innerMonologue.append(MonologueLine(
+            brain.appendMonologue(MonologueLine(
                 text: "🗣 Idiom: '\(firstIdiom.phrase)' = \(firstIdiom.meaning)",
                 type: .insight
             ))
@@ -767,7 +767,7 @@ final class IntegratedCognitiveArchitecture: ObservableObject {
             prediction = "Begränsad prediktion (styrka: \(String(format: "%.2f", combinedStrength))). Stärk världsmodell."
         }
 
-        brain.innerMonologue.append(MonologueLine(text: "🔮 PREDIKTION[\(String(format: "%.0f", combinedStrength * 100))%]: \(prediction)", type: .insight))
+        brain.appendMonologue(MonologueLine(text: "🔮 PREDIKTION[\(String(format: "%.0f", combinedStrength * 100))%]: \(prediction)", type: .insight))
         // v7: Prediction gain boosted when forward model is accurate
         let predGain = 0.003 * (0.5 + fmAccuracy * 0.5)
         await state.update(dimension: .prediction, delta: predGain, source: "prediction_pillar")
@@ -812,7 +812,7 @@ final class IntegratedCognitiveArchitecture: ObservableObject {
         }
 
         if amplified > 0 || suppressedNegative > 0 {
-            brain.innerMonologue.append(MonologueLine(
+            brain.appendMonologue(MonologueLine(
                 text: "🔄 FEEDBACK: \(amplified) positiva, \(suppressedNegative) kompenserade · II=\(String(format: "%.4f", ii)) · v=\(String(format: "%.6f", state.growthVelocity))/min",
                 type: .loopTrigger
             ))

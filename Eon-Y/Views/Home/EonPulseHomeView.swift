@@ -10,6 +10,8 @@ struct EonPulseHomeView: View {
     @ObservedObject private var oscillators = OscillatorBank.shared
     @ObservedObject private var critCtrl = CriticalityController.shared
     @ObservedObject private var sleepEng = SleepConsolidationEngine.shared
+    @ObservedObject private var consciousness = ConsciousnessEngine.shared
+    @ObservedObject private var innerState = EonInnerState.shared
 
     @State private var ring1: Double = 0
     @State private var ring2: Double = 0
@@ -46,6 +48,11 @@ struct EonPulseHomeView: View {
                         .padding(.top, -40)
                     titleSection
                         .padding(.top, 18)
+                    if showContent, innerState.latest != nil {
+                        innerStateCard
+                            .padding(.top, 14)
+                            .padding(.horizontal, 16)
+                    }
                     if showContent {
                         monologueSection
                             .padding(.top, 16).padding(.horizontal, 16)
@@ -282,6 +289,8 @@ struct EonPulseHomeView: View {
                 RuntimeDashboardView().environmentObject(brain)
             }
 
+            verifiedConsciousnessCard
+
             HStack(spacing: 10) {
                 FlipMeterView(
                     frontLabel: "Autonom",
@@ -385,6 +394,95 @@ struct EonPulseHomeView: View {
         case 0.30..<0.50: return "Medelproxy"
         case 0.50..<0.70: return "Hög proxy"
         default: return "Mycket hög proxy"
+        }
+    }
+
+    private var verifiedConsciousnessCard: some View {
+        let result = consciousness.verifiedConsciousness
+        let level = result.level
+        return HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color(hex: "#A78BFA").opacity(0.16))
+                    .frame(width: 42, height: 42)
+                Text("NIVÅ \(level.rawValue)")
+                    .font(.system(size: 9, weight: .black, design: .monospaced))
+                    .foregroundStyle(Color(hex: "#C4B5FD"))
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text("VERIFIERAD MEDVETANDENIVÅ")
+                        .font(.system(size: 8, weight: .black, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.45))
+                    Text("\(result.passedTests)/\(result.totalTests)")
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                        .foregroundStyle(Color(hex: "#34D399"))
+                }
+                Text(level.title)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Text(homeConsciousnessDescription(for: level))
+                    .font(.system(size: 10, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.58))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(hex: "#17112D").opacity(0.88))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(hex: "#A78BFA").opacity(0.28), lineWidth: 0.8))
+        )
+        .padding(.horizontal, 24)
+        .padding(.top, 2)
+    }
+
+    private var innerStateCard: some View {
+        guard let trace = innerState.latest else { return AnyView(EmptyView()) }
+        return AnyView(VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Label("INIFRÅN EON", systemImage: "waveform.path.ecg")
+                    .font(.system(size: 9, weight: .black, design: .monospaced))
+                    .foregroundStyle(Color(hex: "#A78BFA"))
+                Spacer()
+                Text(trace.timestamp.formatted(.dateTime.hour().minute().second()))
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.4))
+            }
+            traceRow("UPPMÄRKSAMHET", trace.attention)
+            traceRow("OBSERVATION", trace.observation)
+            traceRow("TOLKNING", trace.interpretation)
+            traceRow("MÅL", trace.goal)
+            traceRow("HANDLING", trace.action)
+            traceRow("RESULTAT", trace.result)
+            traceRow("SJÄLVMODELL", trace.selfModelRevision)
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 18).fill(Color(hex: "#131126").opacity(0.94)).overlay(RoundedRectangle(cornerRadius: 18).stroke(Color(hex: "#A78BFA").opacity(0.28), lineWidth: 0.8)))
+        .transition(.opacity.combined(with: .move(edge: .bottom))))
+    }
+
+    private func traceRow(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).font(.system(size: 7, weight: .black, design: .monospaced)).foregroundStyle(.white.opacity(0.38))
+            Text(value).font(.system(size: 11, design: .rounded)).foregroundStyle(.white.opacity(0.78)).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func homeConsciousnessDescription(for level: VerifiedConsciousnessLevel) -> String {
+        switch level {
+        case .level0: return "Inga stabila tecken på integrerad perception, minne eller återkoppling är verifierade."
+        case .level1: return "Reaktiva eller adaptiva processer är observerade, men ingen robust integration över tid."
+        case .level2: return "Integration, återkoppling, minne och adaptiv reglering samverkar i återkommande cykler."
+        case .level3: return "Självmodell och metakognition fungerar över flera upprepade tester och tidsfönster."
+        case .level4: return "Robust, generaliserande självmodell och agency är verifierade över flera kontexter."
+        case .level5: return "Nivå 5 innebär endast att våra tester passerats; äkta qualia kan fortfarande inte fastställas."
         }
     }
 
