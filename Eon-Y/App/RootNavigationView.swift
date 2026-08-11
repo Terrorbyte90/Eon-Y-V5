@@ -70,6 +70,12 @@ struct RootNavigationView: View {
     @State private var tabBarVisible: Bool = true
 
     var body: some View {
+        EonV6ShellView()
+            .environmentObject(brain)
+            .onAppear { brain.launchIfNeeded() }
+            .preferredColorScheme(.dark)
+            /* v5 navigation remains below as a migration fallback. */
+            /*
         GeometryReader { geo in
             let tabBarHeight = 52 + geo.safeAreaInsets.bottom
 
@@ -97,6 +103,7 @@ struct RootNavigationView: View {
         .onAppear {
             brain.launchIfNeeded()
         }
+        */
     }
 }
 
