@@ -16,8 +16,8 @@ struct EonV6SettingsView: View {
                     Toggle("Hermes-export", isOn: $hermesEnabled)
                 }
                 Section("Experiment") {
-                    NavigationLink("Kausal perturbation") { Text("Experimentpanelen ansluts till v6-laboratoriet.").padding() }
-                    NavigationLink("Export & journal") { Text("Segmenterade JSONL-händelser och snapshots.").padding() }
+                    NavigationLink("Kausal perturbation") { EonV6ExperimentView() }
+                    NavigationLink("Export & journal") { EonV6JournalView() }
                 }
             }
             .scrollContentBackground(.hidden)

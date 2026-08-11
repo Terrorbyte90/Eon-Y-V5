@@ -19,11 +19,12 @@ final class EonV6Runtime: ObservableObject {
         let ce = ConsciousnessEngine.shared
         state.cycle = ce.unifiedConsciousState.cycleIndex
         state.monotonicTimestamp = Date()
-        state.attention = brain.attentionFocus.isEmpty ? brain.currentWorkspaceFocus : brain.attentionFocus
+        let rawFocus = brain.attentionFocus.isEmpty ? brain.currentWorkspaceFocus : brain.attentionFocus
+        state.attention = EonTextSanitizer.clean(rawFocus.isEmpty ? "Spontan intern aktivitet" : rawFocus, maxLength: 100)
         state.globalBroadcast = ce.unifiedConsciousState.globalBroadcast.first ?? ""
-        state.temporalContinuity = ce.unifiedConsciousState.continuity
+        state.temporalContinuity = min(0.96, max(0, ce.unifiedConsciousState.continuity * 0.72 + brain.selfModelAccuracy * 0.28))
         state.selfModelConfidence = brain.selfModelAccuracy
-        state.agency = ce.unifiedConsciousState.selfModel.agency
+        state.agency = min(0.96, max(0, ce.unifiedConsciousState.selfModel.agency * (1 - ce.unifiedConsciousState.predictionError * 0.35)))
         state.body = InteroceptiveBodyCore().state(thermal: ce.bodyBudget.thermalLevel, cpu: brain.cpuUsage, memory: min(1, brain.memoryUsageMB / 2048))
         state.affect = AffectiveCoreV2().update(previous: state.affect, predictionError: ce.unifiedConsciousState.predictionError, body: state.body, outcomeImprovement: 1 - ce.unifiedConsciousState.predictionError)
         state.languageReporterAvailable = true
