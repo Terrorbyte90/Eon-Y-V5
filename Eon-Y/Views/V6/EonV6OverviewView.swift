@@ -9,6 +9,11 @@ struct EonV6OverviewView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     header
+                    EonV6Card(title: "Nivå \(runtime.verification.level.rawValue) / 5", eyebrow: "Verifierad medvetandenivå", accent: EonV6Theme.amber) {
+                        HStack(alignment: .firstTextBaseline) { Text("\(runtime.verification.level.rawValue)").font(.system(size: 58, weight: .bold, design: .rounded)).foregroundStyle(EonV6Theme.amber); VStack(alignment: .leading) { Text(runtime.verification.level.title).font(.headline).foregroundStyle(.white); Text(runtime.verification.level.biologicalAnalogy).font(.caption).foregroundStyle(.white.opacity(0.55)) }; Spacer(); Text("\(runtime.verification.passedTests)/\(runtime.verification.totalTests) tester").font(.system(size: 11, design: .monospaced)).foregroundStyle(.white.opacity(0.6)) }
+                        Text(runtime.verification.reasons.joined(separator: " • ")).font(.caption).foregroundStyle(.white.opacity(0.65))
+                        HStack { Text("Konfidens"); Spacer(); Text("\(Int(runtime.verification.confidence * 100))%") }.font(.system(size: 12, design: .monospaced)).foregroundStyle(.white.opacity(0.6))
+                    }
                     EonV6Card(title: "Eon är här", eyebrow: "Kärnstatus", accent: EonV6Theme.cyan) {
                         HStack(spacing: 22) {
                             EonV6Metric(label: "cykel", value: "#\(runtime.state.cycle)", tint: EonV6Theme.cyan)
@@ -26,6 +31,10 @@ struct EonV6OverviewView: View {
                         progress("Termiskt tryck", runtime.state.body.thermalPressure, EonV6Theme.coral)
                         progress("Kognitiv belastning", runtime.state.body.cognitiveLoad, EonV6Theme.amber)
                         progress("Tillgänglig kapacitet", runtime.state.body.processingAvailability, EonV6Theme.mint)
+                    }
+                    EonV6Card(title: "Senaste beslut", eyebrow: "Observerbar handling", accent: EonV6Theme.mint) {
+                        Text("Policy: \(runtime.state.activePolicy)").foregroundStyle(.white)
+                        Text("Senast uppdaterad: cykel \(runtime.state.cycle)").font(.caption).foregroundStyle(.white.opacity(0.5))
                     }
                 }.padding(20)
             }
