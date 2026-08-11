@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct EonV6ExperimentView: View {
     @State private var selected = "no-broadcast"
@@ -16,9 +17,12 @@ struct EonV6ExperimentView: View {
 }
 
 struct EonV6JournalView: View {
+    @EnvironmentObject private var runtime: EonV6Runtime
+    @State private var copied = false
     var body: some View {
         List {
-            Section("Livejournal") { Label("JSONL-segment aktivt", systemImage: "doc.text.fill"); Label("Snapshots exporteras periodiskt", systemImage: "arrow.up.doc.fill"); Label("Proveniens bevaras per händelse", systemImage: "link") }
+            Section("Livejournal") { Label("JSONL-segment aktivt", systemImage: "doc.text.fill"); Label("Snapshots exporteras periodiskt", systemImage: "arrow.up.doc.fill"); Label("Proveniens bevaras per händelse", systemImage: "link"); Button(copied ? "Kopierad" : "Kopiera full logg") { UIPasteboard.general.string = runtime.fullLog; copied = true } }
+            Section("Omfång") { Text("\(runtime.fullLog.count) tecken i kopierbar export"); Text("Innehåller verifieringsnivå, teststatus, renad intern trace och journalhändelser.").font(.caption).foregroundStyle(.secondary) }
             Section("Datatyper") { Text("Measurement"); Text("Prediction"); Text("Workspace"); Text("Thought trace"); Text("Causal trace") }
         }.scrollContentBackground(.hidden).background(EonV6Theme.ink).navigationTitle("Export & journal")
     }
