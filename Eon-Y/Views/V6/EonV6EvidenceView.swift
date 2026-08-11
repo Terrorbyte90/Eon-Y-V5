@@ -13,6 +13,22 @@ struct EonV6EvidenceView: View {
             EonV6Card(title: "\(runtime.verification.passedTests)/\(runtime.verification.totalTests) godkända", eyebrow: "Verifieringsfönster", accent: EonV6Theme.cyan) {
                 ForEach(Array(runtime.testRows.enumerated()), id: \.offset) { _, row in HStack { Image(systemName: row.1 ? "checkmark.circle.fill" : "circle").foregroundStyle(row.1 ? EonV6Theme.mint : .white.opacity(0.3)); Text(row.0).foregroundStyle(.white.opacity(0.75)); Spacer(); Text("\(Int(row.2 * 100))%").font(.system(size: 11, design: .monospaced)).foregroundStyle(.white.opacity(0.5)) }.font(.system(size: 12)) }
             }
+            EonV6Card(title: "Alla nivåer", eyebrow: "Oberoende bedömning", accent: EonV6Theme.mint) {
+                ForEach(VerifiedConsciousnessLevel.allCases, id: \.self) { level in
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: runtime.verification.levelPassed[level.rawValue] == true ? "checkmark.circle.fill" : "circle.dashed")
+                            .foregroundStyle(runtime.verification.levelPassed[level.rawValue] == true ? EonV6Theme.mint : .white.opacity(0.35))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Nivå \(level.rawValue) · \(level.title)").foregroundStyle(.white)
+                            Text(level.explanation).font(.caption).foregroundStyle(.white.opacity(0.48))
+                        }
+                        Spacer()
+                        Text(runtime.verification.levelPassed[level.rawValue] == true ? "PASS" : "PÅGÅR")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(runtime.verification.levelPassed[level.rawValue] == true ? EonV6Theme.mint : .white.opacity(0.4))
+                    }
+                }
+            }
             EonV6Card(title: "Laboratorium", eyebrow: "Kontroller", accent: EonV6Theme.amber) { status("Held-out", runtime.evidence.heldOutPassed); status("Language-off", runtime.evidence.languageOffPassed); status("Restart", runtime.evidence.restartPassed); Text("Ablationer rapporteras med baseline, intervention och state-delta.").foregroundStyle(.white.opacity(0.5)) }
         }.padding(20) }.background(EonV6Theme.ink.ignoresSafeArea()).navigationBarTitleDisplayMode(.inline) }
     }
