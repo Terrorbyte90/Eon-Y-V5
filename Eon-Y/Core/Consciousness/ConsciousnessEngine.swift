@@ -160,7 +160,13 @@ final class ConsciousnessEngine: ObservableObject {
         // v10: Merged 3 loops into 1 to reduce concurrent task count (6→4)
         tasks.append(Task(priority: .background) { await self.combinedMaintenanceLoop() })
 
-        print("[ConsciousnessEngine v10] Startat — 4 tasks (was 6), .background priority, thermal-aware ✓")
+        // Keep verification as an explicit lifecycle task. Previously the test
+        // loop existed, but was not scheduled after the maintenance-loop merge;
+        // a session could therefore run indefinitely while still reporting
+        // “Tester har ännu inte körts”.
+        tasks.append(Task(priority: .utility) { await self.consciousnessTestLoop() })
+
+        print("[ConsciousnessEngine v10] Startat — 5 tasks, verifiering schemalagd ✓")
     }
 
     func stop() {
@@ -173,7 +179,7 @@ final class ConsciousnessEngine: ObservableObject {
 
     private func consciousnessTestLoop() async {
         // Initial delay — let system stabilize
-        try? await Task.sleep(nanoseconds: 60_000_000_000) // Wait 60s before first test run
+        try? await Task.sleep(nanoseconds: 15_000_000_000) // First result within one normal observation window
         while !Task.isCancelled {
             await runAllConsciousnessTests()
             // Run every 15 minutes (900 seconds)
@@ -199,7 +205,25 @@ final class ConsciousnessEngine: ObservableObject {
             totalTests: evidence.total,
             stableWindows: stableVerificationWindows
         )
-        print("[ConsciousnessTests] \(passed)/\(consciousnessTests.count) godkända")
+        let result = verifiedConsciousness
+        print("[ConsciousnessTests] \(passed)/\(consciousnessTests.count) godkända — nivå \(result.level.rawValue)")
+        Task {
+            await EventJournal.shared.append(EonObservableEvent(
+                sessionID: "eon-live",
+                cycleID: unifiedConsciousState.cycleIndex,
+                sequence: unifiedConsciousState.cycleIndex,
+                source: "ConsciousnessVerification",
+                kind: .measurement,
+                severity: .notice,
+                payload: [
+                    "event": "verification_run",
+                    "verifiedLevel": String(result.level.rawValue),
+                    "passedTests": String(result.passedTests),
+                    "totalTests": String(result.totalTests),
+                    "confidence": String(result.confidence)
+                ]
+            ))
+        }
     }
 
     private func evaluateTest(_ test: ConsciousnessTest) -> Bool {
@@ -312,11 +336,6 @@ final class ConsciousnessEngine: ObservableObject {
             // Sleep monitoring every 2nd tick (~60s)
             if maintenanceTick % 2 == 0 {
                 await runSleepMonitoringTick()
-            }
-
-            // Consciousness tests every 30th tick (~15 min)
-            if maintenanceTick % 30 == 1 && maintenanceTick > 2 {
-                await runAllConsciousnessTests()
             }
 
             try? await Task.sleep(nanoseconds: 30_000_000_000) // 30s between ticks

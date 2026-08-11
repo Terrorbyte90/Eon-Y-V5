@@ -57,7 +57,9 @@ enum SelfNarrativeEngine {
     }
 
     private static func baseText(_ context: SelfNarrativeContext) -> String {
-        var text = "Jag riktar uppmärksamheten mot \(context.focus). \(context.observation)."
+        let focus = EonTextSanitizer.clean(context.focus, maxLength: 120)
+        let observation = EonTextSanitizer.clean(context.observation, maxLength: 260)
+        var text = "Jag riktar uppmärksamheten mot \(focus.isEmpty ? "den aktuella signalen" : focus). \(observation)."
         if let prediction = context.prediction, let actual = context.actual {
             text += " Jag förutsåg \(prediction), men observerade \(actual). Det gör min tidigare modell osäker."
         }
