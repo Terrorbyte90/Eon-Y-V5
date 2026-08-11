@@ -1,0 +1,7 @@
+import SwiftUI
+
+struct EonV6EvidenceView: View {
+    @EnvironmentObject private var runtime: EonV6Runtime
+    var body: some View { NavigationStack { ScrollView { VStack(alignment: .leading, spacing: 16) { Text("Evidens").font(.system(size: 30, weight: .bold, design: .rounded)).foregroundStyle(.white); Text("Varje familj bedöms separat. Ingen enskild mätare styr helheten.").foregroundStyle(.white.opacity(0.5)); EonV6Card(title: "Profil", eyebrow: "Multi-theory", accent: EonV6Theme.indigo) { EonV6Metric(label: "samlad profil", value: "\(Int(runtime.evidence.mean * 100))%", tint: EonV6Theme.indigo); ForEach(EonEvidenceFamily.allCases, id: \.self) { family in HStack { Text(family.rawValue.capitalized).foregroundStyle(.white.opacity(0.7)); Spacer(); ProgressView(value: runtime.evidence.scores[family] ?? 0).frame(width: 110).tint(EonV6Theme.cyan) } .font(.system(size: 12)) } }; EonV6Card(title: "Laboratorium", eyebrow: "Kontroller", accent: EonV6Theme.amber) { status("Held-out", runtime.evidence.heldOutPassed); status("Language-off", runtime.evidence.languageOffPassed); status("Restart", runtime.evidence.restartPassed); Text("Ablationer körs separat och rapporteras med sina state-delta.").foregroundStyle(.white.opacity(0.5)) } }.padding(20) }.background(EonV6Theme.ink.ignoresSafeArea()).navigationBarTitleDisplayMode(.inline) } }
+    private func status(_ label: String, _ passed: Bool) -> some View { Label(label, systemImage: passed ? "checkmark.circle.fill" : "circle.dashed").foregroundStyle(passed ? EonV6Theme.mint : .white.opacity(0.45)) }
+}
