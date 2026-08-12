@@ -23,6 +23,22 @@ struct EonV6InsideView: View {
                         Text("Qwen får läsa ett snapshot och formulera en rapport. Den får inte skriva till kärnstate.").foregroundStyle(.white.opacity(0.7))
                         Label("Read-only reporter aktiv", systemImage: "lock.fill").foregroundStyle(EonV6Theme.mint)
                     }
+                    if let presentation = runtime.presentation {
+                        EonV6Card(title: "Vad Eon gör", eyebrow: "Aktivitet", accent: EonV6Theme.mint) {
+                            Label(presentation.currentActivity.title, systemImage: "waveform").font(.headline).foregroundStyle(.white)
+                            Text(presentation.currentActivity.consequence).font(.caption).foregroundStyle(.white.opacity(0.65))
+                            row("Nästa policy", presentation.nextAction)
+                            row("Varför", presentation.nextActionReason)
+                        }
+                        EonV6Card(title: "Osäkerhet och gränser", eyebrow: "Epistemik", accent: EonV6Theme.indigo) {
+                            ForEach(presentation.claims) { claim in
+                                HStack(alignment: .top) {
+                                    Text(claim.kind.rawValue.uppercased()).font(.system(size: 9, design: .monospaced)).foregroundStyle(EonV6Theme.indigo)
+                                    Text(claim.text).font(.caption).foregroundStyle(.white.opacity(0.72))
+                                }
+                            }
+                        }
+                    }
                 }.padding(20)
             }
             .background(EonV6Theme.ink.ignoresSafeArea())

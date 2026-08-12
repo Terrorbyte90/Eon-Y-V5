@@ -9,6 +9,8 @@ final class EonV6Runtime: ObservableObject {
     @Published private(set) var verification = ConsciousnessVerificationResult(level: .level0, confidence: 0, passedTests: 0, totalTests: 0, ceiling: .level5, levelPassed: [0: true], reasons: ["Startar verifiering"], evaluatedAt: Date())
     @Published private(set) var testRows: [(String, Bool, Double)] = []
     @Published private(set) var fullLog = ""
+    @Published private(set) var presentation: EonPresentationSnapshot?
+    @Published private(set) var verificationFreshness = "Startar verifiering"
     private var timer: Timer?
 
     func start() {
@@ -34,6 +36,8 @@ final class EonV6Runtime: ObservableObject {
         evidence = ConsciousnessEvidenceEngine().profile(state: state)
         verification = ce.verifiedConsciousness
         testRows = ce.consciousnessTests.map { ($0.name, $0.passed, $0.score) }
+        presentation = EonPresentationSnapshot.make(state: state, verification: verification, brain: brain, previous: presentation)
+        verificationFreshness = "Verifiering från cykel \(state.cycle)"
         objectWillChange.send()
         Task { await refreshFullLog(brain: brain, state: state) }
     }
@@ -41,7 +45,8 @@ final class EonV6Runtime: ObservableObject {
     private func refreshFullLog(brain: EonBrain, state: EonCoreStateV2) async {
         let events = await EventJournal.shared.exportBatch(maxBytes: 120_000)
         let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601; encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        var sections = ["=== EON V6 FULL LOG ===", "generated=\(ISO8601DateFormatter().string(from: Date()))", "cycle=\(state.cycle)", "verified_level=\(verification.level.rawValue)", "verified_title=\(verification.level.title)", "passed_tests=\(verification.passedTests)/\(verification.totalTests)", "level_status=\(VerifiedConsciousnessLevel.allCases.map { "\($0.rawValue):\(verification.levelPassed[$0.rawValue] == true ? "PASS" : "PENDING")" }.joined(separator: ","))", "reasons=\(verification.reasons.joined(separator: " | "))", "--- INNER TRACE ---"]
+        let snapshot = verification
+        var sections = ["=== EON V6 FULL LOG ===", "generated=\(ISO8601DateFormatter().string(from: Date()))", "cycle=\(state.cycle)", "snapshot_cycle=\(state.cycle)", "verification_freshness=\(verificationFreshness)", "verified_level=\(snapshot.level.rawValue)", "verified_title=\(snapshot.level.title)", "passed_tests=\(snapshot.passedTests)/\(snapshot.totalTests)", "level_status=\(VerifiedConsciousnessLevel.allCases.map { "\($0.rawValue):\(snapshot.levelPassed[$0.rawValue] == true ? "PASS" : "PENDING")" }.joined(separator: ","))", "reasons=\(snapshot.reasons.joined(separator: " | "))", "--- INNER TRACE ---"]
         sections += brain.innerMonologue.suffix(80).filter { !EonTextSanitizer.isRecursive($0.text) }.map { "[\($0.timestamp.ISO8601Format())] [\($0.source)] \(EonTextSanitizer.clean($0.text, maxLength: 600))" }
         sections.append("--- JOURNAL EVENTS ---")
         sections += events.compactMap { event in guard let data = try? encoder.encode(event), let text = String(data: data, encoding: .utf8) else { return nil }; return text }
