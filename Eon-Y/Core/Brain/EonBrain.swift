@@ -226,6 +226,10 @@ final class EonBrain: ObservableObject {
 
     private func appendMonologueDirectly(_ line: MonologueLine) {
         guard !line.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let lowInformationQwen = line.source == "SelfNarrative/Qwen" &&
+            line.text.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("Spännande tanke om UNDERLAG!")
+        if lowInformationQwen,
+           innerMonologue.suffix(40).contains(where: { $0.source == line.source && $0.text == line.text }) { return }
         if line.source.hasPrefix("SelfNarrative/"),
            innerMonologue.suffix(24).contains(where: { $0.source == line.source && $0.text == line.text && Date().timeIntervalSince($0.timestamp) < 90 }) { return }
         if let previous = innerMonologue.last,
