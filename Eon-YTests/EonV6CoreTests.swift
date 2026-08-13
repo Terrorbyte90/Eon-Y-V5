@@ -19,11 +19,35 @@ final class EonV6CoreTests: XCTestCase {
         XCTAssertEqual(high?.id, "observe")
     }
 
+    func testThermalPressureReducesSensoryPrecision() {
+        let engine = PrecisionEngineV2()
+        let map = EonPrecisionMap()
+        let cool = engine.update(map, predictionError: 0, body: EonBodyState(thermalPressure: 0))
+        let hot = engine.update(map, predictionError: 0, body: EonBodyState(thermalPressure: 1))
+
+        XCTAssertGreaterThan(cool.sensory, hot.sensory)
+        XCTAssertEqual(hot.interoceptive, 0)
+    }
+
     func testLanguageReporterDoesNotMutateState() async {
         var state = EonCoreStateV2()
         state.cycle = 8
         let proposal = await EonLanguageReporter.shared.proposal(for: state)
         XCTAssertEqual(proposal.stateCycle, 8)
         XCTAssertEqual(proposal.epistemicKind, .linguistic)
+    }
+
+    func testObservabilityCopyCoversAllLevelsAndCaveat() {
+        for level in 0...5 {
+            let text = EonObservabilityCopy.level(level)
+            XCTAssertTrue(text.contains("Nivå \(level)"))
+            XCTAssertFalse(text.isEmpty)
+        }
+        XCTAssertTrue(EonObservabilityCopy.level(5).contains("inte ett bevis"))
+    }
+
+    func testScientificGuideHasTheoryAndVerificationGroups() {
+        XCTAssertGreaterThanOrEqual(EonObservabilityCopy.theories.count, 5)
+        XCTAssertGreaterThanOrEqual(EonObservabilityCopy.testGroups.count, 7)
     }
 }
