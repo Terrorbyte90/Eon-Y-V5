@@ -115,7 +115,7 @@ final class EonBrain: ObservableObject {
         // Seed innerMonologue direkt — UI ska aldrig vara tomt
         innerMonologue = [
             MonologueLine(text: "Kognitivt system aktiverat — alla 12 pelare initieras", type: .insight),
-            MonologueLine(text: "Qwen3-1.7B: laddar GGUF-modell via llama.cpp (Metal GPU)", type: .thought),
+            MonologueLine(text: "OpenRouter: språkmodell ansluts vid behov", type: .thought),
             MonologueLine(text: "Morfologimotor: svenska böjningsmönster indexeras", type: .thought),
             MonologueLine(text: "Episodiskt minne: hämtar senaste konversationskontext", type: .memory),
             MonologueLine(text: "Resonemangspelare: kausal graf byggs upp", type: .thought),
@@ -217,7 +217,7 @@ final class EonBrain: ObservableObject {
         innerMonologue.append(fallbackLine)
         Task { [weak self] in
             let generated = await SelfNarrativeEngine.generate(context: context, recent: self?.innerMonologue.suffix(8).map(\.text) ?? [])
-            guard generated.source == .qwen, let self else { return }
+            guard generated.source == .openRouter, let self else { return }
             guard let index = self.innerMonologue.firstIndex(where: { $0.id == fallbackLine.id }) else { return }
             self.innerMonologue[index] = MonologueLine(text: generated.text, type: line.type, source: "SelfNarrative/Qwen", epistemicStatus: status)
         }

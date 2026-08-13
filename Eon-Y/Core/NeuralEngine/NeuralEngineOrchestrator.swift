@@ -2,12 +2,11 @@ import Foundation
 import NaturalLanguage
 import Accelerate
 
-// MARK: - NeuralEngineOrchestrator: Koordinerar Qwen3-1.7B GGUF på Metal GPU
+// MARK: - NeuralEngineOrchestrator: OpenRouter + deterministisk fallback
 
 actor NeuralEngineOrchestrator {
     static let shared = NeuralEngineOrchestrator()
 
-    private(set) var qwenHandler: QwenHandler?
     private(set) var isLoaded: Bool = false
     private(set) var loadError: String?
 
@@ -19,8 +18,6 @@ actor NeuralEngineOrchestrator {
     private var modelVersion: Int = 1
 
     // Inaktivitetstimers för lazy unload
-    private var lastUse: Date = .distantPast
-    private var idleCheckTask: Task<Void, Never>?
     private let modelModeKey = "eon_local_model_mode"
 
     private init() {}
@@ -37,75 +34,20 @@ actor NeuralEngineOrchestrator {
     }
 
     func unloadNow() async {
-        idleCheckTask?.cancel()
-        await qwenHandler?.unload()
-        qwenHandler = nil
         isLoaded = false
     }
 
     // MARK: - Compatibility aliases (for code that references bert/gpt)
-    var bertLoaded: Bool { qwenHandler != nil }
-    var gptLoaded: Bool { qwenHandler != nil }
-    var bertHandler: QwenHandler? { qwenHandler }
-    var gptHandler: QwenHandler? { qwenHandler }
+    var bertLoaded: Bool { false }
+    var gptLoaded: Bool { false }
 
     // MARK: - Loading
 
     func loadModels() async {
         // Startup must remain lightweight on iPhone. The default `.onDemand`
         // mode loads only when an actual inference request needs the model.
-        guard modelMode == .automatic else { return }
-        guard !isLoaded else { return }
-        print("[QWEN] Loading Qwen3-1.7B...")
-
-        do {
-            let handler = QwenHandler()
-            try await handler.load()
-            qwenHandler = handler
-            lastUse = Date()
-            isLoaded = true
-            print("[QWEN] Qwen3-1.7B ready ✓")
-        } catch {
-            loadError = error.localizedDescription
-            print("[QWEN] Load error: \(error)")
-        }
-
-        startIdleCheck()
-    }
-
-    // MARK: - Idle unload loop
-
-    private func startIdleCheck() {
-        idleCheckTask?.cancel()
-        idleCheckTask = Task(priority: .background) {
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 180_000_000_000) // 3 min
-                await self.unloadIfIdle()
-            }
-        }
-    }
-
-    func unloadIfIdle() async {
-        let now = Date()
-        if qwenHandler != nil && now.timeIntervalSince(lastUse) > 600 {
-            await qwenHandler?.unload()
-            qwenHandler = nil
-            isLoaded = false
-            print("[QWEN] Unloaded — idle >10 min")
-            await RunSessionLogger.shared.log("Qwen3 unloaded (idle >10 min)")
-        }
-    }
-
-    private func ensureLoaded() async {
-        guard modelMode != .disabled else { return }
-        guard qwenHandler == nil else { return }
-        print("[QWEN] Reloading Qwen3...")
-        await RunSessionLogger.shared.log("Qwen3 reloading (lazy)")
-        let handler = QwenHandler()
-        try? await handler.load()
-        qwenHandler = handler
-        isLoaded = true
-        lastUse = Date()
+        isLoaded = false
+        loadError = nil
     }
 
     // MARK: - Embedding
@@ -121,14 +63,7 @@ actor NeuralEngineOrchestrator {
         let cacheKey = (text + "\(modelVersion)").hashValue
         if let cached = embeddingCache[cacheKey] { return cached }
 
-        await ensureLoaded()
-        lastUse = Date()
-
-        guard let handler = qwenHandler else {
-            return fallbackEmbed(text)
-        }
-
-        let embedding = await handler.embed(text)
+        let embedding = fallbackEmbed(text)
         cacheEmbedding(key: cacheKey, value: embedding)
         return embedding
     }
@@ -164,6 +99,12 @@ actor NeuralEngineOrchestrator {
     // MARK: - Generation
 
     func generate(prompt: String, maxTokens: Int = 200, temperature: Float = 0.7, enableThinking: Bool = false) async -> String {
+        let boundedPrompt = OpenRouterLimits.bounded(prompt)
+        if let remote = await OpenRouterProvider.shared.generate(prompt: boundedPrompt, maxTokens: maxTokens, temperature: temperature) {
+            return EonTextNormalizer.normalize(remote, maxLength: OpenRouterLimits.maxCharacters)
+        }
+        return await fallbackGenerate(boundedPrompt)
+        /*
         guard modelMode != .disabled else { return await fallbackGenerate(prompt) }
         // Thermal circuit breaker: skip Qwen entirely when thermal is critical
         if await ThermalSleepManager.shared.shouldSkipQwenInference() {
@@ -172,77 +113,20 @@ actor NeuralEngineOrchestrator {
 
         await ensureLoaded()
         lastUse = Date()
-        guard let handler = qwenHandler else {
-            return await fallbackGenerate(prompt)
-        }
         let raw = await handler.generate(prompt: prompt, maxNewTokens: maxTokens, temperature: temperature, enableThinking: enableThinking)
         let deduped = Self.deduplicateSentences(raw)
         let cleaned = Self.cleanOutput(deduped)
         return Self.finalSafetyDedup(cleaned)
+        */
     }
 
     func generateStream(prompt: String, maxTokens: Int = 200, temperature: Float = 0.7, enableThinking: Bool = false) -> AsyncStream<String> {
         AsyncStream { continuation in
             Task {
-                // Thermal circuit breaker at orchestrator level
-                if await ThermalSleepManager.shared.shouldSkipQwenInference() {
-                    let fallback = await self.fallbackGenerate(prompt)
-                    for word in fallback.split(separator: " ") {
-                        continuation.yield(String(word) + " ")
-                    }
-                    continuation.finish()
-                    return
-                }
-
-                await self.ensureLoaded()
-                self.lastUse = Date()
-                guard let handler = self.qwenHandler else {
-                    let fallback = await self.fallbackGenerate(prompt)
-                    for word in fallback.split(separator: " ") {
-                        continuation.yield(String(word) + " ")
-                        try? await Task.sleep(nanoseconds: 50_000_000)
-                    }
-                    continuation.finish()
-                    return
-                }
-
-                var accumulated = ""
-                var ngramCounts: [String: Int] = [:]
-                var recentSentences: [String] = []
-                var stopped = false
-
-                await handler.generateStream(prompt: prompt, maxNewTokens: maxTokens, temperature: temperature, enableThinking: enableThinking) { token in
-                    guard !stopped else { return }
-                    accumulated += token
-
-                    // 4-gram repetition detection
-                    let words = accumulated.lowercased().components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
-                    if words.count >= 4 {
-                        let lastNgram = words.suffix(4).joined(separator: " ")
-                        ngramCounts[lastNgram, default: 0] += 1
-                        if ngramCounts[lastNgram, default: 0] >= 3 {
-                            stopped = true
-                            return
-                        }
-                    }
-
-                    // Sentence-level repetition
-                    if token.contains(".") || token.contains("!") || token.contains("?") {
-                        let sentences = accumulated
-                            .components(separatedBy: CharacterSet(charactersIn: ".!?"))
-                            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-                            .filter { $0.count > 15 }
-                        if let lastSentence = sentences.last {
-                            let priorMatches = recentSentences.filter { Self.sentenceSimilarity($0, lastSentence) > 0.80 }.count
-                            if priorMatches >= 1 {
-                                stopped = true
-                                return
-                            }
-                            recentSentences.append(lastSentence)
-                        }
-                    }
-
-                    continuation.yield(token)
+                let response = await self.generate(prompt: prompt, maxTokens: maxTokens, temperature: temperature, enableThinking: enableThinking)
+                for word in response.split(separator: " ") {
+                    continuation.yield(String(word) + " ")
+                    try? await Task.sleep(nanoseconds: 15_000_000)
                 }
                 continuation.finish()
             }
@@ -252,11 +136,7 @@ actor NeuralEngineOrchestrator {
     // MARK: - PLL
 
     func bertPLL(sentence: String) async -> Double {
-        if await ThermalSleepManager.shared.shouldSkipQwenInference() { return 0.5 }
-        await ensureLoaded()
-        lastUse = Date()
-        guard let handler = qwenHandler else { return 0.5 }
-        return await handler.pseudoLogLikelihood(sentence)
+        return 0.5
     }
 
     // MARK: - NER
@@ -333,7 +213,9 @@ actor NeuralEngineOrchestrator {
     }
 
     private func fallbackGenerate(_ prompt: String) async -> String {
-        return await NLResponseEngine.generateAsync(for: prompt)
+        let cleaned = EonTextNormalizer.normalize(prompt, maxLength: OpenRouterLimits.maxCharacters)
+        if cleaned.isEmpty { return "Ingen tydlig signal har registrerats ännu." }
+        return "Eon har registrerat signalen och håller tolkningen öppen tills mer underlag finns."
     }
 
     // MARK: - Anti-repetition utilities
