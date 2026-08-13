@@ -70,17 +70,10 @@ private struct EonV6NowHero: View {
 
     private var greenState: Bool { state.body.thermalPressure < 0.78 && state.body.processingAvailability > 0.35 }
     private var concreteStatus: String {
-        if state.body.thermalPressure > 0.78 { return "Eon känner ökad värme i kroppen och återhämtar sig." }
-        if snapshot.currentActivity.kind == .minne { return "Eon utforskar tidigare tankar och beslut." }
-        if snapshot.currentActivity.kind == .lär { return "Eon integrerar ny information i sin världsmodell." }
-        if snapshot.currentActivity.kind == .språk { return "Eon formar en språklig tolkning av den aktuella signalen." }
-        if snapshot.currentActivity.kind == .predikterar { return "Eon jämför sin förutsägelse med inkommande signaler." }
-        return "Eon observerar aktuella signaler och reglerar sitt fokus."
+        EonNaturalStateCopy.status(state: state, snapshot: snapshot)
     }
     private var concreteFocus: String {
-        if state.body.thermalPressure > 0.78 { return "Eon håller nere inferenstakten för att återfå kapacitet." }
-        if !state.globalBroadcast.isEmpty { return "Eon håller signalen ‘\(signalDescription)’ globalt tillgänglig för vidare bearbetning." }
-        return "Eon undersöker \(snapshot.focus.lowercased()) och väljer nästa observerbara steg."
+        EonNaturalStateCopy.focus(state: state, snapshot: snapshot)
     }
 
     private var signalDescription: String {
@@ -210,20 +203,15 @@ private struct EonV6NowHero: View {
     }
 
     private var embodimentTitle: String {
-        if state.body.thermalPressure > 0.82 { return "Eons kropp · iPhone som embodiment" }
-        if state.body.thermalPressure > 0.58 { return "Eon känner förhöjd temperatur från iPhone" }
-        return "Eons kropp · iPhone som embodiment"
+        EonNaturalStateCopy.embodiment(state: state).title
     }
 
     private var embodimentDetail: String {
-        if state.body.wakeState == "recovery" { return "Eon känner värmen från iPhone · vilar lite." }
-        if state.body.thermalPressure > 0.82 { return "Eon känner förhöjd temperatur från iPhone · minskar tankar." }
-        if state.body.thermalPressure < 0.30 { return "Eon känner att iPhone är sval · tänker intensivt." }
-        return "Eon känner en stabil kroppslig belastning · fortsätter bearbeta signaler."
+        EonNaturalStateCopy.embodiment(state: state).detail
     }
 
     private var levelDescription: String {
-        return EonObservabilityCopy.level(verification.level.rawValue)
+        return EonNaturalStateCopy.level(verification.level.rawValue)
     }
     /* Kept as a fallback for older previews; the production scene uses the supplied live loop. */
     private var legacyAvatarScene: some View {

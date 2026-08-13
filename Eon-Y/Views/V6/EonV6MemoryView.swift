@@ -49,7 +49,7 @@ struct EonV6MemoryView: View {
                     category = .observations; label = "Observation"; color = EonV6Theme.cyan
                 }
                 let provenance: (String, String) = {
-                    if line.source.localizedCaseInsensitiveContains("qwen") { return ("Qwen · genererat", "sparkles") }
+                    if line.source.localizedCaseInsensitiveContains("openrouter") { return ("OpenRouter · genererat", "sparkles") }
                     if line.source.localizedCaseInsensitiveContains("fallback") { return ("Eon-mall · simulerat", "wand.and.stars") }
                     return (line.source.isEmpty ? "Eon-motor" : line.source, "cpu")
                 }()
@@ -160,7 +160,7 @@ struct EonV6MemoryView: View {
     private var provenanceNote: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "info.circle").foregroundStyle(EonV6Theme.cyan)
-            Text("Narrativa och Qwen-svar är genererade bearbetningsspår. De visar vad systemet producerade — inte i sig ett bevis på subjektiv upplevelse.")
+            Text("Narrativa svar är genererade bearbetningsspår. De visar vad systemet producerade — inte i sig ett bevis på subjektiv upplevelse.")
                 .font(.system(size: 12)).foregroundStyle(.white.opacity(0.48))
         }.padding(.horizontal, 4)
     }

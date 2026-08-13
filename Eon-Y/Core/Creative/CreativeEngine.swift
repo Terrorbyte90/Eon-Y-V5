@@ -120,7 +120,7 @@ final class CreativeEngine: ObservableObject {
             valence: 0.6,
             arousal: 0.5,
             dominance: 0.7,
-            innerNarrative: "Jag känner en stark nyfikenhet — varje tanke leder till nya upptäckter."
+            innerNarrative: "En ny koppling har prioriterats. Eon undersöker om den håller när den jämförs med tidigare information."
         )
         e.emotionHistory = [
             EmotionSnapshot(emotion: .curious, intensity: 0.7, timestamp: Date().addingTimeInterval(-3600)),
