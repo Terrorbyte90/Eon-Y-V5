@@ -55,7 +55,7 @@ struct EonPresentationSnapshot: Codable, Sendable {
     let freshness: String
 
     static func make(state: EonCoreStateV2, verification: ConsciousnessVerificationResult, brain: EonBrain, previous: EonPresentationSnapshot? = nil) -> EonPresentationSnapshot {
-        let focus = state.attention.isEmpty ? "spontan intern aktivitet" : state.attention
+        let focus = EonTextSanitizer.focus(state.attention.isEmpty ? "spontan intern aktivitet" : state.attention)
         let policy = state.activePolicy.isEmpty ? "observera" : state.activePolicy
         let hot = state.body.thermalPressure > 0.78
         let activityKind: EonActivityKind = hot ? .återhämtning : (state.globalBroadcast.isEmpty ? .observerar : .fokuserar)
@@ -65,7 +65,7 @@ struct EonPresentationSnapshot: Codable, Sendable {
         let broadcastDescription = state.globalBroadcast.isEmpty ? "observerar inkommande signaler" : "har gjort en signal globalt tillgänglig"
         let summary = hot
             ? "Eon är aktiv men arbetar försiktigt eftersom kroppens termiska budget är pressad."
-            : "Eon är aktiv och \(broadcastDescription) medan den håller fokus på \(focus)."
+            : "Eon är aktiv och \(broadcastDescription). Fokus ligger på \(focus)."
         let next = hot ? "Observera och återhämta" : policy
         let reason = hot ? "Tillgänglig kapacitet prioriteras före djupare inferens." : "Policyn valdes från kroppstryck, prediktion och aktuellt fokus."
         var claims = [

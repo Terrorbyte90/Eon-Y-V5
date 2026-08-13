@@ -11,7 +11,10 @@ final class EonV6Runtime: ObservableObject {
     @Published private(set) var fullLog = ""
     @Published private(set) var presentation: EonPresentationSnapshot?
     @Published private(set) var verificationFreshness = "Startar verifiering"
+    @Published private(set) var timelinePulse: String?
+    @Published private(set) var timelinePulseID = UUID()
     private var timer: Timer?
+    private var lastTimelineText = ""
 
     func start() {
         guard timer == nil else { return }
@@ -25,13 +28,20 @@ final class EonV6Runtime: ObservableObject {
         state.cycle = ce.unifiedConsciousState.cycleIndex
         state.monotonicTimestamp = Date()
         let rawFocus = brain.attentionFocus.isEmpty ? brain.currentWorkspaceFocus : brain.attentionFocus
-        state.attention = EonTextSanitizer.clean(rawFocus.isEmpty ? "Spontan intern aktivitet" : rawFocus, maxLength: 100)
+        state.attention = EonTextSanitizer.focus(rawFocus.isEmpty ? "Spontan intern aktivitet" : rawFocus)
         state.globalBroadcast = ce.unifiedConsciousState.globalBroadcast.first ?? ""
         state.temporalContinuity = min(0.96, max(0, ce.unifiedConsciousState.continuity * 0.72 + brain.selfModelAccuracy * 0.28))
         state.selfModelConfidence = brain.selfModelAccuracy
         state.agency = min(0.96, max(0, ce.unifiedConsciousState.selfModel.agency * (1 - ce.unifiedConsciousState.predictionError * 0.35)))
-        state.body = InteroceptiveBodyCore().state(thermal: ce.bodyBudget.thermalLevel, cpu: brain.cpuUsage, memory: min(1, brain.memoryUsageMB / 2048))
+        let sleep = SleepConsolidationEngine.shared
+        state.body = InteroceptiveBodyCore().state(thermal: ce.bodyBudget.thermalLevel, cpu: brain.cpuUsage, memory: min(1, brain.memoryUsageMB / 2048), sleepPressure: sleep.sleepPressure)
         state.affect = AffectiveCoreV2().update(previous: state.affect, predictionError: ce.unifiedConsciousState.predictionError, body: state.body, outcomeImprovement: 1 - ce.unifiedConsciousState.predictionError)
+        let latestTimelineText = brain.innerMonologue.last?.text.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !latestTimelineText.isEmpty && latestTimelineText != lastTimelineText {
+            timelinePulse = EonTextSanitizer.clean(latestTimelineText, maxLength: 180)
+            timelinePulseID = UUID()
+            lastTimelineText = latestTimelineText
+        }
         state.languageReporterAvailable = true
         evidence = ConsciousnessEvidenceEngine().profile(state: state)
         verification = ce.verifiedConsciousness
@@ -57,19 +67,31 @@ final class EonV6Runtime: ObservableObject {
 struct EonV6ShellView: View {
     @StateObject private var runtime = EonV6Runtime.shared
     @State private var selection = 0
+    @State private var tabBarVisible = false
 
     var body: some View {
         TabView(selection: $selection) {
-            EonV6OverviewView().tabItem { Label("Nu", systemImage: "circle.hexagongrid.fill") }.tag(0)
+            EonV6OverviewView { destination in
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    selection = destination
+                    tabBarVisible = true
+                }
+            }
+            .tabItem { Label("Nu", systemImage: "circle.hexagongrid.fill") }.tag(0)
             EonV6InsideView().tabItem { Label("Inifrån", systemImage: "waveform.path.ecg") }.tag(1)
             EonV6EvidenceView().tabItem { Label("Evidens", systemImage: "chart.xyaxis.line") }.tag(2)
             EonV6MemoryView().tabItem { Label("Minne", systemImage: "clock.arrow.circlepath") }.tag(3)
-            EonV6LanguageView().tabItem { Label("Språk", systemImage: "textformat.abc") }.tag(4)
-            EonV6SettingsView().tabItem { Label("System", systemImage: "slider.horizontal.3") }.tag(5)
+            EonV6SettingsView().tabItem { Label("System", systemImage: "slider.horizontal.3") }.tag(4)
         }
         .tint(EonV6Theme.cyan)
         .background(EonV6Theme.ink.ignoresSafeArea())
         .environmentObject(runtime)
+        .environment(\.tabBarVisible, $tabBarVisible)
+        .toolbar(tabBarVisible ? .visible : .hidden, for: .tabBar)
+        .animation(.easeInOut(duration: 0.3), value: tabBarVisible)
         .onAppear { runtime.start() }
+        .onChange(of: selection) { _, newSelection in
+            withAnimation(.easeInOut(duration: 0.3)) { tabBarVisible = newSelection != 0 }
+        }
     }
 }

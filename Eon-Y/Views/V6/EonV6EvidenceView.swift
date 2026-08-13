@@ -30,6 +30,11 @@ struct EonV6EvidenceView: View {
                 }
             }
             EonV6Card(title: "Laboratorium", eyebrow: "Kontroller", accent: EonV6Theme.amber) { status("Held-out", runtime.evidence.heldOutPassed); status("Language-off", runtime.evidence.languageOffPassed); status("Restart", runtime.evidence.restartPassed); Text("Ablationer rapporteras med baseline, intervention och state-delta.").foregroundStyle(.white.opacity(0.5)) }
+            EonV6Card(title: "Vad testerna betyder", eyebrow: "Metod", accent: EonV6Theme.amber) {
+                ForEach(EonObservabilityCopy.testGroups, id: \.0) { group in
+                    VStack(alignment: .leading, spacing: 3) { Text(group.0).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white); Text(group.1).font(.caption).foregroundStyle(.white.opacity(0.55)) }
+                }
+            }
         }.padding(20) }.background(EonV6Theme.ink.ignoresSafeArea()).navigationBarTitleDisplayMode(.inline) }
     }
     private func status(_ label: String, _ passed: Bool) -> some View { Label(label, systemImage: passed ? "checkmark.circle.fill" : "circle.dashed").foregroundStyle(passed ? EonV6Theme.mint : .white.opacity(0.45)) }
