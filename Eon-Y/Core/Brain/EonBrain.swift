@@ -115,7 +115,7 @@ final class EonBrain: ObservableObject {
         // Seed innerMonologue direkt — UI ska aldrig vara tomt
         innerMonologue = [
             MonologueLine(text: "Kognitivt system aktiverat — alla 12 pelare initieras", type: .insight),
-            MonologueLine(text: "Qwen3-1.7B: laddar GGUF-modell via llama.cpp (Metal GPU)", type: .thought),
+            MonologueLine(text: "OpenRouter: språkmodell ansluts vid behov", type: .thought),
             MonologueLine(text: "Morfologimotor: svenska böjningsmönster indexeras", type: .thought),
             MonologueLine(text: "Episodiskt minne: hämtar senaste konversationskontext", type: .memory),
             MonologueLine(text: "Resonemangspelare: kausal graf byggs upp", type: .thought),

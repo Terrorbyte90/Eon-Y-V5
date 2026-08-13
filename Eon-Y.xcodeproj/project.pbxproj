@@ -6,10 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		9BC4FA022F59AFC700A95420 /* llama in Frameworks */ = {isa = PBXBuildFile; productRef = AA000002AA000002AA000002 /* llama */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXContainerItemProxy section */
 		9B388BB42F523DE700F48273 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -79,7 +75,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9BC4FA022F59AFC700A95420 /* llama in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -140,7 +135,6 @@
 			);
 			name = "Eon-Y";
 			packageProductDependencies = (
-				AA000002AA000002AA000002 /* llama */,
 			);
 			productName = "Eon-Y";
 			productReference = 9B388BA62F523DE600F48273 /* Eon-Y.app */;
@@ -225,7 +219,6 @@
 			mainGroup = 9B388B9D2F523DE600F48273;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				AA000001AA000001AA000001 /* XCRemoteSwiftPackageReference "llama" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9B388BA72F523DE600F48273 /* Products */;
@@ -604,25 +597,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		AA000001AA000001AA000001 /* XCRemoteSwiftPackageReference "llama" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ggml-org/llama.cpp";
-			requirement = {
-				kind = revision;
-				revision = d05b3127bd30515955aa4ee2bacdb68ebafe88f4;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		AA000002AA000002AA000002 /* llama */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = AA000001AA000001AA000001 /* XCRemoteSwiftPackageReference "llama" */;
-			productName = llama;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 9B388B9E2F523DE600F48273 /* Project object */;
 }
