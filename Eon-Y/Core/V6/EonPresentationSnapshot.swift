@@ -1,5 +1,28 @@
 import Foundation
 
+enum EonNowCardMode: Equatable {
+    case embodiment, status, timeline, level
+}
+
+struct EonNowCardModeController {
+    private(set) var mode: EonNowCardMode = .embodiment
+    private var normalIndex = 0
+    private let normalModes: [EonNowCardMode] = [.embodiment, .status, .level]
+
+    mutating func advance() {
+        normalIndex = (normalIndex + 1) % normalModes.count
+        mode = normalModes[normalIndex]
+    }
+
+    mutating func showTimeline() {
+        mode = .timeline
+    }
+
+    mutating func restoreNormalMode() {
+        mode = normalModes[normalIndex]
+    }
+}
+
 enum EonPresentationEpistemic: String, Codable, Sendable {
     case observerat, härlett, hypotes, simulerat, genererat
 }

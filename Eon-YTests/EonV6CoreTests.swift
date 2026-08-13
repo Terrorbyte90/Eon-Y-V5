@@ -2,6 +2,29 @@ import XCTest
 @testable import Eon_Y
 
 final class EonV6CoreTests: XCTestCase {
+    func testNowCardCyclesThroughAllFourModes() {
+        var controller = EonNowCardModeController()
+
+        XCTAssertEqual(controller.mode, .embodiment)
+        controller.advance()
+        XCTAssertEqual(controller.mode, .status)
+        controller.advance()
+        XCTAssertEqual(controller.mode, .level)
+        controller.advance()
+        XCTAssertEqual(controller.mode, .embodiment)
+    }
+
+    func testTimelinePulseDoesNotStarveNormalModes() {
+        var controller = EonNowCardModeController()
+
+        controller.showTimeline()
+        XCTAssertEqual(controller.mode, .timeline)
+        controller.restoreNormalMode()
+        controller.advance()
+
+        XCTAssertEqual(controller.mode, .status)
+    }
+
     func testPredictionAndTraceHistoriesAreBounded() {
         var state = EonCoreStateV2()
         for index in 0..<140 {
