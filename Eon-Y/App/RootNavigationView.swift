@@ -194,6 +194,8 @@ struct ScrollOffsetKey: PreferenceKey {
 struct ScrollTabBarVisibilityModifier: ViewModifier {
     @Binding var tabBarVisible: Bool
     @State private var lastOffset: CGFloat = 0
+    @State private var hideGeneration = 0
+    @State private var hasInitialOffset = false
 
     func body(content: Content) -> some View {
         content
@@ -206,20 +208,24 @@ struct ScrollTabBarVisibilityModifier: ViewModifier {
                 }
             )
             .onPreferenceChange(ScrollOffsetKey.self) { offset in
+                guard hasInitialOffset else {
+                    lastOffset = offset
+                    hasInitialOffset = true
+                    return
+                }
                 let delta = offset - lastOffset
                 // Threshold to avoid jitter on tiny movements
-                if delta < -8 {
-                    // Scrolling down → hide
-                    if tabBarVisible {
-                        withAnimation(.spring(response: 0.38, dampingFraction: 0.78)) {
-                            tabBarVisible = false
-                        }
+                if abs(delta) > 8 {
+                    // Any deliberate scroll briefly reveals the navigation, then it recedes.
+                    hideGeneration += 1
+                    let generation = hideGeneration
+                    withAnimation(.spring(response: 0.38, dampingFraction: 0.78)) {
+                        tabBarVisible = true
                     }
-                } else if delta > 8 {
-                    // Scrolling up → show
-                    if !tabBarVisible {
-                        withAnimation(.spring(response: 0.38, dampingFraction: 0.78)) {
-                            tabBarVisible = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        guard generation == hideGeneration else { return }
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            tabBarVisible = false
                         }
                     }
                 }

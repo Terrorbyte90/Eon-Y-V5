@@ -1,6 +1,16 @@
 import Foundation
 
 enum EonTextSanitizer {
+    static func focus(_ input: String) -> String {
+        let cleaned = clean(input, maxLength: 80)
+        let lower = cleaned.lowercased()
+        let recursiveMarkers = ["jag riktar uppmärksamheten mot", "spännande tanke om underlag", "ett närliggande observationstillstånd"]
+        if cleaned.isEmpty || recursiveMarkers.contains(where: { lower.contains($0) }) {
+            return "den aktuella signalen"
+        }
+        return cleaned
+    }
+
     static func clean(_ input: String, maxLength: Int = 220) -> String {
         var text = input.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines)
         let marker = "Jag riktar uppmärksamheten mot"
