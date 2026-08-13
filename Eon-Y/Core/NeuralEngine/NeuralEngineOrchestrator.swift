@@ -2,12 +2,11 @@ import Foundation
 import NaturalLanguage
 import Accelerate
 
-// MARK: - NeuralEngineOrchestrator: Koordinerar Qwen3-1.7B GGUF på Metal GPU
+// MARK: - NeuralEngineOrchestrator: OpenRouter + deterministisk fallback
 
 actor NeuralEngineOrchestrator {
     static let shared = NeuralEngineOrchestrator()
 
-    private(set) var qwenHandler: QwenHandler?
     private(set) var isLoaded: Bool = false
     private(set) var loadError: String?
 
@@ -19,8 +18,6 @@ actor NeuralEngineOrchestrator {
     private var modelVersion: Int = 1
 
     // Inaktivitetstimers för lazy unload
-    private var lastUse: Date = .distantPast
-    private var idleCheckTask: Task<Void, Never>?
     private let modelModeKey = "eon_local_model_mode"
 
     private init() {}
@@ -37,75 +34,20 @@ actor NeuralEngineOrchestrator {
     }
 
     func unloadNow() async {
-        idleCheckTask?.cancel()
-        await qwenHandler?.unload()
-        qwenHandler = nil
         isLoaded = false
     }
 
     // MARK: - Compatibility aliases (for code that references bert/gpt)
-    var bertLoaded: Bool { qwenHandler != nil }
-    var gptLoaded: Bool { qwenHandler != nil }
-    var bertHandler: QwenHandler? { qwenHandler }
-    var gptHandler: QwenHandler? { qwenHandler }
+    var bertLoaded: Bool { false }
+    var gptLoaded: Bool { false }
 
     // MARK: - Loading
 
     func loadModels() async {
         // Startup must remain lightweight on iPhone. The default `.onDemand`
         // mode loads only when an actual inference request needs the model.
-        guard modelMode == .automatic else { return }
-        guard !isLoaded else { return }
-        print("[QWEN] Loading Qwen3-1.7B...")
-
-        do {
-            let handler = QwenHandler()
-            try await handler.load()
-            qwenHandler = handler
-            lastUse = Date()
-            isLoaded = true
-            print("[QWEN] Qwen3-1.7B ready ✓")
-        } catch {
-            loadError = error.localizedDescription
-            print("[QWEN] Load error: \(error)")
-        }
-
-        startIdleCheck()
-    }
-
-    // MARK: - Idle unload loop
-
-    private func startIdleCheck() {
-        idleCheckTask?.cancel()
-        idleCheckTask = Task(priority: .background) {
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 180_000_000_000) // 3 min
-                await self.unloadIfIdle()
-            }
-        }
-    }
-
-    func unloadIfIdle() async {
-        let now = Date()
-        if qwenHandler != nil && now.timeIntervalSince(lastUse) > 600 {
-            await qwenHandler?.unload()
-            qwenHandler = nil
-            isLoaded = false
-            print("[QWEN] Unloaded — idle >10 min")
-            await RunSessionLogger.shared.log("Qwen3 unloaded (idle >10 min)")
-        }
-    }
-
-    private func ensureLoaded() async {
-        guard modelMode != .disabled else { return }
-        guard qwenHandler == nil else { return }
-        print("[QWEN] Reloading Qwen3...")
-        await RunSessionLogger.shared.log("Qwen3 reloading (lazy)")
-        let handler = QwenHandler()
-        try? await handler.load()
-        qwenHandler = handler
-        isLoaded = true
-        lastUse = Date()
+        isLoaded = false
+        loadError = nil
     }
 
     // MARK: - Embedding
@@ -121,14 +63,7 @@ actor NeuralEngineOrchestrator {
         let cacheKey = (text + "\(modelVersion)").hashValue
         if let cached = embeddingCache[cacheKey] { return cached }
 
-        await ensureLoaded()
-        lastUse = Date()
-
-        guard let handler = qwenHandler else {
-            return fallbackEmbed(text)
-        }
-
-        let embedding = await handler.embed(text)
+        let embedding = fallbackEmbed(text)
         cacheEmbedding(key: cacheKey, value: embedding)
         return embedding
     }
@@ -178,9 +113,6 @@ actor NeuralEngineOrchestrator {
 
         await ensureLoaded()
         lastUse = Date()
-        guard let handler = qwenHandler else {
-            return await fallbackGenerate(prompt)
-        }
         let raw = await handler.generate(prompt: prompt, maxNewTokens: maxTokens, temperature: temperature, enableThinking: enableThinking)
         let deduped = Self.deduplicateSentences(raw)
         let cleaned = Self.cleanOutput(deduped)
@@ -204,11 +136,7 @@ actor NeuralEngineOrchestrator {
     // MARK: - PLL
 
     func bertPLL(sentence: String) async -> Double {
-        if await ThermalSleepManager.shared.shouldSkipQwenInference() { return 0.5 }
-        await ensureLoaded()
-        lastUse = Date()
-        guard let handler = qwenHandler else { return 0.5 }
-        return await handler.pseudoLogLikelihood(sentence)
+        return 0.5
     }
 
     // MARK: - NER
@@ -285,7 +213,9 @@ actor NeuralEngineOrchestrator {
     }
 
     private func fallbackGenerate(_ prompt: String) async -> String {
-        return await NLResponseEngine.generateAsync(for: prompt)
+        let cleaned = EonTextNormalizer.normalize(prompt, maxLength: OpenRouterLimits.maxCharacters)
+        if cleaned.isEmpty { return "Ingen tydlig signal har registrerats ännu." }
+        return "Eon har registrerat signalen och håller tolkningen öppen tills mer underlag finns."
     }
 
     // MARK: - Anti-repetition utilities

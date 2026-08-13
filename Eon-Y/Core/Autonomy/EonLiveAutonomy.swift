@@ -574,11 +574,6 @@ final class EonLiveAutonomy: ObservableObject {
                         fact.object.components(separatedBy: .whitespaces)
             for word in words where word.count > 3 && !morphologyCacheSet.contains(word.lowercased()) {
         let analysis = await swedish.analyze(word)
-        await QwenAutonomyQueue.shared.enqueue(.make(
-            kind: .languageExpansion,
-            reason: "Autonom svensk analys av nytt ord: (word)",
-            inputDigest: word
-        ))
                 morphologyCacheSet.insert(word.lowercased())
                 analyzedCount += 1
 
