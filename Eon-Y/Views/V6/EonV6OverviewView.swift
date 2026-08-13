@@ -41,10 +41,7 @@ private struct EonV6NowHero: View {
     @State private var rotation = 0.0
     @State private var smoke = false
     @State private var messageVisible = false
-    @State private var mode: DisplayMode = .embodiment
-    @State private var phaseIndex = 0
-
-    private enum DisplayMode { case embodiment, status, timeline, level }
+    @State private var modeController = EonNowCardModeController()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -55,18 +52,17 @@ private struct EonV6NowHero: View {
         .onAppear { withAnimation(.easeInOut(duration: 5.5).repeatForever(autoreverses: true)) { smoke = true } }
         .onAppear { withAnimation(.easeInOut(duration: 0.55)) { messageVisible = true } }
         .onReceive(Timer.publish(every: 8, on: .main, in: .common).autoconnect()) { _ in
-            guard mode != .timeline else { return }
+            guard modeController.mode != .timeline else { return }
             withAnimation(.easeInOut(duration: 0.35)) {
-                phaseIndex = (phaseIndex + 1) % 3
-                mode = [.embodiment, .status, .level][phaseIndex]
+                modeController.advance()
             }
         }
         .onChange(of: timelinePulseID) { _, _ in
             guard timelinePulse != nil else { return }
-            withAnimation(.easeInOut(duration: 0.35)) { mode = .timeline }
+            withAnimation(.easeInOut(duration: 0.35)) { modeController.showTimeline() }
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                 withAnimation(.easeInOut(duration: 0.35)) {
-                    mode = [.embodiment, .status, .level][phaseIndex]
+                    modeController.restoreNormalMode()
                 }
             }
         }
@@ -175,7 +171,7 @@ private struct EonV6NowHero: View {
     }
 
     private var primaryMessage: String {
-        switch mode {
+        switch modeController.mode {
         case .embodiment: return embodimentTitle
         case .status: return popUpMessage
         case .timeline: return "Ny insikt"
@@ -184,7 +180,7 @@ private struct EonV6NowHero: View {
     }
 
     private var secondaryMessage: String {
-        switch mode {
+        switch modeController.mode {
         case .embodiment: return embodimentDetail
         case .status: return concreteFocus
         case .timeline: return shortenedTimelinePulse

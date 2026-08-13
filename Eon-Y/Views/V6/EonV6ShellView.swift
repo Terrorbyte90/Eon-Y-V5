@@ -37,10 +37,12 @@ final class EonV6Runtime: ObservableObject {
         state.body = InteroceptiveBodyCore().state(thermal: ce.bodyBudget.thermalLevel, cpu: brain.cpuUsage, memory: min(1, brain.memoryUsageMB / 2048), sleepPressure: sleep.sleepPressure)
         state.affect = AffectiveCoreV2().update(previous: state.affect, predictionError: ce.unifiedConsciousState.predictionError, body: state.body, outcomeImprovement: 1 - ce.unifiedConsciousState.predictionError)
         let latestTimelineText = brain.innerMonologue.last?.text.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !latestTimelineText.isEmpty && latestTimelineText != lastTimelineText {
-            timelinePulse = EonTextSanitizer.clean(latestTimelineText, maxLength: 180)
+        let cleanedTimelineText = EonTextSanitizer.clean(latestTimelineText, maxLength: 180)
+        let isRecursiveFallback = EonTextSanitizer.isRecursive(latestTimelineText)
+        if !cleanedTimelineText.isEmpty && cleanedTimelineText != lastTimelineText && !isRecursiveFallback {
+            timelinePulse = cleanedTimelineText
             timelinePulseID = UUID()
-            lastTimelineText = latestTimelineText
+            lastTimelineText = cleanedTimelineText
         }
         state.languageReporterAvailable = true
         evidence = ConsciousnessEvidenceEngine().profile(state: state)
