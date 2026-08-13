@@ -31,7 +31,7 @@ struct EonV6SettingsView: View {
                     NavigationLink("Export & journal") { EonV6JournalView() }
                 }
                 Section("Så fungerar Eon") {
-                    Text("Eon är ett lokalt, tillståndsbaserat neurokognitivt experimentsystem. Kärnan samlar signaler, bygger prediktioner, väljer policy och uppdaterar kroppsliga och kognitiva budgetar. Språkmodulen rapporterar state men får inte skriva till kärnan.").font(.subheadline)
+                    Text("Eon är ett tillståndsbaserat neurokognitivt experimentsystem. Kärnan samlar signaler, bygger prediktioner, väljer policy och uppdaterar kroppsliga och kognitiva budgetar. Språkmodulen rapporterar tillstånd men får inte skriva till kärnan.").font(.subheadline)
                     ForEach(EonObservabilityCopy.theories, id: \.0) { theory in
                         VStack(alignment: .leading, spacing: 3) {
                             Text(theory.0).font(.headline)

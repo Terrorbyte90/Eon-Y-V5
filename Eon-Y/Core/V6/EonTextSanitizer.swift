@@ -4,7 +4,7 @@ enum EonTextSanitizer {
     static func focus(_ input: String) -> String {
         let cleaned = clean(input, maxLength: 80)
         let lower = cleaned.lowercased()
-        let recursiveMarkers = ["jag riktar uppmärksamheten mot", "spännande tanke om underlag", "ett närliggande observationstillstånd"]
+        let recursiveMarkers = ["jag riktar uppmärksamheten mot", "spännande tanke om underlag", "ett närliggande observationstillstånd", "upplever jag dessa observationer"]
         if cleaned.isEmpty || recursiveMarkers.contains(where: { lower.contains($0) }) {
             return "den aktuella signalen"
         }

@@ -83,7 +83,7 @@ struct EonPresentationSnapshot: Codable, Sendable {
         let hot = state.body.thermalPressure > 0.78
         let activityKind: EonActivityKind = hot ? .återhämtning : (state.globalBroadcast.isEmpty ? .observerar : .fokuserar)
         let activityTitle = hot ? "Systemet sänker tempo för att återhämta sig" : "Eon arbetar med \(focus)"
-        let consequence = hot ? "Termisk belastning begränsar Qwen-inferens och skyddar tillgänglig kapacitet." : "Fokus och policy uppdateras från aktuella signaler och prediktioner."
+        let consequence = hot ? "Termisk belastning begränsar beräkningarna och skyddar tillgänglig kapacitet." : "Fokus och policy uppdateras från aktuella signaler och prediktioner."
         let activity = EonPresentationActivity(kind: activityKind, title: activityTitle, consequence: consequence, source: "EonCoreStateV2", cycle: state.cycle, epistemic: .härlett)
         let broadcastDescription = state.globalBroadcast.isEmpty ? "observerar inkommande signaler" : "har gjort en signal globalt tillgänglig"
         let summary = hot
@@ -96,7 +96,7 @@ struct EonPresentationSnapshot: Codable, Sendable {
             EonPresentationClaim(text: "Nivå \(verification.level.rawValue) är funktionellt verifierad", kind: .härlett, source: "ConsciousnessVerification", cycle: state.cycle),
             EonPresentationClaim(text: "Självbeskrivningar är genererade språkspår, inte bevis på qualia", kind: .simulerat, source: "Epistemisk policy", cycle: state.cycle)
         ]
-        if !brain.innerMonologue.isEmpty { claims.append(EonPresentationClaim(text: "Eon har ett internt narrativspår", kind: .genererat, source: "Qwen/Fallback", cycle: state.cycle)) }
+        if !brain.innerMonologue.isEmpty { claims.append(EonPresentationClaim(text: "Eon har skapat ett internt språkspår", kind: .genererat, source: "OpenRouter/Fallback", cycle: state.cycle)) }
         var deltas: [EonStateDelta] = []
         if let previous {
             let continuityDelta = state.temporalContinuity - previous.deltasValue("kontinuitet")

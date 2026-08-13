@@ -627,7 +627,7 @@ class ChatViewModel: ObservableObject {
     init() {
         messages.append(ChatMessage(
             role: .eon,
-            content: "Hej! Jag är Eon — ett lokalt kognitivt AI-system. Jag visar när den lokala modellen är aktiv och när jag använder en fallback. Vad vill du utforska?",
+            content: "Hej! Jag är Eon — ett kognitivt system som visar vad jag registrerar, vad jag antar och hur säker jag är. Vad vill du utforska?",
             confidence: 0.95,
             emotion: .neutral
         ))
