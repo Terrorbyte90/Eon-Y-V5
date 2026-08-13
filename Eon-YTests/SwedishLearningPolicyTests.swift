@@ -3,7 +3,7 @@ import XCTest
 
 final class SwedishLearningPolicyTests: XCTestCase {
     func testValidSwedishCandidatePasses() {
-        let candidate = SwedishLearningPolicy.candidate(word: "samsyn", definition: "gemensam förståelse", example: "Vi nådde samsyn.", domain: "Semantik", source: "qwen")
+        let candidate = SwedishLearningPolicy.candidate(word: "samsyn", definition: "gemensam förståelse", example: "Vi nådde samsyn.", domain: "Semantik", source: "openrouter")
         XCTAssertNotNil(candidate)
     }
 

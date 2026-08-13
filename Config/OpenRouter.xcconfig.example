@@ -1,0 +1,6 @@
+// Copy these values into the Eon-Y scheme's Run > Arguments > Environment Variables.
+// Never commit the real API key.
+OPENROUTER_MODEL = ~deepseek/deepseek-v4-flash-latest
+OPENROUTER_ENDPOINT = https://openrouter.ai/api/v1/chat/completions
+OPENROUTER_APP_TITLE = Eon
+// OPENROUTER_API_KEY = sk-or-v1-replace-in-Xcode-only

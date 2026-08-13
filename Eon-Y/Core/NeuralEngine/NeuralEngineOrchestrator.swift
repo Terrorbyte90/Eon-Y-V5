@@ -164,6 +164,12 @@ actor NeuralEngineOrchestrator {
     // MARK: - Generation
 
     func generate(prompt: String, maxTokens: Int = 200, temperature: Float = 0.7, enableThinking: Bool = false) async -> String {
+        let boundedPrompt = OpenRouterLimits.bounded(prompt)
+        if let remote = await OpenRouterProvider.shared.generate(prompt: boundedPrompt, maxTokens: maxTokens, temperature: temperature) {
+            return EonTextNormalizer.normalize(remote, maxLength: OpenRouterLimits.maxCharacters)
+        }
+        return await fallbackGenerate(boundedPrompt)
+        /*
         guard modelMode != .disabled else { return await fallbackGenerate(prompt) }
         // Thermal circuit breaker: skip Qwen entirely when thermal is critical
         if await ThermalSleepManager.shared.shouldSkipQwenInference() {
@@ -179,70 +185,16 @@ actor NeuralEngineOrchestrator {
         let deduped = Self.deduplicateSentences(raw)
         let cleaned = Self.cleanOutput(deduped)
         return Self.finalSafetyDedup(cleaned)
+        */
     }
 
     func generateStream(prompt: String, maxTokens: Int = 200, temperature: Float = 0.7, enableThinking: Bool = false) -> AsyncStream<String> {
         AsyncStream { continuation in
             Task {
-                // Thermal circuit breaker at orchestrator level
-                if await ThermalSleepManager.shared.shouldSkipQwenInference() {
-                    let fallback = await self.fallbackGenerate(prompt)
-                    for word in fallback.split(separator: " ") {
-                        continuation.yield(String(word) + " ")
-                    }
-                    continuation.finish()
-                    return
-                }
-
-                await self.ensureLoaded()
-                self.lastUse = Date()
-                guard let handler = self.qwenHandler else {
-                    let fallback = await self.fallbackGenerate(prompt)
-                    for word in fallback.split(separator: " ") {
-                        continuation.yield(String(word) + " ")
-                        try? await Task.sleep(nanoseconds: 50_000_000)
-                    }
-                    continuation.finish()
-                    return
-                }
-
-                var accumulated = ""
-                var ngramCounts: [String: Int] = [:]
-                var recentSentences: [String] = []
-                var stopped = false
-
-                await handler.generateStream(prompt: prompt, maxNewTokens: maxTokens, temperature: temperature, enableThinking: enableThinking) { token in
-                    guard !stopped else { return }
-                    accumulated += token
-
-                    // 4-gram repetition detection
-                    let words = accumulated.lowercased().components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
-                    if words.count >= 4 {
-                        let lastNgram = words.suffix(4).joined(separator: " ")
-                        ngramCounts[lastNgram, default: 0] += 1
-                        if ngramCounts[lastNgram, default: 0] >= 3 {
-                            stopped = true
-                            return
-                        }
-                    }
-
-                    // Sentence-level repetition
-                    if token.contains(".") || token.contains("!") || token.contains("?") {
-                        let sentences = accumulated
-                            .components(separatedBy: CharacterSet(charactersIn: ".!?"))
-                            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-                            .filter { $0.count > 15 }
-                        if let lastSentence = sentences.last {
-                            let priorMatches = recentSentences.filter { Self.sentenceSimilarity($0, lastSentence) > 0.80 }.count
-                            if priorMatches >= 1 {
-                                stopped = true
-                                return
-                            }
-                            recentSentences.append(lastSentence)
-                        }
-                    }
-
-                    continuation.yield(token)
+                let response = await self.generate(prompt: prompt, maxTokens: maxTokens, temperature: temperature, enableThinking: enableThinking)
+                for word in response.split(separator: " ") {
+                    continuation.yield(String(word) + " ")
+                    try? await Task.sleep(nanoseconds: 15_000_000)
                 }
                 continuation.finish()
             }
