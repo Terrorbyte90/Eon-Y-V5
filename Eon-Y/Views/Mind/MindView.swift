@@ -411,8 +411,8 @@ struct MindView: View {
             }
 
             HStack(spacing: 10) {
-                modelCard("Qwen3", "1.7B · GGUF", "cpu", Color(hex: "#7C3AED"), brain.neuralEngine.isLoaded)
-                modelCard("llama.cpp", "Inference", "waveform", Color(hex: "#34D399"), brain.neuralEngine.isLoaded)
+                modelCard("DeepSeek V4 Flash", "OpenRouter · fjärrmodell", "cloud.fill", Color(hex: "#7C3AED"), brain.neuralEngine.isLoaded)
+                modelCard("Svensk fallback", "Regelbaserad", "text.bubble.fill", Color(hex: "#34D399"), !brain.neuralEngine.isLoaded)
             }
         }
         .padding(16)

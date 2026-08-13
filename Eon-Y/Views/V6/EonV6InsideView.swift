@@ -25,8 +25,8 @@ struct EonV6InsideView: View {
                         row("Nyfikenhet", String(format: "%.2f", runtime.state.affect.curiosity))
                         row("Kontroll", String(format: "%.2f", runtime.state.affect.controlEstimate))
                     }
-                    EonV6Card(title: "Språkorgan", eyebrow: "Qwen boundary", accent: EonV6Theme.amber) {
-                        Text("Qwen får läsa ett snapshot och formulera en rapport. Den får inte skriva till kärnstate.").foregroundStyle(.white.opacity(0.7))
+                    EonV6Card(title: "Språkorgan", eyebrow: "OpenRouter boundary", accent: EonV6Theme.amber) {
+                        Text("DeepSeek får läsa ett begränsat snapshot och formulera en kort rapport. Den får inte skriva till kärnstate.").foregroundStyle(.white.opacity(0.7))
                         Label("Read-only reporter aktiv", systemImage: "lock.fill").foregroundStyle(EonV6Theme.mint)
                     }
                     if let presentation = runtime.presentation {

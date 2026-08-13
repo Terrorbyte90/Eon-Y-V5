@@ -217,7 +217,7 @@ final class EonBrain: ObservableObject {
         innerMonologue.append(fallbackLine)
         Task { [weak self] in
             let generated = await SelfNarrativeEngine.generate(context: context, recent: self?.innerMonologue.suffix(8).map(\.text) ?? [])
-            guard generated.source == .qwen, let self else { return }
+            guard generated.source == .openRouter, let self else { return }
             guard let index = self.innerMonologue.firstIndex(where: { $0.id == fallbackLine.id }) else { return }
             self.innerMonologue[index] = MonologueLine(text: generated.text, type: line.type, source: "SelfNarrative/Qwen", epistemicStatus: status)
         }

@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct EonV6SettingsView: View {
-    @AppStorage("eon_qwen_enabled") private var qwenEnabled = true
     @AppStorage("eon_hermes_enabled") private var hermesEnabled = false
     @AppStorage("eon_thermal_mode") private var thermalMode = "adaptive"
     @AppStorage("eon_refresh_interval") private var refreshInterval = "5"
@@ -11,8 +10,9 @@ struct EonV6SettingsView: View {
         NavigationStack {
             Form {
                 Section("Modell") {
-                    Toggle("Qwen språkorgan", isOn: $qwenEnabled)
-                    Text("Qwen läser state men får inte ändra kärnan.").font(.caption).foregroundStyle(.secondary)
+                    Text("DeepSeek V4 Flash via OpenRouter").font(.headline)
+                    Text("API-nyckeln läses från OPENROUTER_API_KEY i Xcode-schemat. Språkmodellen får bara formulera text; den ändrar inte Eons kärnstate.").font(.caption).foregroundStyle(.secondary)
+                    Text("Anrop: högst 1 000 tecken in/ut").font(.caption).foregroundStyle(.secondary)
                 }
                 Section("Körning") {
                     Picker("Thermal policy", selection: $thermalMode) { Text("Adaptiv").tag("adaptive"); Text("Sval").tag("cool"); Text("Full").tag("full") }
