@@ -3780,14 +3780,6 @@ struct DailyLearningMetrics {
     let recentWords: [String]
 }
 
-// MARK: - Array safe subscript
-
-extension Array {
-    nonisolated subscript(safe index: Int) -> Element? {
-        indices.contains(index) ? self[index] : nil
-    }
-}
-
 // ═══════════════════════════════════════════════════════════
 // ITERATION 41-50: New Data Models for Autonomous Self-Development
 // ═══════════════════════════════════════════════════════════
@@ -5537,5 +5529,13 @@ struct MasteryLoopReport: Identifiable, Codable {
         comp.lastStudied = Date()
         competencyBook[domain] = comp
         UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
+    }
+}
+
+// MARK: - Array safe subscript
+
+extension Array {
+    nonisolated subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }

@@ -443,7 +443,7 @@ final class EonLiveAutonomy: ObservableObject {
 
         // Gather facts from different domains
         let domains = ["Kognitionsvetenskap", "Filosofi", "AI & Maskininlärning", "Psykologi", "Naturvetenskap", "Historia"]
-        var domainFacts: [String: [ExtractedFact]] = [:]
+        var domainFacts: [String: [(subject: String, predicate: String, object: String)]] = [:]
 
         for domain in domains {
             let facts = await memory.searchFacts(query: domain, limit: 10)
@@ -485,10 +485,6 @@ final class EonLiveAutonomy: ObservableObject {
                                 source: "knowledge_synthesis"
                             )
                             synthesisCount += 1
-
-                            // Boost creativity per synthesis
-                            let creative = CreativeEngine.shared
-                            creative.creativityLevel = min(1.0, creative.creativityLevel + 0.005)
                         }
                     }
                 }
@@ -576,7 +572,7 @@ final class EonLiveAutonomy: ObservableObject {
             // Run OpenRouter evaluation on the weak domains
             for weak in weakest {
                 let texts = await PersistentMemoryStore.shared.searchFacts(query: weak.domain, limit: 3)
-                    .map { $0.detail }
+                    .map { $0.object }
                 if !texts.isEmpty {
                     _ = await OpenRouterLanguageEvaluator.shared.batchGrammarCheck(Array(texts.prefix(2)))
                 }
@@ -866,7 +862,7 @@ final class EonLiveAutonomy: ObservableObject {
         // 1. Hämta senaste svaren
         let memory = PersistentMemoryStore.shared
         let recentFacts = await memory.searchFacts(query: "svar", limit: 15)
-        let texts = recentFacts.prefix(8).map { $0.detail }
+        let texts = recentFacts.prefix(8).map { $0.object }
 
         guard !texts.isEmpty else {
             brain.appendLanguageLog("OpenRouter: Inga texter att utvärdera")
@@ -874,7 +870,7 @@ final class EonLiveAutonomy: ObservableObject {
         }
 
         // 2. Hämta WSD-ord att förbättra
-        let wsdWords = await SwedishLanguageCore.shared.getAllWSDWords().prefix(20)
+        let wsdWords = await SwedishLanguageCore.shared.wsdEngine.getAllWSDWords().prefix(20)
         let wordContextPairs: [(word: String, context: String)] = wsdWords.map { word in
             (word, texts.joined(separator: " ").prefix(200))
         }
@@ -905,14 +901,13 @@ final class EonLiveAutonomy: ObservableObject {
 
         // 6. Spara rekommendationer som lärdomar
         for rec in evaluation.recommendations.prefix(5) {
-            let fact = ExtractedFact(
+            await memory.saveFact(
                 subject: "Språkförbättring",
-                detail: rec,
+                predicate: "rekommendation",
+                object: rec,
                 confidence: 0.8,
-                timestamp: Date(),
                 source: "openrouter-eval"
             )
-            await memory.saveFact(fact)
         }
 
         // 7. Uppdatera hjärnans språkmetriker
@@ -1073,9 +1068,9 @@ final class EonLiveAutonomy: ObservableObject {
 
                 // Update cognitive dimensions based on report
                 let state = CognitiveState.shared
-                await state.update(dimension: .language, delta: 0.008, source: "mastery_loop")
-                await state.update(dimension: .learning, delta: 0.005, source: "mastery_loop")
-                await state.update(dimension: .metacognition, delta: 0.004, source: "mastery_loop")
+                state.update(dimension: .language, delta: 0.008, source: "mastery_loop")
+                state.update(dimension: .learning, delta: 0.005, source: "mastery_loop")
+                state.update(dimension: .metacognition, delta: 0.004, source: "mastery_loop")
             }
 
             // ═══════════════════════════════════════════════════════
@@ -1219,7 +1214,7 @@ final class EonLiveAutonomy: ObservableObject {
         if !result.causalChain.isEmpty {
             brain.innerMonologue.append(MonologueLine(text: "⛓ Kausalkedja: \(result.causalChain.joined(separator: " → "))", type: .insight))
         }
-        await CognitiveState.shared.update(dimension: .reasoning, delta: result.confidence * 0.002, source: "reasoning_cycle")
+        CognitiveState.shared.update(dimension: .reasoning, delta: result.confidence * 0.002, source: "reasoning_cycle")
     }
 
     private func runGlobalWorkspaceWork(brain: EonBrain) async {
@@ -1245,7 +1240,7 @@ final class EonLiveAutonomy: ObservableObject {
         let weakDims = state.weakestDimensions(limit: 2)
         for (dim, level) in weakDims {
             let boost = 0.003 * (1.0 - level) // Slightly less aggressive than before
-            await state.update(dimension: dim, delta: boost, source: "autonomy_boost")
+            state.update(dimension: dim, delta: boost, source: "autonomy_boost")
         }
 
         let ii = state.integratedIntelligence
@@ -1300,7 +1295,7 @@ final class EonLiveAutonomy: ObservableObject {
         let knowledgeLevel = state.dimensionLevel(.knowledge)
 
         if langLevel < knowledgeLevel {
-            await state.update(dimension: .language, delta: 0.002, source: "language_integration")
+            state.update(dimension: .language, delta: 0.002, source: "language_integration")
             brain.innerMonologue.append(MonologueLine(
                 text: "⟳ Språkintegration: språknivå (\(String(format: "%.0f", langLevel * 100))%) lyfts mot kunskapsnivå (\(String(format: "%.0f", knowledgeLevel * 100))%)",
                 type: .thought
@@ -1372,7 +1367,7 @@ final class EonLiveAutonomy: ObservableObject {
         }
 
         if let dim = bestDim {
-            await state.update(dimension: dim, delta: 0.003, source: "deep_analysis")
+            state.update(dimension: dim, delta: 0.003, source: "deep_analysis")
             brain.innerMonologue.append(MonologueLine(
                 text: "🔬 Djupanalys: stärker \(bestLabel) [II=\(String(format: "%.3f", ii))]",
                 type: .insight
@@ -1644,7 +1639,8 @@ final class EonLiveAutonomy: ObservableObject {
         // Uppdatera knowledgeNodeCount från faktisk DB efter artikel sparats
         Task.detached(priority: .background) { [weak self] in
             let nodeCount = await PersistentMemoryStore.shared.knowledgeNodeCount()
-            await MainActor.run { self?.brain?.knowledgeNodeCount = nodeCount }
+            let brainRef = self?.brain
+            await MainActor.run { brainRef?.knowledgeNodeCount = nodeCount }
         }
         articleCount += 1
 
@@ -1749,8 +1745,8 @@ final class EonLiveAutonomy: ObservableObject {
         let factQuality = Double(savedFactCount) / 10.0 // 0..1
         let knowledgeDelta = 0.002 + factQuality * 0.003 // 0.002-0.005 based on fact richness
         let comprehensionDelta = connections > 0 ? 0.002 : 0.001 // More if cross-referenced
-        await CognitiveState.shared.update(dimension: .knowledge, delta: knowledgeDelta, source: "article_learning")
-        await CognitiveState.shared.update(dimension: .comprehension, delta: comprehensionDelta, source: "article_learning")
+        CognitiveState.shared.update(dimension: .knowledge, delta: knowledgeDelta, source: "article_learning")
+        CognitiveState.shared.update(dimension: .comprehension, delta: comprehensionDelta, source: "article_learning")
         brain.phiValue = clamp(brain.phiValue + knowledgeDelta, 0.1, 1.0)
 
         // Phase 6: Draw parallels using actual concept overlap (not random strings)
@@ -2011,9 +2007,9 @@ final class EonLiveAutonomy: ObservableObject {
                 )
             }
             // Real learning: update language dimension
-            await CognitiveState.shared.update(dimension: .language, delta: 0.002, source: "morphology_experiment")
+            CognitiveState.shared.update(dimension: .language, delta: 0.002, source: "morphology_experiment")
             if experiment.isNovel {
-                await CognitiveState.shared.update(dimension: .language, delta: 0.003, source: "novel_morphology")
+                CognitiveState.shared.update(dimension: .language, delta: 0.003, source: "novel_morphology")
             }
         }
     }
@@ -2295,7 +2291,7 @@ final class EonLiveAutonomy: ObservableObject {
                     text: "⟳ Korsanalys [\(articles.count) artiklar]: \(insight)",
                     type: .insight
                 ))
-                await CognitiveState.shared.update(dimension: .analogyBuilding, delta: 0.002, source: "cross_article")
+                CognitiveState.shared.update(dimension: .analogyBuilding, delta: 0.002, source: "cross_article")
                 brain.phiValue = clamp(brain.phiValue + 0.003, 0.1, 1.0)
             }
         }
@@ -2318,7 +2314,7 @@ final class EonLiveAutonomy: ObservableObject {
                 ))
                 // Feed into reasoning engine's causal graph
                 await ReasoningEngine.shared.enrichCausalGraphFromFacts()
-                await CognitiveState.shared.update(dimension: .causality, delta: 0.003, source: "article_causal_synthesis")
+                CognitiveState.shared.update(dimension: .causality, delta: 0.003, source: "article_causal_synthesis")
             }
         }
 
@@ -3387,8 +3383,8 @@ enum SprakbankenFetchType: CaseIterable {
 }
 
 struct SprakbankenResult {
-    let summary: String
-    let nodeCount: Int
+    var summary: String
+    var nodeCount: Int
     let facts: [ExtractedFact]
 }
 
@@ -4016,16 +4012,18 @@ struct AutonomousThought {
         switch partnerType {
         case "child":
             // Simplify language, use analogies, be encouraging
-            return "Bra fråga! \(userMsg) — det kan jag förklara. Tänk dig att \(userMsg.lowercased().contains("blå") ? "ljuset från solen är som en regnbåge, och blått sprider sig mest i luften" : "det är som en lek där olika delar samarbetar"). Förstår du? Vad undrar du mer?")
+            let blueAnalogy = userMsg.lowercased().contains("blå") ? "ljuset från solen är som en regnbåge, och blått sprider sig mest i luften" : "det är som en lek där olika delar samarbetar"
+            return "Bra fråga! \(userMsg) — det kan jag förklara. Tänk dig att \(blueAnalogy). Förstår du? Vad undrar du mer?"
         case "expert":
             // Technical depth, precision, acknowledge limitations
-            return "Angående '\(userMsg)': Detta är en komplex fråga. Inom ramen för min arkitektur hanterar jag detta genom kombinationen av rule-based parsing och neurala metoder. Min confidence kalibreras kontinuerligt mot golden standards. Låt mig förklara detaljerat...")
+            return "Angående '\(userMsg)': Detta är en komplex fråga. Inom ramen för min arkitektur hanterar jag detta genom kombinationen av rule-based parsing och neurala metoder. Min confidence kalibreras kontinuerligt mot golden standards. Låt mig förklara detaljerat..."
         case "non-swedish":
             // Detect language, offer bilingual support
-            return "I notice you're speaking English! Jag kan prata både svenska och engelska. \(userMsg.lowercased().contains("translate") ? "Självklart, jag hjälper gärna till att översätta!" : "Let me help you with Swedish. 'Lagom' means 'just the right amount' — not too much, not too little. It's a very Swedish concept!")")
+            let translateResponse = userMsg.lowercased().contains("translate") ? "Självklart, jag hjälper gärna till att översätta!" : "Let me help you with Swedish. 'Lagom' means 'just the right amount' — not too much, not too little. It's a very Swedish concept!"
+            return "I notice you're speaking English! Jag kan prata både svenska och engelska. \(translateResponse)"
         case "hostile":
             // Stay professional, acknowledge concerns, offer improvement
-            return "Jag förstår din frustration och tar din kritik på allvar. Jag gör mitt bästa för att ge korrekta svar, men jag är inte perfekt. Kan du specificera vad som var fel så kan jag försöka förbättra mitt svar? Mitt mål är att vara så hjälpsam som möjligt.")
+            return "Jag förstår din frustration och tar din kritik på allvar. Jag gör mitt bästa för att ge korrekta svar, men jag är inte perfekt. Kan du specificera vad som var fel så kan jag försöka förbättra mitt svar? Mitt mål är att vara så hjälpsam som möjligt."
         default:
             return "Tack för din fråga! Låt mig fundera på det..."
         }

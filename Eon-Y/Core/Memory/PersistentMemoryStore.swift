@@ -223,20 +223,20 @@ actor PersistentMemoryStore {
 
         // ── FAS 2: Language System tables ──
         // Learned words
-        execute("""CREATE TABLE IF NOT EXISTS learned_words (id INTEGER PRIMARY KEY AUTOINCREMENT, word TEXT NOT NULL, pos TEXT DEFAULT 'unknown', context TEXT, source TEXT DEFAULT 'unknown', confidence REAL DEFAULT 0.3, reinforcement_count INTEGER DEFAULT 0, first_seen TEXT DEFAULT (datetime('now')), last_seen TEXT DEFAULT (datetime('now')), embedding BLOB, UNIQUE(word))""")
+        execute("CREATE TABLE IF NOT EXISTS learned_words (id INTEGER PRIMARY KEY AUTOINCREMENT, word TEXT NOT NULL, pos TEXT DEFAULT 'unknown', context TEXT, source TEXT DEFAULT 'unknown', confidence REAL DEFAULT 0.3, reinforcement_count INTEGER DEFAULT 0, first_seen TEXT DEFAULT (datetime('now')), last_seen TEXT DEFAULT (datetime('now')), embedding BLOB, UNIQUE(word))")
         execute("CREATE INDEX IF NOT EXISTS idx_learned_words_word ON learned_words(word)")
 
         // Collocations
-        execute("""CREATE TABLE IF NOT EXISTS collocations (id INTEGER PRIMARY KEY AUTOINCREMENT, phrase TEXT NOT NULL UNIQUE, frequency INTEGER DEFAULT 1, first_seen TEXT DEFAULT (datetime('now')), last_seen TEXT DEFAULT (datetime('now')))""")
+        execute("CREATE TABLE IF NOT EXISTS collocations (id INTEGER PRIMARY KEY AUTOINCREMENT, phrase TEXT NOT NULL UNIQUE, frequency INTEGER DEFAULT 1, first_seen TEXT DEFAULT (datetime('now')), last_seen TEXT DEFAULT (datetime('now')))")
 
         // Grammar patterns
-        execute("""CREATE TABLE IF NOT EXISTS grammar_patterns (id INTEGER PRIMARY KEY AUTOINCREMENT, pattern TEXT NOT NULL UNIQUE, frequency INTEGER DEFAULT 1, first_seen TEXT DEFAULT (datetime('now')))""")
+        execute("CREATE TABLE IF NOT EXISTS grammar_patterns (id INTEGER PRIMARY KEY AUTOINCREMENT, pattern TEXT NOT NULL UNIQUE, frequency INTEGER DEFAULT 1, first_seen TEXT DEFAULT (datetime('now')))")
 
         // Corrections
-        execute("""CREATE TABLE IF NOT EXISTS corrections (id INTEGER PRIMARY KEY AUTOINCREMENT, wrong_form TEXT NOT NULL, correct_form TEXT NOT NULL, context TEXT, created_at TEXT DEFAULT (datetime('now')))""")
+        execute("CREATE TABLE IF NOT EXISTS corrections (id INTEGER PRIMARY KEY AUTOINCREMENT, wrong_form TEXT NOT NULL, correct_form TEXT NOT NULL, context TEXT, created_at TEXT DEFAULT (datetime('now')))")
 
         // Language snapshots
-        execute("""CREATE TABLE IF NOT EXISTS language_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL UNIQUE, vocabulary_size INTEGER, morphology_mastery REAL, syntax_mastery REAL, semantic_mastery REAL, pragmatic_mastery REAL, overall_level REAL, unknown_word_ratio REAL, avg_sentence_complexity REAL)""")
+        execute("CREATE TABLE IF NOT EXISTS language_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL UNIQUE, vocabulary_size INTEGER, morphology_mastery REAL, syntax_mastery REAL, semantic_mastery REAL, pragmatic_mastery REAL, overall_level REAL, unknown_word_ratio REAL, avg_sentence_complexity REAL)")
     }
 
     // MARK: - Conversation operations
