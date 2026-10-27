@@ -16,7 +16,7 @@ actor GrammarErrorDetector {
         for (pattern, desc, correction) in errorPatterns {
             if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
                regex.firstMatch(in: lower, range: NSRange(lower.startIndex..., in: lower)) != nil {
-                errors.append(GrammarError(matchedText: text.prefix(30), description: desc, suggestion: correction, severity: .medium))
+                errors.append(GrammarError(matchedText: String(text.prefix(30)), description: desc, suggestion: correction, severity: .medium))
             }
         }
         return errors

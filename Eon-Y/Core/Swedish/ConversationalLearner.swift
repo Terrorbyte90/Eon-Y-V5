@@ -71,9 +71,11 @@ actor ConversationalLearner {
     }
 
     private func guessPOS(_ word: String, in context: String) -> String {
-        let tagger = NLTaggerPool.shared.lexicalTagger(for: context)
+        let tagger = NLTagger(tagSchemes: [.lexicalClass])
+        tagger.string = context
         let range = context.range(of: word) ?? context.startIndex..<context.endIndex
-        if let (tag, _) = tagger.tag(at: range.lowerBound, unit: .word, scheme: .lexicalClass) {
+        let (tag, _) = tagger.tag(at: range.lowerBound, unit: .word, scheme: .lexicalClass)
+        if let tag {
             switch tag {
             case .noun: return "noun"
             case .verb: return "verb"

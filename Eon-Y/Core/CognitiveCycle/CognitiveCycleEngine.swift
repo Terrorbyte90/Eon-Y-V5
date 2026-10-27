@@ -76,7 +76,7 @@ struct InputAnalyzer {
         )
     }
 
-    private static func detectQuestionType(_ lower: String) -> InputAnalysis.QuestionType {
+    nonisolated private static func detectQuestionType(_ lower: String) -> InputAnalysis.QuestionType {
         if lower.hasPrefix("vad ") || lower.hasPrefix("vad?") { return .what }
         if lower.hasPrefix("vem ") || lower.hasPrefix("vem?") { return .who }
         if lower.hasPrefix("när ") || lower.hasPrefix("när?") { return .when }
@@ -103,7 +103,7 @@ struct InputAnalyzer {
         return .statement
     }
 
-    private static func extractNounsAndEntities(_ input: String) -> ([String], [String]) {
+    nonisolated private static func extractNounsAndEntities(_ input: String) -> ([String], [String]) {
         let tagger = NLTagger(tagSchemes: [.lexicalClass, .nameType])
         tagger.string = input
 
@@ -155,7 +155,7 @@ struct InputAnalyzer {
         return (nouns, entities)
     }
 
-    private static func extractCoreTopic(input: String, lower: String, nouns: [String], entities: [String]) -> String {
+    nonisolated private static func extractCoreTopic(input: String, lower: String, nouns: [String], entities: [String]) -> String {
         // Priority 1: Named entities are usually the core topic
         if let firstEntity = entities.first {
             return firstEntity
@@ -190,7 +190,7 @@ struct InputAnalyzer {
         return String(input.prefix(30))
     }
 
-    private static func buildSummary(questionType: InputAnalysis.QuestionType, coreTopic: String, input: String) -> String {
+    nonisolated private static func buildSummary(questionType: InputAnalysis.QuestionType, coreTopic: String, input: String) -> String {
         switch questionType {
         case .what:      return "Användaren frågar vad \(coreTopic) är/innebär"
         case .who:       return "Användaren frågar vem \(coreTopic) är"
@@ -209,7 +209,7 @@ struct InputAnalyzer {
 
     /// Computes clause complexity: counts main clauses, subordinate clauses, relative clauses
     /// and produces a normalized complexity score 0-1
-    private static func computeClauseComplexity(_ text: String) -> (mainClauses: Int, subClauses: Int, relativeClauses: Int, complexity: Double) {
+    nonisolated private static func computeClauseComplexity(_ text: String) -> (mainClauses: Int, subClauses: Int, relativeClauses: Int, complexity: Double) {
         // Split into sentences first
         let sentences = text.components(separatedBy: CharacterSet(charactersIn: ".!?"))
             .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -299,7 +299,15 @@ struct InputAnalyzer {
 // Enkla frågor hoppar över embedding (steg 4) och grafberikning (steg 9) — sparar resurser.
 
 struct ComplexityEstimate: Sendable {
-    enum Level: Equatable, Sendable { case simple, medium, complex }
+    enum Level: Equatable, Sendable {
+        case simple, medium, complex
+        nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+            switch (lhs, rhs) {
+            case (.simple, .simple), (.medium, .medium), (.complex, .complex): return true
+            default: return false
+            }
+        }
+    }
     let level: Level
     let skipBERT: Bool
     let skipEnrichment: Bool
@@ -469,7 +477,7 @@ actor CognitiveCycleEngine {
         }
 
         // v71: Deep linguistic analysis via Qwen3
-        context.deepAnalysis = await swedish.enrichAnalysis(input)
+        context.deepAnalysis = await swedish.enrichAnalysis(text: input)
 
         // Steg 2: WSD (Pelare F)
         await onStepUpdate(.wsd, .active)
@@ -832,7 +840,7 @@ actor CognitiveCycleEngine {
         }
 
         // v71: Deep linguistic analysis via Qwen3
-        context.deepAnalysis = await swedish.enrichAnalysis(input)
+        context.deepAnalysis = await swedish.enrichAnalysis(text: input)
 
         await onStepUpdate(.wsd, .active)
         await onStepUpdate(.wsd, .completed)
@@ -861,7 +869,7 @@ actor CognitiveCycleEngine {
             }
             // Apply recency boost after parallel collection
             var scored: [(record: ConversationRecord, score: Double)] = scoredMemories.map { mem, sim in
-                let ageHours = now.timeIntervalSince(mem.date) / 3600.0
+                let ageHours = now.timeIntervalSince(Date(timeIntervalSince1970: mem.timestamp)) / 3600.0
                 let recencyBoost = exp(-ageHours / 48.0) * 0.10
                 return (mem, sim + recencyBoost)
             }
@@ -905,12 +913,12 @@ actor CognitiveCycleEngine {
         await onMonologue(MonologueLine(text: "Bygger djup kontext med kunskapsbanken...", type: .thought))
         let knowledgeArticles = await memory.loadAllArticles()
         let relevantArticles: [KnowledgeArticle]
-        if !inputEmbedding.allSatisfy({ $0 == 0 }) {
+        if !context.inputEmbedding.allSatisfy({ $0 == 0 }) {
             // Semantic ranking — embed each article title+summary and compute similarity
             var scored: [(article: KnowledgeArticle, score: Float)] = []
             for article in knowledgeArticles.prefix(50) {
                 let articleEmb = await neuralEngine.embed(article.title + " " + article.summary)
-                let sim = await neuralEngine.cosineSimilarity(inputEmbedding, articleEmb)
+                let sim = await neuralEngine.cosineSimilarity(context.inputEmbedding, articleEmb)
                 scored.append((article, sim))
             }
             // Also check content keywords for articles that might have poor titles
@@ -1195,8 +1203,8 @@ actor CognitiveCycleEngine {
         // v73: Emotional context — include current emotional valence from ConsciousnessEngine
         // so responses are emotionally appropriate
         if remaining > 40 {
-            let valence = ConsciousnessEngine.shared.bodyBudget.valence  // -1.0 to +1.0
-            let arousal = ConsciousnessEngine.shared.bodyBudget.arousalLevel  // 0.0 to 1.0
+            let valence = await ConsciousnessEngine.shared.bodyBudget.valence  // -1.0 to +1.0
+            let arousal = await ConsciousnessEngine.shared.bodyBudget.arousal  // 0.0 to 1.0
             let emotionLabel: String
             if valence > 0.3 {
                 emotionLabel = "positiv"
@@ -1303,8 +1311,6 @@ actor CognitiveCycleEngine {
 
         // v79: Include last 3 user messages and Eon responses for conversational context
         let recentTurns = context.conversationHistory.suffix(6)  // Get more to filter by role
-        let userTurns = recentTurns.filter { $0.role == "user" }.suffix(3)
-        let eonTurns = recentTurns.filter { $0.role == "assistant" }.suffix(3)
 
         // Interleave user and Eon turns chronologically
         var allTurns: [(role: String, content: String)] = []
@@ -1333,7 +1339,8 @@ actor CognitiveCycleEngine {
             parts.append("entiteter: \(entityStr)")
         }
         // Semantisk kategori via NLTagger (inte keyword-matching)
-        let tagger = NLTaggerPool.shared.lexicalTagger(for: input)
+        let tagger = NLTagger(tagSchemes: [.lexicalClass])
+        tagger.string = input
         var nouns: [String] = []
         tagger.enumerateTags(in: input.startIndex..<input.endIndex, unit: .word, scheme: .lexicalClass, options: [.omitWhitespace, .omitPunctuation]) { tag, range in
             if tag == .noun, String(input[range]).count > 3 { nouns.append(String(input[range])) }
@@ -1368,7 +1375,8 @@ actor CognitiveCycleEngine {
         if wordCount <= 4 && followUps.contains(where: { lower.hasPrefix($0) }) && !history.isEmpty { return .followUp }
 
         // --- Phase 2: NLTagger POS analysis for structural intent ---
-        let tagger = NLTaggerPool.shared.lexicalTagger(for: input)
+        let tagger = NLTagger(tagSchemes: [.lexicalClass])
+        tagger.string = input
         var verbCount = 0, nounCount = 0, adjCount = 0
         var firstWordTag: NLTag?
         var isFirst = true
@@ -2324,7 +2332,7 @@ extension CognitiveCycleEngine {
     // ITERATION 107: User Intent Prediction (15+ intent types)
     // ═══════════════════════════════════════════════════════════
 
-    enum UserIntent: String, Sendable {
+    enum UserIntent: String, CaseIterable, Sendable {
         case informationSeeking = "information-seeking"
         case opinionSeeking = "opinion-seeking"
         case helpRequest = "help-request"
@@ -2681,7 +2689,7 @@ extension CognitiveCycleEngine {
             if clarificationMarkers.contains(where: { current.contains($0) }) {
                 repairs.append(Repair(
                     repairType: .clarificationRequest,
-                    trigger: prev.prefix(80),
+                    trigger: String(prev.prefix(80)),
                     repairAction: "Bad om förtydligande",
                     success: true,
                     timestamp: Date()
@@ -2693,7 +2701,7 @@ extension CognitiveCycleEngine {
             if rephraseMarkers.contains(where: { current.contains($0) }) {
                 repairs.append(Repair(
                     repairType: .rephrasing,
-                    trigger: prev.prefix(80),
+                    trigger: String(prev.prefix(80)),
                     repairAction: "Formulerade om",
                     success: true,
                     timestamp: Date()
@@ -2705,7 +2713,7 @@ extension CognitiveCycleEngine {
             if exampleMarkers.contains(where: { current.contains($0) }) {
                 repairs.append(Repair(
                     repairType: .example,
-                    trigger: prev.prefix(80),
+                    trigger: String(prev.prefix(80)),
                     repairAction: "Gav exempel för att förtydliga",
                     success: true,
                     timestamp: Date()
@@ -2717,7 +2725,7 @@ extension CognitiveCycleEngine {
             if ackMarkers.contains(where: { current.contains($0) }) && (prev.contains("?") || prev.contains("inte")) {
                 repairs.append(Repair(
                     repairType: .acknowledgment,
-                    trigger: prev.prefix(80),
+                    trigger: String(prev.prefix(80)),
                     repairAction: "Bekräftade förståelse",
                     success: true,
                     timestamp: Date()
@@ -2726,10 +2734,10 @@ extension CognitiveCycleEngine {
 
             // 5. Elaboration (adding more detail after possible confusion)
             let elaborationMarkers = ["dessutom", "ytterligare", "också", "dessutom kan", "vi kan också", "dessutom bör"]
-            if elaborationMarkers.contains(where: { current.contains($0) }) && current.count > prev.count * 0.5 {
+            if elaborationMarkers.contains(where: { current.contains($0) }) && current.count > Int(Double(prev.count) * 0.5) {
                 repairs.append(Repair(
                     repairType: .elaboration,
-                    trigger: prev.prefix(80),
+                    trigger: String(prev.prefix(80)),
                     repairAction: "Utökade med mer information",
                     success: true,
                     timestamp: Date()

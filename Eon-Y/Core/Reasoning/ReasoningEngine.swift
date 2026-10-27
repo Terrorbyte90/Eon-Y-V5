@@ -729,7 +729,7 @@ actor ReasoningEngine {
 // CausalGraph är en class (referenstyp) skyddad av NSLock för trådsäkerhet.
 // Alla mutationer och läsningar av relations sker under lock.
 final class CausalGraph: @unchecked Sendable {
-    private var relations: [CausalRelation] = []
+    nonisolated(unsafe) private var relations: [CausalRelation] = []
     private let lock = NSLock()
 
     nonisolated init() {}

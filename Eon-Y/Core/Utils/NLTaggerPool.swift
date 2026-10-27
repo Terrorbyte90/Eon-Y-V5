@@ -10,15 +10,14 @@ final class NLTaggerPool {
 
     private init() {
         lexicalTagger = NLTagger(tagSchemes: [.lexicalClass])
-        lexicalTagger.setLanguage(.swedish, range: nil)
         nameTypeTagger = NLTagger(tagSchemes: [.nameType])
-        nameTypeTagger.setLanguage(.swedish, range: nil)
     }
 
     /// Reuse the lexical-class tagger for the given text.
     /// Caller must not retain the returned tagger across async boundaries.
     func lexicalTagger(for text: String) -> NLTagger {
         lexicalTagger.string = text
+        lexicalTagger.setLanguage(.swedish, range: text.startIndex..<text.endIndex)
         return lexicalTagger
     }
 
@@ -26,6 +25,7 @@ final class NLTaggerPool {
     /// Caller must not retain the returned tagger across async boundaries.
     func nameTypeTagger(for text: String) -> NLTagger {
         nameTypeTagger.string = text
+        nameTypeTagger.setLanguage(.swedish, range: text.startIndex..<text.endIndex)
         return nameTypeTagger
     }
 }

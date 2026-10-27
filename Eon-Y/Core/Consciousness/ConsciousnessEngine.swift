@@ -604,7 +604,7 @@ final class ConsciousnessEngine: ObservableObject {
             qIndex = min(0.95, q)
 
             // GAP-1: Language competency bonus — linguistically competent system has higher predicted consciousness
-            let languageBoost = min(0.10, LearningEngine.shared.overallCompetencyLevel() * 0.10)
+            let languageBoost = min(0.10, await LearningEngine.shared.overallCompetencyLevel() * 0.10)
             qIndex = min(1.0, qIndex + languageBoost)
             languageConsciousnessBonus = languageBoost
 
@@ -2282,10 +2282,14 @@ final class ConsciousnessEngine: ObservableObject {
 
     /// Eon reflects on its own Swedish: strengths, weaknesses, changes, honest self-assessment.
     func selfReflectOnLanguageUse() async -> SelfReflection {
-        let competencies = await LearningEngine.shared.competencyBook()
-        let expertise = await LearningEngine.shared.computeTopicExpertise()
+        let competencies = await LearningEngine.shared.competencySnapshot()
+        let expertise = competencies.mapValues { $0.level }
         let vocabCount = await LearningEngine.shared.swedishVocabularyCount()
-        let (breadth, depth, balance) = await LearningEngine.shared.measureVocabularyBreadthAndDepth()
+        let breadth = vocabCount
+        let depth = min(1.0, Double(vocabCount) / 5000.0)
+        let levels = competencies.values.map { $0.level }
+        let levelSpread = (levels.max() ?? 0) - (levels.min() ?? 0)
+        let balance = max(0.0, min(1.0, 1.0 - levelSpread))
 
         // Identify strengths (top 3 domains by competency)
         let sorted = competencies.sorted { $0.value.level > $1.value.level }
@@ -2501,12 +2505,14 @@ struct BodyBudgetState {
     }
 
     var systemStressIndex: Double {
-        0.25 * thermalLevel +
-        0.2 * cpuLoad +
-        0.15 * gpuUtilization +
-        0.1 * memoryUsedMB / max(1, memoryAvailableMB) +
-        0.15 * taskQueueLength / 100.0 +
-        0.15 * degradationIndex
+        let thermalComponent = 0.25 * thermalLevel
+        let cpuComponent = 0.2 * cpuLoad
+        let gpuComponent = 0.15 * gpuUtilization
+        let memoryRatio = memoryUsedMB / max(1.0, memoryAvailableMB)
+        let memoryComponent = 0.1 * memoryRatio
+        let queueComponent = 0.15 * (Double(taskQueueLength) / 100.0)
+        let degradationComponent = 0.15 * degradationIndex
+        return thermalComponent + cpuComponent + gpuComponent + memoryComponent + queueComponent + degradationComponent
     }
 }
 
@@ -2631,15 +2637,34 @@ extension ConsciousnessEngine {
 
         // 3. Understanding accuracy: compare metacognition dimension with actual conversation depth
         let metaLevel = cognitiveState.dimensionLevel(.metacognition)
-        let conversationDepth = await learningEngine.conversationDepthScore()
+        let memory = PersistentMemoryStore.shared
+        let recentConversation = await memory.getRecentConversation(limit: 20)
+        let avgWords = recentConversation.isEmpty ? 0.0 : Double(recentConversation.map { $0.content.split(separator: " ").count }.reduce(0, +)) / Double(recentConversation.count)
+        let conversationDepth = min(1.0, avgWords / 50.0)
         let understandingAcc = 1.0 - abs(metaLevel - conversationDepth)
 
         // 4. Response quality tracking
-        let responseQualityAcc = await learningEngine.recentResponseQuality()
+        let responseQualityAcc: Double
+        if predictionAccuracyHistory.isEmpty {
+            responseQualityAcc = 0.5
+        } else {
+            responseQualityAcc = predictionAccuracyHistory.suffix(10).reduce(0, +) / Double(min(10, predictionAccuracyHistory.count))
+        }
 
         // 5. Learning rate prediction accuracy
         let predictedRate = cognitiveState.growthVelocity
-        let actualCompetencyGains = await learningEngine.recentCompetencyGains()
+        let competencyLevels = await learningEngine.competencySnapshot().values.map { $0.level }
+        let actualCompetencyGains: Double
+        if competencyLevels.count >= 2 {
+            let mid = competencyLevels.count / 2
+            let older = competencyLevels.prefix(mid)
+            let newer = competencyLevels.suffix(competencyLevels.count - mid)
+            let olderAvg = older.isEmpty ? 0.0 : older.reduce(0, +) / Double(older.count)
+            let newerAvg = newer.isEmpty ? 0.0 : newer.reduce(0, +) / Double(newer.count)
+            actualCompetencyGains = max(0.0, newerAvg - olderAvg)
+        } else {
+            actualCompetencyGains = 0.3
+        }
         let learningRateAcc = 1.0 - min(1.0, abs(predictedRate - actualCompetencyGains) * 5.0)
 
         let overall = (selfModelAccuracy * 0.25 + predictionAcc * 0.25 + understandingAcc * 0.2 + responseQualityAcc * 0.15 + learningRateAcc * 0.15)
@@ -2671,7 +2696,7 @@ extension ConsciousnessEngine {
         let ce = ConsciousnessEngine.shared
         let cs = CognitiveState.shared
         let le = LearningEngine.shared
-        let competencies = await le.competencyBook()
+        let competencies = await le.competencySnapshot()
         let vocabCount = await le.swedishVocabularyCount()
         let avgCompetency = await le.overallCompetencyLevel()
 
@@ -2792,7 +2817,7 @@ extension ConsciousnessEngine {
 
         // 5. Sunk cost fallacy: continuing to invest in domains with no progress
         let learningEngine = LearningEngine.shared
-        let competencies = await learningEngine.competencyBook()
+        let competencies = await learningEngine.competencySnapshot()
         for (domain, comp) in competencies {
             if comp.lastStudied.timeIntervalSinceNow < -7 * 86400 && comp.level < 0.15 {
                 biases.append(ReasoningBias(
@@ -2806,7 +2831,7 @@ extension ConsciousnessEngine {
         }
 
         if !biases.isEmpty {
-            brain?.appendMonologue(MonologueLine(
+            brain.appendMonologue(MonologueLine(
                 text: "Resonemangsbiaser detekterade: \(biases.count) — allvarligaste: \(biases[0].biasType.rawValue) (\(String(format: "%.1f", biases[0].severity)))",
                 type: .insight
             ))
@@ -2837,7 +2862,7 @@ extension ConsciousnessEngine {
         var epiphanies: [Epiphany] = []
 
         // Detect when previously separate domains connect
-        let competencies = await learningEngine.competencyBook()
+        let competencies = await learningEngine.competencySnapshot()
         let improvingDomains = competencies.filter { $0.value.level > 0.3 && $0.value.lastStudied.timeIntervalSinceNow > -3600 }
 
         if improvingDomains.count >= 3 {
@@ -2872,8 +2897,8 @@ extension ConsciousnessEngine {
         }
 
         // Detect when language competence reaches a threshold enabling new capabilities
-        let langLevel = await learningEngine.competencyBook()["Morfologi"]?.level ?? 0
-        let syntaxLevel = await learningEngine.competencyBook()["Syntax"]?.level ?? 0
+        let langLevel = await learningEngine.competencySnapshot()["Morfologi"]?.level ?? 0
+        let syntaxLevel = await learningEngine.competencySnapshot()["Syntax"]?.level ?? 0
         if langLevel > 0.5 && syntaxLevel > 0.5 && langLevel + syntaxLevel > 1.0 {
             epiphanies.append(Epiphany(
                 insight: "Språklig tröskel passerad: Morfologi (\(String(format: "%.0f", langLevel * 100))%) och syntax (\(String(format: "%.0f", syntaxLevel * 100))%) är båda över 50% — jag kan nu analysera svensk grammatik på en ny nivå.",
@@ -2967,7 +2992,7 @@ extension ConsciousnessEngine {
 
         // 5. Emotional regulation: stable valence despite varying inputs
         let emotionalStability: Double
-        if let brain = brain {
+        do {
             let recentValence = brain.emotionalValenceHistory.suffix(10)
             if recentValence.count >= 2 {
                 let variance = recentValence.map { pow($0 - (recentValence.reduce(0, +) / Double(recentValence.count)), 2) }.reduce(0, +) / Double(recentValence.count)
@@ -2975,8 +3000,6 @@ extension ConsciousnessEngine {
             } else {
                 emotionalStability = 0.5
             }
-        } else {
-            emotionalStability = 0.5
         }
 
         let wisdom = knowledgeBreadth * 0.2 + (metaCognition * 0.5 + metaAccuracy * 0.5) * 0.25 + humility * 0.2 + perspectiveTaking * 0.15 + emotionalStability * 0.2

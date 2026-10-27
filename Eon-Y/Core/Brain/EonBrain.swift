@@ -365,7 +365,7 @@ final class EonBrain: ObservableObject {
     private func syncLanguageMetrics() async {
         let learning = LearningEngine.shared
         let snapshot = await learning.competencySnapshot()
-        for comp in snapshot {
+        for comp in snapshot.values {
             switch comp.domain {
             case "Morfologi": self.morphologyMastery = comp.level
             case "Syntax": self.syntaxMastery = comp.level
@@ -924,11 +924,22 @@ struct MonologueLine: Identifiable, Equatable {
     }
 }
 
-enum DevelopmentalStage: String {
+enum DevelopmentalStage: String, CaseIterable {
     case toddler = "Toddler"
     case child = "Child"
     case adolescent = "Adolescent"
     case mature = "Mature"
+
+    var label: String { rawValue }
+
+    func threshold() -> Double {
+        switch self {
+        case .toddler: return 0.0
+        case .child: return 0.44
+        case .adolescent: return 0.60
+        case .mature: return 0.76
+        }
+    }
 
     var displayName: String {
         switch self {

@@ -184,6 +184,10 @@ actor LearningEngine {
 
     // v72: Competency calibration tracking
     private var calibrationFlags: [String] = []
+    private var achievedMilestones: Set<String> = []
+    private var milestonesHistory: [LanguageMilestone] = []
+    private var activeHypotheses: [Hypothesis] = []
+    private var testedHypotheses: [Hypothesis] = []
 
     func syncCompetenciesFromDatabase() async {
         // v71: Prevent redundant syncs (max once per 60 seconds)
@@ -411,7 +415,7 @@ actor LearningEngine {
     // MARK: - Helper methods for external access (Iteration 28)
 
     /// Returns a copy of the competency book for external reading
-    func competencyBook() -> [String: DomainCompetency] {
+    func competencySnapshot() -> [String: DomainCompetency] {
         competencyBook
     }
 
@@ -1311,7 +1315,7 @@ actor LearningEngine {
 
     /// Push latest state to the MainActor observable proxy
     private func notifyProxy() async {
-        let snapshot = competencySnapshot()
+        let snapshot = competencyRanking()
         let level = overallCompetencyLevel()
         let recentWords = Array(recentlyLearnedWords.suffix(10))
         let topics = activeStudyTopics
@@ -1954,7 +1958,7 @@ actor LearningEngine {
 
     // MARK: - Statistik
 
-    func competencySnapshot() -> [DomainCompetency] {
+    func competencyRanking() -> [DomainCompetency] {
         competencyBook.values.sorted { $0.level > $1.level }
     }
 
@@ -2216,8 +2220,8 @@ actor LearningEngine {
         // 1. Hämta Eons senaste svar
         let recentConversations = await memory.searchFacts(query: "svar", limit: 20)
         let eonResponses = recentConversations.compactMap { fact -> String? in
-            guard fact.source == "eon_response" || fact.subject.contains("svar") else { return nil }
-            return fact.detail
+            guard fact.predicate == "eon_response" || fact.subject.contains("svar") else { return nil }
+            return fact.object
         }.prefix(10)
 
         guard !eonResponses.isEmpty else { return }
@@ -2228,14 +2232,13 @@ actor LearningEngine {
         // 3. Lär av felen
         for analysis in errorAnalyses {
             // Spara korrigering som faktum
-            let correctionFact = ExtractedFact(
+            await memory.saveFact(
                 subject: "Språkkorrigering: \(analysis.error)",
-                detail: "Korrekt: \(analysis.correction). Regel: \(analysis.ruleExplanation)",
+                predicate: "korrigering",
+                object: "Korrekt: \(analysis.correction). Regel: \(analysis.ruleExplanation)",
                 confidence: analysis.learningPriority,
-                timestamp: Date(),
                 source: "self-improvement"
             )
-            await memory.saveFact(correctionFact)
 
             // Öka relevant domän-kompetens
             let domain: String
@@ -2413,10 +2416,8 @@ actor LearningEngine {
 
             let lesson = ScheduledLesson(
                 topic: reviewPrompt,
-                domain: item.domain,
-                scheduledDate: Date().addingTimeInterval(delay),
-                priority: urgency,
-                estimatedDuration: 60
+                domain: item.domain ?? "okänd",
+                scheduledAt: Date().addingTimeInterval(delay)
             )
             lessons.append(lesson)
         }
@@ -2582,14 +2583,13 @@ actor LearningEngine {
                     initialDifficulty: word.cefrLevel == "C1" || word.cefrLevel == "C2" ? 0.7 : 0.4
                 )
 
-                let fact = ExtractedFact(
+                await PersistentMemoryStore.shared.saveFact(
                     subject: "Ord: \(word.word)",
-                    detail: "\(word.pos): \(word.definition). Exempel: \(word.exampleSentence)",
+                    predicate: "definition",
+                    object: "\(word.pos): \(word.definition). Exempel: \(word.exampleSentence)",
                     confidence: 0.9,
-                    timestamp: Date(),
                     source: "openrouter-vocabulary"
                 )
-                await PersistentMemoryStore.shared.saveFact(fact)
             }
         }
 
@@ -2787,7 +2787,7 @@ actor LearningEngine {
             styleScore: 0.7,  // Default until we have style tracking
             conversationCount: conversationsToday,
             wordsLearnedThisWeek: wordsThisWeek,
-            weeklyGrowthRate: growthRate
+            weeklyGrowthRate: Double(growthRate)
         )
 
         weeklyProgressSnapshots.append(snapshot)
@@ -2966,7 +2966,7 @@ actor LearningEngine {
     func selfEvaluateLanguage() async -> SelfEvaluationReport {
         let memory = PersistentMemoryStore.shared
         let recentConversations = await memory.searchFacts(query: "svar", limit: 15)
-        let eonTexts = recentConversations.prefix(8).map { $0.detail }
+        let eonTexts = recentConversations.prefix(8).map { $0.object }
 
         guard !eonTexts.isEmpty else {
             return SelfEvaluationReport(
@@ -3012,7 +3012,7 @@ actor LearningEngine {
             if currIdx > prevIdx {
                 comparisonToPrevious = "Framsteg! Från \(previous.estimatedCEFR) till \(openRouterResult.estimatedLevel)"
             } else if currIdx == prevIdx {
-                let scoreDelta = openRouterResult.overallScore - previous.overallScore
+                let scoreDelta = openRouterResult.confidence - previous.overallScore
                 if scoreDelta > 0.05 {
                     comparisonToPrevious = "Samma nivå (\(openRouterResult.estimatedLevel)) men förbättrad poäng (+\(String(format: "%.1f", scoreDelta * 100))%)"
                 } else {
@@ -3605,7 +3605,7 @@ actor LearningEngine {
         print("[MasteryLoop] Step 5: Self-correcting...")
         let memory = PersistentMemoryStore.shared
         let recentResponses = await memory.searchFacts(query: "svar", limit: 5)
-        let responseTexts = recentResponses.prefix(3).map { $0.detail }
+        let responseTexts = recentResponses.prefix(3).map { $0.object }
         for text in responseTexts {
             let correction = await OpenRouterLanguageEvaluator.shared.selfCorrectText(text)
             if correction.hadErrors {
@@ -3648,7 +3648,7 @@ actor LearningEngine {
             selectedStrategy: strategy,
             knowledgeSyntheses: syntheses.count,
             selfEvalQuestionsGenerated: selfEvalQuestions.count,
-            errorsCorrected: responseTexts.reduce(0) { $0 + 1 },
+            errorsCorrected: responseTexts.count,
             motivationalThought: motivationalThought,
             currentCEFR: selfEval.estimatedCEFR,
             currentDifficultyTier: currentDifficultyTier,
@@ -3697,6 +3697,7 @@ actor LearningEngine {
     }
 
     // MARK: - Data Models
+}
 
 struct DomainCompetency: Identifiable {
     let id = UUID()
@@ -3778,14 +3779,6 @@ struct DailyLearningMetrics {
     let learningVelocity: Double
     let activeStudyTopics: [String]
     let recentWords: [String]
-}
-
-// MARK: - Array safe subscript
-
-extension Array {
-    nonisolated subscript(safe index: Int) -> Element? {
-        indices.contains(index) ? self[index] : nil
-    }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3878,7 +3871,7 @@ struct SelfGeneratedEval: Identifiable, Codable {
 // MARK: - Iteration 50: Mastery Loop Report
 
 struct MasteryLoopReport: Identifiable, Codable {
-    let id = UUID()
+    var id = UUID()
     let executedAt: Date
     let selfEvaluation: SelfEvaluationReport
     let curriculum: Curriculum
@@ -3904,9 +3897,11 @@ struct MasteryLoopReport: Identifiable, Codable {
         Motivation: \(motivationalThought)
         """
     }
+}
 
-    // MARK: - Iteration 70: Knowledge Graph Expansion from Text
+// MARK: - Iteration 70: Knowledge Graph Expansion from Text
 
+extension LearningEngine {
     struct KnowledgeGraph {
         let entities: [KGEntity]
         let relations: [KGRelation]
@@ -4463,9 +4458,6 @@ struct MasteryLoopReport: Identifiable, Codable {
         let celebration: String
     }
 
-    private var achievedMilestones: Set<String> = []
-    private var milestonesHistory: [LanguageMilestone] = []
-
     private static let milestoneDefinitions: [(id: String, milestone: String, domain: String, metric: String, threshold: Double, celebration: String)] = [
         ("first_idiom", "Första idiom förstått", "Pragmatik", "idioms_understood", 1.0, "Jag förstod mitt första svenska idiom! 🎉"),
         ("first_complex_sentence", "Första komplexa meningen genererad", "Syntax", "clause_complexity", 0.5, "Jag genererade min första komplexa mening! 🏆"),
@@ -4560,7 +4552,7 @@ struct MasteryLoopReport: Identifiable, Codable {
 
     /// Based on current competencies, knowledge gaps, and user interests, generate an optimal learning path.
     func recommendLearningPath(targetCEFR: String = "B2", userInterests: [String] = []) async -> LearningPath {
-        let competencies = competencyBook()
+        let competencies = competencySnapshot()
         let expertise = await computeTopicExpertise()
         let (_, metrics) = await buildKnowledgeGraph()
 
@@ -4595,7 +4587,7 @@ struct MasteryLoopReport: Identifiable, Codable {
         if metrics.knowledgeGaps.count > 5 {
             phases.append(LearningPhase(
                 name: "Kunskapsintegration",
-                focusDomains: metrics.knowledgeGaps.prefix(5),
+                focusDomains: Array(metrics.knowledgeGaps.prefix(5)),
                 activities: ["Kunskapsgrafer", "Analogiträning", "Tvärvetenskapliga kopplingar"],
                 estimatedWeeks: 3,
                 milestones: metrics.knowledgeGaps.prefix(3).map { "Fyll kunskapslucka: \( $0 )" },
@@ -4657,7 +4649,7 @@ struct MasteryLoopReport: Identifiable, Codable {
             if usedInConversation { wordDepth += 0.2 }
 
             // Has the word appeared in FSRS items?
-            let inFSRS = fsrsItems.contains { $0.content.contains(word) }
+            let inFSRS = fsrsItems.contains { $0.topic.contains(word) }
             if inFSRS { wordDepth += 0.3 }
 
             // Has the word been morphologically analyzed?
@@ -4918,12 +4910,9 @@ struct MasteryLoopReport: Identifiable, Codable {
         let createdAt: Date
     }
 
-    private var activeHypotheses: [Hypothesis] = []
-    private var testedHypotheses: [Hypothesis] = []
-
     /// Formulate hypotheses about what learning methods work best and test them.
     func generateLearningHypothesis() async -> Hypothesis {
-        let competencies = await competencyBook()
+        let competencies = await competencySnapshot()
         let learningData = collectLearningData()
 
         // Generate hypothesis based on current learning patterns
@@ -4967,11 +4956,11 @@ struct MasteryLoopReport: Identifiable, Codable {
         let result: String
 
         if hypothesis.statement.contains("samanhang") || hypothesis.statement.contains("berättelse") {
-            let contextRatio = learningData.storyContextWords / max(1, learningData.isolatedWords)
+            let contextRatio = Double(learningData.storyContextWords) / Double(max(1, learningData.isolatedWords))
             result = contextRatio > 1.5
                 ? "BEKRÄFTAD: Kontextuella ord (\(learningData.storyContextWords)) > isolerade (\(learningData.isolatedWords))"
                 : "VARKEN BEKRÄFTAD ELLER AVFÄRDAD: För lite data"
-            let updated = Hypothesis(id: hypothesis.id, statement: hypothesis.statement, method: hypothesis.method,
+            let updated = Hypothesis(statement: hypothesis.statement, method: hypothesis.method,
                 confidence: contextRatio > 1.5 ? 0.85 : hypothesis.confidence, testResult: result, createdAt: hypothesis.createdAt)
             activeHypotheses = activeHypotheses.filter { $0.id != hypothesis.id }
             testedHypotheses.append(updated)
@@ -5009,7 +4998,7 @@ struct MasteryLoopReport: Identifiable, Codable {
 
     /// Find domains where Eon has ZERO or MINIMAL knowledge despite being asked about them.
     func detectKnowledgeBlindspots() async -> [Blindspot] {
-        let competencies = await competencyBook()
+        let competencies = await competencySnapshot()
         let memory = PersistentMemoryStore.shared
         let conversationHistory = await memory.getRecentConversation(limit: 100)
 
@@ -5075,7 +5064,7 @@ struct MasteryLoopReport: Identifiable, Codable {
 
     /// Can Eon explain a concept to someone else? Generate a teaching explanation and evaluate its quality.
     func evaluateTeachingAbility(subject: String) async -> Double {
-        let competency = await competencyBook()[subject]?.level ?? 0.0
+        let competency = await competencySnapshot()[subject]?.level ?? 0.0
         let memory = PersistentMemoryStore.shared
 
         // Generate a teaching explanation
@@ -5090,11 +5079,11 @@ struct MasteryLoopReport: Identifiable, Codable {
         let factualScore = hasFactualBasis ? min(1.0, Double(facts.count) / 5.0) : 0.0
 
         // 3. Metacognitive ability to explain (20%)
-        let metaLevel = CognitiveState.shared.dimensionLevel(.metacognition)
+        let metaLevel = await CognitiveState.shared.dimensionLevel(.metacognition)
         let metaScore = metaLevel
 
         // 4. Language ability to formulate clearly (20%)
-        let langLevel = await (competencyBook()["Språk"]?.level ?? 0.0)
+        let langLevel = await (competencySnapshot()["Språk"]?.level ?? 0.0)
         let langScore = min(1.0, langLevel * 1.5)
 
         let teachingScore = competencyScore * 0.4 + factualScore * 0.2 + metaScore * 0.2 + langScore * 0.2
@@ -5119,7 +5108,7 @@ struct MasteryLoopReport: Identifiable, Codable {
 
     /// Project what Eon's competencies will look like in N days at current learning rate.
     func simulateFutureSelf(daysAhead: Int) async -> FutureSelfProjection {
-        let competencies = await competencyBook()
+        let competencies = await competencySnapshot()
         let currentVocab = swedishVocabularyCount()
         let cs = CognitiveState.shared
 
@@ -5170,7 +5159,7 @@ struct MasteryLoopReport: Identifiable, Codable {
         let memory = PersistentMemoryStore.shared
 
         // 1. Dimension balance: how evenly developed are cognitive dimensions?
-        let dimensions = cs.dimensionSnapshot()
+        let dimensions = await cs.dimensionSnapshot()
         let values = dimensions.values.filter { $0 > 0.1 }
         guard !values.isEmpty else { return 0.3 }
 
@@ -5183,10 +5172,10 @@ struct MasteryLoopReport: Identifiable, Codable {
         let topicFlexibility = min(1.0, Double(transitionCount) / 20.0)
 
         // 3. Adaptivity dimension
-        let adaptivityScore = cs.dimensionLevel(.adaptivity)
+        let adaptivityScore = await cs.dimensionLevel(.adaptivity)
 
         // 4. Multi-domain competency spread
-        let competencies = await competencyBook()
+        let competencies = await competencySnapshot()
         let activeDomains = competencies.filter { $0.value.level > 0.15 }.count
         let domainSpread = min(1.0, Double(activeDomains) / 15.0)
 
@@ -5210,7 +5199,7 @@ struct MasteryLoopReport: Identifiable, Codable {
 
     /// When knowledge from one domain is successfully applied to another.
     func detectKnowledgeTransfer() async -> [KnowledgeTransfer] {
-        let competencies = await competencyBook()
+        let competencies = await competencySnapshot()
         let memory = PersistentMemoryStore.shared
         let facts = await memory.getAllFacts(limit: 500)
 
@@ -5264,7 +5253,7 @@ struct MasteryLoopReport: Identifiable, Codable {
 
     /// Identify when learning has stalled in a domain (no improvement over N sessions).
     func detectLearningPlateaus() async -> [Plateau] {
-        let competencies = await competencyBook()
+        let competencies = await competencySnapshot()
         let history = selfEvaluationHistory
 
         var plateaus: [Plateau] = []
@@ -5329,7 +5318,7 @@ struct MasteryLoopReport: Identifiable, Codable {
         let conceptLower = concept.lowercased()
 
         // Level 1: Has the concept in memory
-        let hasBasicFact = competencyBook()[concept] != nil
+        let hasBasicFact = competencySnapshot()[concept] != nil
         guard hasBasicFact else { return .knowsWord }
 
         // Level 2: Can define (has definitions stored)
@@ -5345,7 +5334,7 @@ struct MasteryLoopReport: Identifiable, Codable {
         guard usedInContext else { return .canUseInContext }
 
         // Level 4: Can explain (domain competency > 0.5)
-        let domainCompetency = competencyBook()[concept]?.level ?? 0.0
+        let domainCompetency = competencySnapshot()[concept]?.level ?? 0.0
         guard domainCompetency > 0.5 else { return .canExplain }
 
         // Level 5: Can apply creatively (cross-domain transfer detected)
@@ -5359,7 +5348,7 @@ struct MasteryLoopReport: Identifiable, Codable {
 
     /// How quickly does Eon adapt to new topics, new users, new styles?
     func measureAdaptationSpeed() async -> Double {
-        let competencies = await competencyBook()
+        let competencies = await competencySnapshot()
         let cs = CognitiveState.shared
 
         // 1. Time-to-competence for new domains
@@ -5371,7 +5360,7 @@ struct MasteryLoopReport: Identifiable, Codable {
         let velocityScore = min(1.0, abs(learningVelocity) * 0.5)
 
         // 3. Adaptivity dimension
-        let adaptivityScore = cs.dimensionLevel(.adaptivity)
+        let adaptivityScore = await cs.dimensionLevel(.adaptivity)
 
         // 4. Strategy switching ability
         let strategyScore = min(1.0, Double(strategyHistory.count) / 10.0)
@@ -5396,7 +5385,7 @@ struct MasteryLoopReport: Identifiable, Codable {
 
     /// The ultimate meta-loop: analyze all learning data, identify patterns, update strategies.
     func executeMetaLearningCycle() async -> MetaLearningReport {
-        let competencies = await competencyBook()
+        let competencies = await competencySnapshot()
         let cs = CognitiveState.shared
 
         // 1. Analyze learning patterns
@@ -5450,12 +5439,13 @@ struct MasteryLoopReport: Identifiable, Codable {
         }
 
         // 4. Generate insights
+        let growthVelocity = await MainActor.run { cs.growthVelocity }
         let insights: [String] = [
             "Totalt \(swedishVocabularyCount()) svenska ord i ordförrådet",
             "Genomsnittlig kompetens: \(String(format: "%.0f", competencies.values.map { $0.level }.reduce(0, +) / Double(max(1, competencies.count)) * 100))%",
-            "Kognitiv tillväxthastighet: \(String(format: "%.3f", cs.growthVelocity)) per minut",
+            "Kognitiv tillväxthastighet: \(String(format: "%.3f", growthVelocity)) per minut",
             "Antal aktiva FSRS-objekt: \(fsrsItems.count)",
-            "Inlärningsstrategi: \(currentLearningStrategyLabel)",
+            "Inlärningsstrategi: \(currentLearningStrategy.rawValue)",
         ]
 
         // 5. Recommended actions
@@ -5510,7 +5500,7 @@ struct MasteryLoopReport: Identifiable, Codable {
     // ═══════════════════════════════════════════════════════════
 
     func recentCompetencyGains() async -> Double {
-        let competencies = await competencyBook()
+        let competencies = await competencySnapshot()
         let levels = competencies.values.map { $0.level }
         guard levels.count >= 2 else { return 0.3 }
         let recent = levels.suffix(levels.count / 2)
@@ -5537,5 +5527,13 @@ struct MasteryLoopReport: Identifiable, Codable {
         comp.lastStudied = Date()
         competencyBook[domain] = comp
         UserDefaults.standard.set(comp.level, forKey: "competency_\(domain)")
+    }
+}
+
+// MARK: - Array safe subscript
+
+extension Array {
+    nonisolated subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }

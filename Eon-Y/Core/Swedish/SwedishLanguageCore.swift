@@ -3453,7 +3453,9 @@ actor SwedishMorphologyEngine {
 
     func addInflection(baseForm: String, formKey: String, formValue: String) {
         guard var entry = lexicon[baseForm.lowercased()] else { return }
-        entry.forms[formKey] = formValue
+        var forms = entry.forms
+        forms[formKey] = formValue
+        entry = LexiconEntry(word: entry.word, pos: entry.pos, forms: forms)
         lexicon[baseForm.lowercased()] = entry
     }
 
@@ -3721,12 +3723,10 @@ actor SwedishMorphologyEngine {
 
             for orResult in openRouterResults {
                 // Bygg analys från OpenRouter-data
-                let forms: [String: String]
+                var forms: [String: String] = [:]
                 if !orResult.inflection.paradigm.isEmpty {
                     forms["plural"] = orResult.inflection.paradigm.first ?? ""
                     forms["grammaticalCategory"] = orResult.inflection.grammaticalCategory
-                } else {
-                    forms = [:]
                 }
 
                 let enhancedAnalysis = MorphemeAnalysis(
@@ -3862,7 +3862,7 @@ actor SwedishMorphologyEngine {
             // e.g., "tunn" → "tunnhet" (already has double), "glad" → "gladhet"
             // Root ending in single consonant + "het"/"bar" sometimes doubles
             if root.count <= 3 && root.count >= 2 {
-                if let lastChar = root.last, !lastChar.isVowel {
+                if let lastChar = root.last, !Self.isVowel(lastChar) {
                     // Short root with single final consonant — sometimes doubled
                     // Only apply for specific suffixes where doubling is common
                     if suffix == "het" || suffix == "bar" {
@@ -3888,6 +3888,20 @@ actor SwedishMorphologyEngine {
         }
 
         return derivatives
+    }
+
+    private static func isVowel(_ character: Character) -> Bool {
+        "aeiouyåäöAEIOUYÅÄÖ".contains(character)
+    }
+
+    private static func analyzeEmotionalValence(_ text: String) -> (valence: Double, arousal: Double, emotion: String) {
+        let lower = text.lowercased()
+        let positive = ["glad", "lycka", "hopp", "kärlek", "stolt", "bra"].filter { lower.contains($0) }.count
+        let negative = ["ledsen", "arg", "rädd", "oro", "dålig", "hat"].filter { lower.contains($0) }.count
+        let valence = max(-1.0, min(1.0, Double(positive - negative) * 0.25))
+        let arousal = min(1.0, 0.2 + Double(positive + negative) * 0.15)
+        let emotion = valence >= 0.2 ? "positiv" : (valence <= -0.2 ? "negativ" : "neutral")
+        return (valence, arousal, emotion)
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -4069,9 +4083,9 @@ actor SwedishMorphologyEngine {
             risingAction = Array(sentences[chunkSize..<min(chunkSize * 2, sentences.count)])
             if sentences.count > chunkSize * 2 { climax = Array(sentences[chunkSize * 2..<min(chunkSize * 3, sentences.count)]) }
             if sentences.count > chunkSize * 3 { fallingAction = Array(sentences[chunkSize * 3..<min(chunkSize * 4, sentences.count)]) }
-            if sentences.count > chunkSize * 4 { resolution = Array(sentences[chunkSize * 4...]) }
+            if sentences.count > chunkSize * 4 { resolution = Array(sentences[(chunkSize * 4)..<sentences.count]) }
         }
-        let arc = NarrativeArc(expedition: exposition, risingAction: risingAction, climax: climax, fallingAction: fallingAction, resolution: resolution)
+        let arc = NarrativeArc(exposition: exposition, risingAction: risingAction, climax: climax, fallingAction: fallingAction, resolution: resolution)
 
         var temporalMarkers: [TemporalMarker] = []
         for (idx, s) in sentences.enumerated() {
@@ -4104,7 +4118,7 @@ actor SwedishMorphologyEngine {
         else if !temporalMarkers.isEmpty { narrativeType = .linear }
         else { narrativeType = .unknown }
 
-        let arcElements = [exposition, risingAction, climax, fallingAction, resolution].filter { !$0 }.count
+        let arcElements = [exposition, risingAction, climax, fallingAction, resolution].filter { !$0.isEmpty }.count
         let plotCoherence = min(1.0, Double(arcElements) / 5.0 * 0.6 + (temporalMarkers.isEmpty ? 0.2 : 0.4))
         let creativityBoost = min(0.04, Double(arcElements) * 0.004 + (hasTemporalShifts ? 0.01 : 0.0))
         let comprehensionBoost = min(0.03, Double(perspectives.count) * 0.003 + (arc.arcComplete ? 0.01 : 0.0))
@@ -4116,7 +4130,7 @@ actor SwedishMorphologyEngine {
 
     struct RhetoricalDevice: Identifiable, Codable {
         let id = UUID(); let type: RhetoricalDeviceType; let text: String; let explanation: String; let positions: [Int]; let strength: Double
-        enum RhetoricalDeviceType: String, CaseIterable {
+        enum RhetoricalDeviceType: String, CaseIterable, Codable {
             case anaphora = "anafor"; case epistrophe = "epifor"; case chiasmus = "chiasm"; case parallelism = "parallelism"
             case tricolon = "trikolon"; case rhetoricalQuestion = "retorisk fråga"; case litotes = "litotes"
             case hyperbole = "hyperbol"; case alliteration = "allitteration"; case assonance = "assonans"
@@ -4573,7 +4587,7 @@ actor SwedishMorphologyEngine {
 
         var perSentence: [SentenceSentiment] = []
         for (idx, sentence) in sentences.enumerated() {
-            let result = analyzeEmotionalValence(sentence)
+            let result = Self.analyzeEmotionalValence(sentence)
             perSentence.append(SentenceSentiment(sentence: sentence, index: idx, valence: result.valence, arousal: result.arousal, emotion: result.emotion))
         }
 
@@ -4630,7 +4644,7 @@ actor SwedishMorphologyEngine {
 
     struct SemanticRole: Identifiable { let id = UUID(); let predicate: String; let roles: [RoleFiller]; let sentence: String; let confidence: Double }
     struct RoleFiller: Codable { let role: SemanticRoleType; let filler: String; let position: String; let confidence: Double }
-    enum SemanticRoleType: String, CaseIterable { case agent = "agens"; case patient = "patiens"; case instrument = "instrument"; case source = "källa"; case goal = "mål"; case location = "lokal"; case time = "tid"; case manner = "sätt"; case cause = "orsak"; case experiencer = "experiens"; case beneficiary = "gynnare" }
+    enum SemanticRoleType: String, CaseIterable, Codable { case agent = "agens"; case patient = "patiens"; case instrument = "instrument"; case source = "källa"; case goal = "mål"; case location = "lokal"; case time = "tid"; case manner = "sätt"; case cause = "orsak"; case experiencer = "experiens"; case beneficiary = "gynnare" }
 
     private static let agentPreps: Set<String> = ["av", "genom", "med hjälp av"]
     private static let sourcePreps: Set<String> = ["från", "ur", "av", "ifrån"]
@@ -5762,7 +5776,7 @@ actor SwedishWSDEngine {
     func disambiguateWithEmbeddings(_ word: String, context: String) async -> DisambiguationResult? {
         guard let senses = senseDatabase[word], !senses.isEmpty else { return nil }
         let contextEmb = await NeuralEngineOrchestrator.shared.embed(context)
-        guard !contextEmb.isEmpty else { return disambiguate(context).first(where: { $0.word == word }) }
+        guard !contextEmb.isEmpty else { return await disambiguate(context).first(where: { $0.word == word }) }
         var bestSense: WordSense? = nil, bestScore: Double = -1.0
         for sense in senses {
             let senseText = "\(sense.definition). \(sense.examples.joined(separator: ". "))"
@@ -6499,7 +6513,7 @@ struct SwedishAnalysis {
     var anaphoraResolutions: [AnaphoraResolution] = []
 
     // v16: Empty analysis for fast-path (greetings etc)
-    static let empty = SwedishAnalysis(
+    nonisolated static let empty = SwedishAnalysis(
         originalText: "",
         morphemes: [],
         disambiguations: [],
@@ -6784,8 +6798,8 @@ extension SwedishLanguageCore {
         // Create nodes from fact subjects (words/concepts Eon knows)
         var wordSet: Set<String> = []
         for fact in facts.prefix(200) {
-            let words = fact.subject.components(separatedBy: .whitespacesAndNewlines)
-                .map { $0.lowercased().trimmingCharacters(in: .punctuationCharacters) }
+            let words = fact.subject.components(separatedBy: CharacterSet.whitespacesAndNewlines)
+                .map { $0.lowercased().trimmingCharacters(in: CharacterSet.punctuationCharacters) }
                 .filter { $0.count > 2 }
             for word in words {
                 if wordSet.insert(word).inserted {
@@ -6800,7 +6814,7 @@ extension SwedishLanguageCore {
         // Synonymy/antonymy from fact predicates
         for fact in facts.prefix(200) {
             if fact.predicate.contains("synonym") || fact.predicate.contains("liknande") {
-                let parts = fact.object.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                let parts = fact.object.components(separatedBy: ",").map { $0.trimmingCharacters(in: CharacterSet.whitespaces) }
                 if parts.count >= 2 {
                     edges.append(WordEdge(from: parts[0], to: parts[1], edgeType: .synonymy, weight: 0.8))
                 }
@@ -6851,7 +6865,7 @@ extension SwedishLanguageCore {
             }
             return d
         }()
-        let connectedNodes = degreeMap.keys.intersection(allWords).count
+        let connectedNodes = Set(degreeMap.keys).intersection(allWords).count
         let avgDegree = allWords.isEmpty ? 0 : Double(edges.count * 2) / Double(allWords.count)
         let maxEdges = allWords.count * (allWords.count - 1) / 2
         let density = maxEdges > 0 ? Double(edges.count) / Double(maxEdges) : 0
@@ -6904,8 +6918,8 @@ extension SwedishLanguageCore {
         // Collect Swedish words Eon knows
         var candidateWords: [String] = []
         for fact in facts {
-            let words = fact.subject.components(separatedBy: .whitespacesAndNewlines)
-                .map { $0.lowercased().trimmingCharacters(in: .punctuationCharacters) }
+            let words = fact.subject.components(separatedBy: CharacterSet.whitespacesAndNewlines)
+                .map { $0.lowercased().trimmingCharacters(in: CharacterSet.punctuationCharacters) }
                 .filter { $0.count >= 3 && $0.count <= 12 && $0.allSatisfy { $0.isLetter } }
             candidateWords.append(contentsOf: words)
         }
@@ -6936,8 +6950,9 @@ extension SwedishLanguageCore {
             for (rowIdx, row) in grid.enumerated() {
                 for (colIdx, cell) in row.enumerated() {
                     if let existingChar = cell, let wordCharIdx = word.firstIndex(of: existingChar) {
+                        let wordOffset = word.distance(from: word.startIndex, to: wordCharIdx)
                         // Try to place word vertically through this position
-                        let startRow = rowIdx - wordCharIdx
+                        let startRow = rowIdx - wordOffset
                         guard startRow >= 0 && startRow + word.count <= gridSize else { continue }
 
                         // Check if placement is valid
